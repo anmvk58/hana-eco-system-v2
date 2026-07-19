@@ -3,9 +3,10 @@ from datetime import datetime
 from fastapi import HTTPException, status
 from sqlalchemy import or_, select
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from app.models.product import Product
+from app.models.product_category import ProductCategory
 from app.schemas.product import ProductCreate, ProductUpdate
 
 
@@ -16,7 +17,7 @@ def list_products(
     skip: int = 0,
     limit: int = 50,
 ) -> list[Product]:
-    stmt = select(Product)
+    stmt = select(Product).options(selectinload(Product.category))
     if not include_deleted:
         stmt = stmt.where(Product.deleted_at.is_(None))
     if search:
@@ -27,7 +28,7 @@ def list_products(
 
 
 def get_product(db: Session, product_id: int, include_deleted: bool = False) -> Product:
-    stmt = select(Product).where(Product.id == product_id)
+    stmt = select(Product).options(selectinload(Product.category)).where(Product.id == product_id)
     if not include_deleted:
         stmt = stmt.where(Product.deleted_at.is_(None))
     product = db.scalar(stmt)
@@ -36,7 +37,16 @@ def get_product(db: Session, product_id: int, include_deleted: bool = False) -> 
     return product
 
 
+def validate_category(db: Session, category_id: int | None) -> None:
+    if category_id is None:
+        return
+    category = db.scalar(select(ProductCategory).where(ProductCategory.id == category_id, ProductCategory.deleted_at.is_(None)))
+    if not category:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product category not found")
+
+
 def create_product(db: Session, payload: ProductCreate) -> Product:
+    validate_category(db, payload.category_id)
     product = Product(**payload.model_dump())
     db.add(product)
     try:
@@ -50,7 +60,10 @@ def create_product(db: Session, payload: ProductCreate) -> Product:
 
 def update_product(db: Session, product_id: int, payload: ProductUpdate) -> Product:
     product = get_product(db, product_id)
-    for field, value in payload.model_dump(exclude_unset=True).items():
+    update_data = payload.model_dump(exclude_unset=True)
+    if "category_id" in update_data:
+        validate_category(db, update_data["category_id"])
+    for field, value in update_data.items():
         setattr(product, field, value)
     try:
         db.commit()
@@ -65,4 +78,3 @@ def soft_delete_product(db: Session, product_id: int) -> None:
     product = get_product(db, product_id)
     product.deleted_at = datetime.utcnow()
     db.commit()
-

@@ -4,13 +4,13 @@ from typing import Any
 
 from fastapi import HTTPException, status
 from fastapi.encoders import jsonable_encoder
-from sqlalchemy import func, select
+from sqlalchemy import select, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
 from app.models.customer import Customer
 from app.models.enums import ExtraChargeType, InvoiceHistoryAction, InvoiceStatus
-from app.models.invoice import Invoice, InvoiceExtraCharge, InvoiceHistory, InvoiceItem
+from app.models.invoice import Invoice, InvoiceCodeSequence, InvoiceExtraCharge, InvoiceHistory, InvoiceItem
 from app.models.product import Product
 from app.models.user import User
 from app.schemas.invoice import InvoiceCreate, InvoiceExtraChargeCreate, InvoiceItemCreate, InvoiceUpdate
@@ -39,12 +39,48 @@ def get_actor(db: Session, user_id: int | None, user_name: str | None) -> tuple[
     return user_id, user_name
 
 
-def generate_invoice_code(db: Session, sold_at: datetime | None = None) -> str:
+def parse_invoice_sequence_number(code: str, date_key: str) -> int | None:
+    prefix = f"HD-{date_key}-"
+    if not code.startswith(prefix):
+        return None
+    suffix = code.removeprefix(prefix)
+    return int(suffix) if suffix.isdigit() else None
+
+
+def get_existing_max_sequence(db: Session, date_key: str) -> int:
+    codes = db.scalars(select(Invoice.code).where(Invoice.code.like(f"HD-{date_key}-%"))).all()
+    numbers = [number for code in codes if (number := parse_invoice_sequence_number(code, date_key)) is not None]
+    return max(numbers, default=0)
+
+
+def ensure_invoice_sequence_row(db: Session, date_key: str) -> None:
+    initial_next_value = get_existing_max_sequence(db, date_key) + 1
+    db.execute(
+        text(
+            """
+            INSERT INTO invoice_code_sequences (date_key, next_value, created_at, updated_at)
+            VALUES (:date_key, :next_value, UTC_TIMESTAMP(), UTC_TIMESTAMP())
+            ON DUPLICATE KEY UPDATE date_key = date_key
+            """
+        ),
+        {"date_key": date_key, "next_value": initial_next_value},
+    )
+
+
+def reserve_invoice_code(db: Session, sold_at: datetime | None = None) -> str:
     current = sold_at or datetime.utcnow()
-    start = datetime.combine(current.date(), time.min)
-    end = datetime.combine(current.date(), time.max)
-    count = db.scalar(select(func.count(Invoice.id)).where(Invoice.created_at >= start, Invoice.created_at <= end)) or 0
-    return f"HD{current:%Y%m%d}{count + 1:04d}"
+    date_key = current.strftime("%Y%m%d")
+    ensure_invoice_sequence_row(db, date_key)
+    sequence = db.scalar(select(InvoiceCodeSequence).where(InvoiceCodeSequence.date_key == date_key).with_for_update())
+    if not sequence:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Invoice sequence not found")
+
+    while True:
+        code = f"HD-{date_key}-{sequence.next_value:04d}"
+        sequence.next_value += 1
+        existing = db.scalar(select(Invoice.id).where(Invoice.code == code))
+        if not existing:
+            return code
 
 
 def validate_customer(db: Session, customer_id: int | None) -> None:
@@ -53,6 +89,12 @@ def validate_customer(db: Session, customer_id: int | None) -> None:
     customer = db.scalar(select(Customer).where(Customer.id == customer_id, Customer.deleted_at.is_(None)))
     if not customer:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Customer not found")
+
+
+def same_datetime_to_second(left: datetime | None, right: datetime | None) -> bool:
+    if left is None or right is None:
+        return left is right
+    return left.replace(microsecond=0) == right.replace(microsecond=0)
 
 
 def get_active_product(db: Session, product_id: int) -> Product:
@@ -228,7 +270,7 @@ def create_invoice(db: Session, payload: InvoiceCreate, user_id: int | None, use
     sold_at = payload.sold_at or datetime.utcnow()
     try:
         invoice = Invoice(
-            code=payload.code or generate_invoice_code(db, sold_at),
+            code=payload.code or reserve_invoice_code(db, sold_at),
             customer_id=payload.customer_id,
             status=payload.status,
             sold_at=sold_at,
@@ -263,16 +305,17 @@ def create_invoice(db: Session, payload: InvoiceCreate, user_id: int | None, use
 
 def update_invoice(db: Session, invoice_id: int, payload: InvoiceUpdate, user_id: int | None, user_name: str | None) -> Invoice:
     invoice = get_invoice(db, invoice_id)
-    validate_customer(db, payload.customer_id)
+    if payload.customer_id != invoice.customer_id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cannot change invoice customer")
+    if payload.sold_at is not None and not same_datetime_to_second(payload.sold_at, invoice.sold_at):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cannot change invoice sold time")
     before_data = snapshot_invoice(invoice)
 
     try:
         if invoice.status == InvoiceStatus.completed:
             apply_stock_change(db, invoice.items, direction=1)
 
-        invoice.customer_id = payload.customer_id
         invoice.status = payload.status
-        invoice.sold_at = payload.sold_at or invoice.sold_at
         invoice.note = payload.note
         invoice.items.clear()
         invoice.extra_charges.clear()

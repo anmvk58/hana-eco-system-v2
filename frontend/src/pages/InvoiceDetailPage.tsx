@@ -6,7 +6,7 @@ import { api } from "../api/client";
 import { EmptyState } from "../components/EmptyState";
 import { StatusBadge } from "../components/StatusBadge";
 import type { Invoice, InvoiceHistory } from "../types";
-import { dateTime, money } from "../utils/format";
+import { dateTime, numberText } from "../utils/format";
 
 export function InvoiceDetailPage() {
   const { invoiceId } = useParams();
@@ -31,12 +31,31 @@ export function InvoiceDetailPage() {
   if (error) return <div className="alert error">{error}</div>;
   if (!invoice) return <EmptyState title="Đang tải hóa đơn" />;
 
+  const customerName = invoice.customer?.name ?? "Khách lẻ";
+  const customerPhone = invoice.customer?.phone || "-";
+  const customerAddress = invoice.customer?.address || "-";
+  const soldDate = new Intl.DateTimeFormat("vi-VN", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  }).format(new Date(invoice.sold_at));
+  const soldTime = new Intl.DateTimeFormat("vi-VN", {
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date(invoice.sold_at));
+  const shippingFee = invoice.extra_charges.find((charge) => charge.charge_type === "shipping")?.amount ?? "0";
+  const packingFee = invoice.extra_charges.find((charge) => charge.charge_type === "packing")?.amount ?? "0";
+  const otherFees = invoice.extra_charges
+    .filter((charge) => charge.charge_type === "other")
+    .reduce((sum, charge) => sum + Number(charge.amount), 0);
+  const barcodeBars = invoice.code.replace(/\D/g, "").slice(-24).padStart(24, "0").split("");
+
   return (
     <div className="page-stack invoice-detail">
       <section className="detail-header">
         <div>
           <h2>{invoice.code}</h2>
-          <span>{dateTime(invoice.sold_at)} · {invoice.customer?.name ?? "Khách lẻ"}</span>
+          <span>{dateTime(invoice.sold_at)} · {customerName}</span>
         </div>
         <div className="detail-actions">
           <StatusBadge status={invoice.status} />
@@ -51,55 +70,62 @@ export function InvoiceDetailPage() {
         </div>
       </section>
 
-      <section className="print-area">
-        <div className="receipt-heading">
-          <h2>HANA SHOP</h2>
-          <span>Hóa đơn bán hàng</span>
+      <section className="print-area receipt-k80">
+        <div className="k80-shop-name">HANA FRUITS</div>
+        <div className="k80-phone">Điện thoại: 0788.349.222</div>
+
+        <div className="k80-title">
+          <strong>HÓA ĐƠN BÁN HÀNG</strong>
+          <span>Số HĐ: {invoice.code}</span>
+          <span>Ngày {soldDate}</span>
+          <span>{soldTime}</span>
         </div>
-        <div className="receipt-meta">
-          <div>
-            <span>Mã hóa đơn</span>
-            <strong>{invoice.code}</strong>
-          </div>
-          <div>
-            <span>Khách hàng</span>
-            <strong>{invoice.customer?.name ?? "Khách lẻ"}</strong>
-          </div>
-          <div>
-            <span>Số điện thoại</span>
-            <strong>{invoice.customer?.phone ?? ""}</strong>
-          </div>
-          <div>
-            <span>Ngày bán</span>
-            <strong>{dateTime(invoice.sold_at)}</strong>
-          </div>
+
+        <div className="k80-customer">
+          <div>Khách hàng: {customerName}</div>
+          <div>SĐT: {customerPhone}</div>
+          <div>Địa chỉ: {customerAddress}</div>
+          <div>Ghi chú: {invoice.note || ""}</div>
         </div>
-        <table className="data-table receipt-table">
-          <thead>
-            <tr>
-              <th>Sản phẩm</th>
-              <th>SL</th>
-              <th>Đơn giá</th>
-              <th>Thành tiền</th>
-            </tr>
-          </thead>
-          <tbody>
-            {invoice.items.map((item) => (
-              <tr key={item.id}>
-                <td>{item.product_code} - {item.product_name}</td>
-                <td className="numeric">{item.quantity}</td>
-                <td className="numeric">{money(item.unit_price)}</td>
-                <td className="numeric">{money(item.line_total)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        <div className="receipt-total">
-          <div><span>Tổng tiền hàng</span><strong>{money(invoice.subtotal)}</strong></div>
-          {invoice.extra_charges.map((charge) => (
-            <div key={charge.id}><span>{charge.name}</span><strong>{money(charge.amount)}</strong></div>
+
+        <div className="k80-items">
+          <div className="k80-item-head">
+            <strong>Đơn giá</strong>
+            <strong>SL</strong>
+            <strong>Thành tiền</strong>
+          </div>
+          {invoice.items.map((item) => (
+            <div className="k80-item" key={item.id}>
+              <div className="k80-item-name">{item.product_name}</div>
+              <div className="k80-item-values">
+                <span>{numberText(item.unit_price)}</span>
+                <span>{numberText(item.quantity, 3)}</span>
+                <span>{numberText(item.line_total)}</span>
+              </div>
+            </div>
           ))}
-          <div className="summary-total"><span>Tổng thanh toán</span><strong>{money(invoice.total_amount)}</strong></div>
+        </div>
+
+        <div className="k80-totals">
+          <div><span>Tổng tiền hàng:</span><strong>{numberText(invoice.subtotal)}</strong></div>
+          <div><span>Giảm giá:</span><strong>0</strong></div>
+          <div><span>Phí ship:</span><strong>{numberText(shippingFee)}</strong></div>
+          {Number(packingFee) > 0 ? <div><span>Phí đóng hàng:</span><strong>{numberText(packingFee)}</strong></div> : null}
+          {otherFees > 0 ? <div><span>Phụ thu khác:</span><strong>{numberText(otherFees)}</strong></div> : null}
+          <div><span>Tổng thanh toán:</span><strong>{numberText(invoice.total_amount)}</strong></div>
+        </div>
+
+        <div className="k80-notes">
+          <p>- Bảo hành 100% nếu có vấn đề xảy ra khi nhận hàng.</p>
+          <p>- Vui lòng kiểm tra sản phẩm và báo shop tình trạng gặp hỏng trong ngày.</p>
+          <p>- Không nhận bảo hành sản phẩm qua ngày, xin quý khách thông cảm.</p>
+        </div>
+
+        <div className="k80-thanks">Cảm ơn quý khách và hẹn gặp lại!</div>
+        <div className="k80-barcode" aria-label={`Barcode ${invoice.code}`}>
+          {barcodeBars.map((digit, index) => (
+            <span key={`${digit}-${index}`} style={{ width: `${Number(digit) % 3 === 0 ? 1 : Number(digit) % 3 === 1 ? 2 : 3}px` }} />
+          ))}
         </div>
       </section>
 
@@ -130,4 +156,3 @@ export function InvoiceDetailPage() {
     </div>
   );
 }
-

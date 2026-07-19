@@ -26,6 +26,8 @@ export interface Product {
   id: number;
   code: string;
   name: string;
+  category_id?: number | null;
+  category?: ProductCategory | null;
   unit: string;
   sale_price: string;
   cost_price: string;
@@ -39,11 +41,26 @@ export interface Product {
 export interface ProductPayload {
   code: string;
   name: string;
+  category_id?: number | null;
   unit: string;
   sale_price: string;
   cost_price: string;
   stock_quantity: string;
   status: ProductStatus;
+}
+
+export interface ProductCategory {
+  id: number;
+  name: string;
+  note?: string | null;
+  created_at: string;
+  updated_at: string;
+  deleted_at?: string | null;
+}
+
+export interface ProductCategoryPayload {
+  name: string;
+  note?: string;
 }
 
 export interface InvoiceItemPayload {
@@ -56,6 +73,24 @@ export interface InvoiceExtraChargePayload {
   charge_type: ExtraChargeType;
   name?: string;
   amount: string;
+  note?: string;
+}
+
+export interface ExtraChargeSetting {
+  id: number;
+  charge_type: ExtraChargeType;
+  name: string;
+  default_amount: string;
+  is_active: boolean;
+  note?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ExtraChargeSettingPayload {
+  name?: string;
+  default_amount?: string;
+  is_active?: boolean;
   note?: string;
 }
 
@@ -117,4 +152,3 @@ export interface InvoiceHistory {
   after_data?: Record<string, unknown> | null;
   created_at: string;
 }
-

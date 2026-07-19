@@ -1,11 +1,16 @@
 import type {
   Customer,
   CustomerPayload,
+  ExtraChargeSetting,
+  ExtraChargeSettingPayload,
+  ExtraChargeType,
   Invoice,
   InvoiceHistory,
   InvoicePayload,
   InvoiceStatus,
   Product,
+  ProductCategory,
+  ProductCategoryPayload,
   ProductPayload,
 } from "../types";
 
@@ -66,6 +71,19 @@ export const api = {
       request<Product>(`/products/${id}`, { method: "PUT", body: JSON.stringify(payload) }),
     remove: (id: number) => request<void>(`/products/${id}`, { method: "DELETE" }),
   },
+  productCategories: {
+    list: () => request<ProductCategory[]>("/product-categories"),
+    create: (payload: ProductCategoryPayload) =>
+      request<ProductCategory>("/product-categories", { method: "POST", body: JSON.stringify(payload) }),
+    update: (id: number, payload: Partial<ProductCategoryPayload>) =>
+      request<ProductCategory>(`/product-categories/${id}`, { method: "PUT", body: JSON.stringify(payload) }),
+    remove: (id: number) => request<void>(`/product-categories/${id}`, { method: "DELETE" }),
+  },
+  extraChargeSettings: {
+    list: () => request<ExtraChargeSetting[]>("/extra-charge-settings"),
+    update: (chargeType: ExtraChargeType, payload: ExtraChargeSettingPayload) =>
+      request<ExtraChargeSetting>(`/extra-charge-settings/${chargeType}`, { method: "PUT", body: JSON.stringify(payload) }),
+  },
   invoices: {
     list: (filters?: { status?: InvoiceStatus; customer_id?: number; from_date?: string; to_date?: string }) =>
       request<Invoice[]>("/invoices", {}, filters),
@@ -78,4 +96,3 @@ export const api = {
     print: (id: number) => request<Invoice>(`/invoices/${id}/print`),
   },
 };
-

@@ -21,11 +21,23 @@
 | id | integer | Primary key |
 | code | varchar(40) | Unique, indexed |
 | name | varchar(240) | Indexed |
+| category_id | integer | FK product_categories.id, nullable |
 | unit | varchar(40) | Required |
 | sale_price | numeric(14,2) | Required |
 | cost_price | numeric(14,2) | Required |
 | stock_quantity | numeric(14,3) | Required |
 | status | enum(active, inactive) | Required |
+| created_at | datetime | Required |
+| updated_at | datetime | Required |
+| deleted_at | datetime | Nullable, soft delete |
+
+## product_categories
+
+| Column | Type | Notes |
+| --- | --- | --- |
+| id | integer | Primary key |
+| name | varchar(160) | Unique, indexed |
+| note | text | Nullable |
 | created_at | datetime | Required |
 | updated_at | datetime | Required |
 | deleted_at | datetime | Nullable, soft delete |
@@ -46,6 +58,16 @@
 | created_at | datetime | Required |
 | updated_at | datetime | Required |
 | deleted_at | datetime | Nullable, soft delete |
+
+## invoice_code_sequences
+
+| Column | Type | Notes |
+| --- | --- | --- |
+| id | integer | Primary key |
+| date_key | varchar(8) | Unique, dạng YYYYMMDD |
+| next_value | integer | Số thứ tự hóa đơn tiếp theo trong ngày |
+| created_at | datetime | Required |
+| updated_at | datetime | Required |
 
 ## invoice_items
 
@@ -100,4 +122,3 @@
 | is_active | boolean | Required |
 | created_at | datetime | Required |
 | updated_at | datetime | Required |
-

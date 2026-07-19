@@ -6,7 +6,6 @@ import {
   Gauge,
   Menu,
   PlusCircle,
-  Search,
   Users,
 } from "lucide-react";
 import type { ReactNode } from "react";
@@ -34,6 +33,7 @@ export function Layout({ children }: { children: ReactNode }) {
   const location = useLocation();
   const navigate = useNavigate();
   const title = routeTitles[location.pathname] ?? (location.pathname.startsWith("/invoices/") ? "Chi tiết hóa đơn" : "Hana POS");
+  const isSalesPage = location.pathname === "/invoices/new";
 
   return (
     <div className="app-shell">
@@ -69,20 +69,17 @@ export function Layout({ children }: { children: ReactNode }) {
               <span className="breadcrumb">Hana POS / {title}</span>
             </div>
           </div>
-          <div className="global-actions">
-            <div className="global-search">
-              <Search size={16} />
-              <input placeholder="Tìm nhanh mã đơn, khách hàng, sản phẩm" />
+          {!isSalesPage ? (
+            <div className="global-actions">
+              <button className="primary-button" type="button" onClick={() => navigate("/invoices/new")}>
+                <FileText size={17} />
+                Tạo hóa đơn
+              </button>
             </div>
-            <button className="primary-button" type="button" onClick={() => navigate("/invoices/new")}>
-              <FileText size={17} />
-              Tạo hóa đơn
-            </button>
-          </div>
+          ) : null}
         </header>
         <div className="content">{children}</div>
       </main>
     </div>
   );
 }
-

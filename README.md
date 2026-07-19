@@ -9,8 +9,8 @@ MVP cho phần mềm bán hàng web app đơn giản, lấy cảm hứng từ lu
 - `backend/app/services`: business logic, tính tiền invoice, snapshot audit, điều chỉnh tồn kho.
 - `backend/app/api/routers`: REST API theo từng module.
 - `frontend/src`: React UI với sidebar, bảng quản lý, tạo hóa đơn, chi tiết hóa đơn, báo cáo.
-- Database mặc định khi chạy local là SQLite qua `DATABASE_URL=sqlite:///./hana_pos.db`.
-- Docker Compose chạy frontend, API và PostgreSQL.
+- Database mặc định là MySQL qua `backend/.env`.
+- Docker Compose chạy frontend, API và MySQL.
 
 ## Quan hệ database
 
@@ -33,6 +33,11 @@ MVP cho phần mềm bán hàng web app đơn giản, lấy cảm hứng từ lu
 - `GET /api/products/{id}`
 - `PUT /api/products/{id}`
 - `DELETE /api/products/{id}`
+- `GET /api/product-categories`
+- `POST /api/product-categories`
+- `GET /api/product-categories/{id}`
+- `PUT /api/product-categories/{id}`
+- `DELETE /api/product-categories/{id}`
 - `GET /api/invoices?status=completed&from_date=2026-06-01&to_date=2026-06-30`
 - `POST /api/invoices`
 - `GET /api/invoices/{id}`
@@ -45,7 +50,9 @@ Swagger UI: `http://localhost:8000/docs`
 
 Frontend: `http://localhost:5173`
 
-## Chạy local bằng SQLite
+## Chạy backend local bằng MySQL
+
+Trước hết chạy MySQL bằng Docker Compose hoặc một MySQL local tương thích với thông tin trong `backend/.env`.
 
 ```powershell
 cd backend
@@ -55,7 +62,11 @@ pip install -r requirements.txt
 uvicorn app.main:app --reload
 ```
 
-API chạy tại `http://localhost:8000`.
+API chạy tại `http://localhost:8000`. Backend sẽ đọc `backend/.env`:
+
+```env
+DATABASE_URL=mysql+pymysql://hana:hana_password@localhost:3306/hana_pos?charset=utf8mb4
+```
 
 ## Chạy frontend local
 
@@ -77,7 +88,7 @@ Docker Compose sẽ chạy:
 
 - FastAPI tại `http://localhost:8000`
 - React frontend tại `http://localhost:5173`
-- PostgreSQL tại `localhost:5432`
+- MySQL tại `localhost:3306`
 
 ## Ví dụ tạo hóa đơn
 

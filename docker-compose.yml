@@ -16,7 +16,7 @@ services:
     build:
       context: ./backend
     environment:
-      DATABASE_URL: postgresql+psycopg2://hana:hana_password@db:5432/hana_pos
+      DATABASE_URL: mysql+pymysql://hana:hana_password@db:3306/hana_pos?charset=utf8mb4
       CORS_ORIGINS: '["http://localhost:5173","http://127.0.0.1:5173","http://localhost:3000"]'
     ports:
       - "8000:8000"
@@ -27,20 +27,21 @@ services:
       - ./backend/app:/app/app
 
   db:
-    image: postgres:16-alpine
+    image: mysql:8.4
     environment:
-      POSTGRES_DB: hana_pos
-      POSTGRES_USER: hana
-      POSTGRES_PASSWORD: hana_password
+      MYSQL_DATABASE: hana_pos
+      MYSQL_USER: hana
+      MYSQL_PASSWORD: hana_password
+      MYSQL_ROOT_PASSWORD: root_password
     ports:
-      - "5432:5432"
+      - "3306:3306"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U hana -d hana_pos"]
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u hana --password=hana_password --silent"]
       interval: 5s
       timeout: 3s
       retries: 10
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - mysql_data:/var/lib/mysql
 
 volumes:
-  postgres_data:
+  mysql_data:

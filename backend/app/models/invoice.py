@@ -1,7 +1,7 @@
 from datetime import datetime
 from decimal import Decimal
 
-from sqlalchemy import DateTime, Enum, ForeignKey, JSON, Numeric, String, Text
+from sqlalchemy import DateTime, Enum, ForeignKey, Integer, JSON, Numeric, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -26,6 +26,14 @@ class Invoice(Base, TimestampMixin, SoftDeleteMixin):
     items = relationship("InvoiceItem", back_populates="invoice", cascade="all, delete-orphan")
     extra_charges = relationship("InvoiceExtraCharge", back_populates="invoice", cascade="all, delete-orphan")
     histories = relationship("InvoiceHistory", back_populates="invoice", cascade="all, delete-orphan")
+
+
+class InvoiceCodeSequence(Base, TimestampMixin):
+    __tablename__ = "invoice_code_sequences"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    date_key: Mapped[str] = mapped_column(String(8), unique=True, index=True, nullable=False)
+    next_value: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
 
 
 class InvoiceItem(Base, TimestampMixin):
@@ -73,4 +81,3 @@ class InvoiceHistory(Base):
 
     invoice = relationship("Invoice", back_populates="histories")
     changed_by_user = relationship("User", back_populates="invoice_histories")
-
