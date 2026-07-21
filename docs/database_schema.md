@@ -64,7 +64,7 @@
 | Column | Type | Notes |
 | --- | --- | --- |
 | id | integer | Primary key |
-| date_key | varchar(8) | Unique, dạng YYYYMMDD |
+| date_key | varchar(8) | Unique, dạng YYMMDD |
 | next_value | integer | Số thứ tự hóa đơn tiếp theo trong ngày |
 | created_at | datetime | Required |
 | updated_at | datetime | Required |

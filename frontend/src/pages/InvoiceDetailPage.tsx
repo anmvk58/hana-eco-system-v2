@@ -1,5 +1,6 @@
 import { Edit, Printer, RotateCcw } from "lucide-react";
-import { useEffect, useState } from "react";
+import JsBarcode from "jsbarcode";
+import { useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 
 import { api } from "../api/client";
@@ -14,6 +15,7 @@ export function InvoiceDetailPage() {
   const [invoice, setInvoice] = useState<Invoice | null>(null);
   const [history, setHistory] = useState<InvoiceHistory[]>([]);
   const [error, setError] = useState("");
+  const barcodeRef = useRef<SVGSVGElement | null>(null);
 
   useEffect(() => {
     async function load() {
@@ -23,6 +25,17 @@ export function InvoiceDetailPage() {
     }
     void load().catch((err) => setError(err instanceof Error ? err.message : "Không tải được hóa đơn"));
   }, [id]);
+
+  useEffect(() => {
+    if (!invoice || !barcodeRef.current) return;
+    JsBarcode(barcodeRef.current, invoice.code, {
+      displayValue: false,
+      format: "CODE128",
+      height: 44,
+      margin: 0,
+      width: 1.4,
+    });
+  }, [invoice]);
 
   function printInvoice() {
     window.print();
@@ -48,8 +61,6 @@ export function InvoiceDetailPage() {
   const otherFees = invoice.extra_charges
     .filter((charge) => charge.charge_type === "other")
     .reduce((sum, charge) => sum + Number(charge.amount), 0);
-  const barcodeBars = invoice.code.replace(/\D/g, "").slice(-24).padStart(24, "0").split("");
-
   return (
     <div className="page-stack invoice-detail">
       <section className="detail-header">
@@ -122,11 +133,7 @@ export function InvoiceDetailPage() {
         </div>
 
         <div className="k80-thanks">Cảm ơn quý khách và hẹn gặp lại!</div>
-        <div className="k80-barcode" aria-label={`Barcode ${invoice.code}`}>
-          {barcodeBars.map((digit, index) => (
-            <span key={`${digit}-${index}`} style={{ width: `${Number(digit) % 3 === 0 ? 1 : Number(digit) % 3 === 1 ? 2 : 3}px` }} />
-          ))}
-        </div>
+        <svg className="k80-barcode" ref={barcodeRef} aria-label={`Barcode ${invoice.code}`} role="img" />
       </section>
 
       <section className="history-panel">

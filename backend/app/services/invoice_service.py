@@ -40,7 +40,7 @@ def get_actor(db: Session, user_id: int | None, user_name: str | None) -> tuple[
 
 
 def parse_invoice_sequence_number(code: str, date_key: str) -> int | None:
-    prefix = f"HD-{date_key}-"
+    prefix = f"HD{date_key}"
     if not code.startswith(prefix):
         return None
     suffix = code.removeprefix(prefix)
@@ -48,7 +48,7 @@ def parse_invoice_sequence_number(code: str, date_key: str) -> int | None:
 
 
 def get_existing_max_sequence(db: Session, date_key: str) -> int:
-    codes = db.scalars(select(Invoice.code).where(Invoice.code.like(f"HD-{date_key}-%"))).all()
+    codes = db.scalars(select(Invoice.code).where(Invoice.code.like(f"HD{date_key}%"))).all()
     numbers = [number for code in codes if (number := parse_invoice_sequence_number(code, date_key)) is not None]
     return max(numbers, default=0)
 
@@ -69,14 +69,14 @@ def ensure_invoice_sequence_row(db: Session, date_key: str) -> None:
 
 def reserve_invoice_code(db: Session, sold_at: datetime | None = None) -> str:
     current = sold_at or datetime.utcnow()
-    date_key = current.strftime("%Y%m%d")
+    date_key = current.strftime("%y%m%d")
     ensure_invoice_sequence_row(db, date_key)
     sequence = db.scalar(select(InvoiceCodeSequence).where(InvoiceCodeSequence.date_key == date_key).with_for_update())
     if not sequence:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Invoice sequence not found")
 
     while True:
-        code = f"HD-{date_key}-{sequence.next_value:04d}"
+        code = f"HD{date_key}{sequence.next_value:04d}"
         sequence.next_value += 1
         existing = db.scalar(select(Invoice.id).where(Invoice.code == code))
         if not existing:

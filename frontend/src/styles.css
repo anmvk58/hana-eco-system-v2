@@ -871,16 +871,11 @@ label {
 }
 
 .k80-barcode {
-  align-items: stretch;
-  display: flex;
-  gap: 1px;
-  height: 11mm;
-  justify-content: center;
-}
-
-.k80-barcode span {
-  background: #000;
   display: block;
+  height: 11mm;
+  margin: 0 auto;
+  max-width: 58mm;
+  width: 58mm;
 }
 
 .receipt-heading {
