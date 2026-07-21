@@ -756,7 +756,8 @@ label {
 
 .receipt-k80 {
   color: #000;
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: Tahoma, "Segoe UI", Arial, sans-serif;
+  font-synthesis: none;
   font-size: 12px;
   line-height: 1.22;
   margin: 0 auto;
@@ -764,24 +765,26 @@ label {
   width: 80mm;
 }
 
-.k80-shop-name {
-  font-size: 18px;
-  font-weight: 900;
-  letter-spacing: 0.5px;
-  margin: 3mm 0 2mm;
-  text-align: center;
+.k80-shop-logo {
+  display: block;
+  height: auto;
+  margin: 1mm auto 2mm;
+  max-height: 23mm;
+  max-width: 73mm;
+  object-fit: contain;
+  width: 73mm;
 }
 
 .k80-phone {
   font-size: 13px;
-  font-weight: 800;
+  font-weight: 700;
   margin-bottom: 5mm;
   text-align: center;
 }
 
 .k80-title {
   font-size: 13px;
-  font-weight: 800;
+  font-weight: 700;
   text-align: center;
 }
 
@@ -847,7 +850,7 @@ label {
 .k80-totals div {
   align-items: center;
   display: flex;
-  font-weight: 800;
+  font-weight: 700;
   justify-content: space-between;
 }
 

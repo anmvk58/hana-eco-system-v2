@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 
 import { api } from "../api/client";
+import posLogo from "../assets/pos_logo2.png";
 import { EmptyState } from "../components/EmptyState";
 import { StatusBadge } from "../components/StatusBadge";
 import type { Invoice, InvoiceHistory } from "../types";
@@ -82,7 +83,7 @@ export function InvoiceDetailPage() {
       </section>
 
       <section className="print-area receipt-k80">
-        <div className="k80-shop-name">HANA FRUITS</div>
+        <img className="k80-shop-logo" src={posLogo} alt="Hana Fruits" />
         <div className="k80-phone">Điện thoại: 0788.349.222</div>
 
         <div className="k80-title">
