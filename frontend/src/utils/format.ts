@@ -53,6 +53,11 @@ export function todayInputValue() {
   return `${now.getFullYear()}-${month}-${day}`;
 }
 
+export function firstDayOfCurrentMonthInputValue() {
+  const today = todayInputValue();
+  return `${today.slice(0, 8)}01`;
+}
+
 export function localTimeValue(date = new Date()) {
   const hours = String(date.getHours()).padStart(2, "0");
   const minutes = String(date.getMinutes()).padStart(2, "0");

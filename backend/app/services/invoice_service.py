@@ -25,9 +25,9 @@ def to_money(value: Decimal) -> Decimal:
 
 def default_charge_name(charge_type: ExtraChargeType) -> str:
     return {
-        ExtraChargeType.shipping: "Phi ship",
-        ExtraChargeType.packing: "Phi dong hang",
-        ExtraChargeType.other: "Phu thu khac",
+        ExtraChargeType.shipping: "Phí ship",
+        ExtraChargeType.packing: "Phí đóng hàng",
+        ExtraChargeType.other: "Phụ thu khác",
     }[charge_type]
 
 
@@ -272,7 +272,7 @@ def create_invoice(db: Session, payload: InvoiceCreate, user_id: int | None, use
         invoice = Invoice(
             code=payload.code or reserve_invoice_code(db, sold_at),
             customer_id=payload.customer_id,
-            status=payload.status,
+            status=InvoiceStatus.created,
             sold_at=sold_at,
             note=payload.note,
         )
@@ -281,8 +281,7 @@ def create_invoice(db: Session, payload: InvoiceCreate, user_id: int | None, use
         recalculate_invoice(invoice)
         db.add(invoice)
         db.flush()
-        if invoice.status == InvoiceStatus.completed:
-            apply_stock_change(db, invoice.items, direction=-1)
+        apply_stock_change(db, invoice.items, direction=-1)
         add_history(
             db,
             invoice,
@@ -305,6 +304,8 @@ def create_invoice(db: Session, payload: InvoiceCreate, user_id: int | None, use
 
 def update_invoice(db: Session, invoice_id: int, payload: InvoiceUpdate, user_id: int | None, user_name: str | None) -> Invoice:
     invoice = get_invoice(db, invoice_id)
+    if invoice.status == InvoiceStatus.cancelled:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Không thể sửa hóa đơn đã hủy")
     if payload.customer_id != invoice.customer_id:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cannot change invoice customer")
     if payload.sold_at is not None and not same_datetime_to_second(payload.sold_at, invoice.sold_at):
@@ -312,10 +313,9 @@ def update_invoice(db: Session, invoice_id: int, payload: InvoiceUpdate, user_id
     before_data = snapshot_invoice(invoice)
 
     try:
-        if invoice.status == InvoiceStatus.completed:
-            apply_stock_change(db, invoice.items, direction=1)
+        apply_stock_change(db, invoice.items, direction=1)
 
-        invoice.status = payload.status
+        invoice.status = InvoiceStatus.created
         invoice.note = payload.note
         invoice.items.clear()
         invoice.extra_charges.clear()
@@ -325,8 +325,7 @@ def update_invoice(db: Session, invoice_id: int, payload: InvoiceUpdate, user_id
         recalculate_invoice(invoice)
         db.flush()
 
-        if invoice.status == InvoiceStatus.completed:
-            apply_stock_change(db, invoice.items, direction=-1)
+        apply_stock_change(db, invoice.items, direction=-1)
 
         after_data = snapshot_invoice(invoice)
         add_history(
@@ -352,7 +351,7 @@ def update_invoice(db: Session, invoice_id: int, payload: InvoiceUpdate, user_id
 def soft_delete_invoice(db: Session, invoice_id: int, user_id: int | None, user_name: str | None, reason: str | None = None) -> None:
     invoice = get_invoice(db, invoice_id)
     before_data = snapshot_invoice(invoice)
-    if invoice.status == InvoiceStatus.completed:
+    if invoice.status == InvoiceStatus.created:
         apply_stock_change(db, invoice.items, direction=1)
     invoice.deleted_at = datetime.utcnow()
     after_data = snapshot_invoice(invoice)
@@ -367,6 +366,34 @@ def soft_delete_invoice(db: Session, invoice_id: int, user_id: int | None, user_
         reason=reason,
     )
     db.commit()
+
+
+def cancel_invoice(db: Session, invoice_id: int, user_id: int, user_name: str, reason: str) -> Invoice:
+    invoice = db.scalar(invoice_query(invoice_id).where(Invoice.deleted_at.is_(None)).with_for_update())
+    if not invoice:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Invoice not found")
+    if invoice.status == InvoiceStatus.cancelled:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Hóa đơn đã được hủy trước đó")
+    before_data = snapshot_invoice(invoice)
+    try:
+        apply_stock_change(db, invoice.items, direction=1)
+        invoice.status = InvoiceStatus.cancelled
+        db.flush()
+        add_history(
+            db,
+            invoice,
+            InvoiceHistoryAction.updated,
+            before_data=before_data,
+            after_data=snapshot_invoice(invoice),
+            user_id=user_id,
+            user_name=user_name,
+            reason=reason,
+        )
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+    return get_invoice(db, invoice.id)
 
 
 def list_invoice_history(db: Session, invoice_id: int) -> list[InvoiceHistory]:

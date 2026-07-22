@@ -3,8 +3,7 @@ import type { InvoiceStatus, ProductStatus } from "../types";
 const labels: Record<InvoiceStatus | ProductStatus, string> = {
   active: "Đang bán",
   inactive: "Ngừng bán",
-  draft: "Nháp",
-  completed: "Hoàn thành",
+  created: "Đã tạo",
   cancelled: "Đã hủy",
 };
 

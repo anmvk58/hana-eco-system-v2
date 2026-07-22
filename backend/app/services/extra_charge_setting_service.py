@@ -10,9 +10,9 @@ from app.schemas.extra_charge_setting import ExtraChargeSettingUpdate
 
 
 DEFAULT_EXTRA_CHARGE_SETTINGS = {
-    ExtraChargeType.shipping: {"name": "Phi ship", "default_amount": Decimal("0")},
-    ExtraChargeType.packing: {"name": "Phi dong hang", "default_amount": Decimal("0")},
-    ExtraChargeType.other: {"name": "Phu thu khac", "default_amount": Decimal("0")},
+    ExtraChargeType.shipping: {"name": "Phí ship", "default_amount": Decimal("0")},
+    ExtraChargeType.packing: {"name": "Phí đóng hàng", "default_amount": Decimal("0")},
+    ExtraChargeType.other: {"name": "Phụ thu khác", "default_amount": Decimal("0")},
 }
 
 

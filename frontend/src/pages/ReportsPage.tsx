@@ -2,6 +2,7 @@ import { Search } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
 import { api } from "../api/client";
+import { DateRangePicker } from "../components/DateRangePicker";
 import { EmptyState } from "../components/EmptyState";
 import type { Invoice } from "../types";
 import { dateOnly, money, todayInputValue } from "../utils/format";
@@ -22,7 +23,7 @@ export function ReportsPage() {
   async function loadReports() {
     setError("");
     try {
-      setInvoices(await api.invoices.list({ status: "completed", from_date: fromDate || undefined, to_date: toDate || undefined }));
+      setInvoices(await api.invoices.list({ status: "created", from_date: fromDate || undefined, to_date: toDate || undefined }));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Không tải được báo cáo");
     }
@@ -67,8 +68,7 @@ export function ReportsPage() {
   return (
     <div className="page-stack">
       <section className="toolbar">
-        <input type="date" value={fromDate} onChange={(event) => setFromDate(event.target.value)} />
-        <input type="date" value={toDate} onChange={(event) => setToDate(event.target.value)} />
+        <DateRangePicker from={fromDate} to={toDate} onChange={(from, to) => { setFromDate(from); setToDate(to); }} />
         <button className="secondary-button" type="button" onClick={() => void loadReports()}>
           <Search size={17} />
           Xem báo cáo
@@ -120,7 +120,7 @@ export function ReportsPage() {
           <div className="panel-header">
             <div>
               <h2>Doanh thu theo ngày</h2>
-              <span>Chỉ tính hóa đơn hoàn thành</span>
+              <span>Chỉ tính hóa đơn đã tạo</span>
             </div>
           </div>
           <table className="data-table">

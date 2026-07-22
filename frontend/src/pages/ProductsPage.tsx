@@ -2,6 +2,7 @@ import { Edit2, Plus, Search, Trash2 } from "lucide-react";
 import { FormEvent, useEffect, useState } from "react";
 
 import { api } from "../api/client";
+import { useAuth } from "../auth/AuthContext";
 import { EmptyState } from "../components/EmptyState";
 import { Modal } from "../components/Modal";
 import { StatusBadge } from "../components/StatusBadge";
@@ -20,6 +21,7 @@ const blankProduct: ProductPayload = {
 };
 
 export function ProductsPage() {
+  const { hasPermission } = useAuth();
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<ProductCategory[]>([]);
   const [search, setSearch] = useState("");
@@ -140,10 +142,10 @@ export function ProductsPage() {
         <button className="secondary-button" type="button" onClick={() => void loadProducts()}>
           Tìm kiếm
         </button>
-        <button className="primary-button" type="button" onClick={openCreate}>
+        {hasPermission("products.create") ? <button className="primary-button" type="button" onClick={openCreate}>
           <Plus size={17} />
           Thêm sản phẩm
-        </button>
+        </button> : null}
       </section>
 
       {error ? <div className="alert error">{error}</div> : null}
@@ -177,12 +179,12 @@ export function ProductsPage() {
                   <StatusBadge status={product.status} />
                 </td>
                 <td className="row-actions">
-                  <button className="icon-button" type="button" onClick={() => openEdit(product)} aria-label="Sửa">
+                  {hasPermission("products.update") ? <button className="icon-button" type="button" onClick={() => openEdit(product)} aria-label="Sửa">
                     <Edit2 size={16} />
-                  </button>
-                  <button className="icon-button danger" type="button" onClick={() => void remove(product)} aria-label="Xóa">
+                  </button> : null}
+                  {hasPermission("products.delete") ? <button className="icon-button danger" type="button" onClick={() => void remove(product)} aria-label="Xóa">
                     <Trash2 size={16} />
-                  </button>
+                  </button> : null}
                 </td>
               </tr>
             ))}
@@ -266,7 +268,7 @@ export function ProductsPage() {
               />
             </label>
 
-            <section className="inline-create span-2">
+            {hasPermission("product_categories.create") ? <section className="inline-create span-2">
               <div>
                 <strong>Tạo nhanh ngành hàng</strong>
                 <span>Ngành hàng mới sẽ được chọn ngay cho sản phẩm hiện tại.</span>
@@ -285,7 +287,7 @@ export function ProductsPage() {
                 <Plus size={16} />
                 Tạo ngành hàng
               </button>
-            </section>
+            </section> : null}
 
             <div className="form-actions span-2">
               <button className="secondary-button" type="button" onClick={() => setForm(blankProduct)}>

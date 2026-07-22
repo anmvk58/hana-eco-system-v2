@@ -48,7 +48,7 @@ class InvoiceExtraChargeRead(ORMBase):
 class InvoiceCreate(ORMBase):
     code: str | None = Field(default=None, max_length=60)
     customer_id: int | None = None
-    status: InvoiceStatus = InvoiceStatus.draft
+    status: InvoiceStatus = InvoiceStatus.created
     sold_at: datetime | None = None
     note: str | None = None
     items: list[InvoiceItemCreate] = Field(min_length=1)
@@ -58,7 +58,7 @@ class InvoiceCreate(ORMBase):
 
 class InvoiceUpdate(ORMBase):
     customer_id: int | None = None
-    status: InvoiceStatus = InvoiceStatus.draft
+    status: InvoiceStatus = InvoiceStatus.created
     sold_at: datetime | None = None
     note: str | None = None
     items: list[InvoiceItemCreate] = Field(min_length=1)
@@ -66,8 +66,12 @@ class InvoiceUpdate(ORMBase):
     reason: str | None = Field(default=None, description="Ghi chú lý do sửa, sẽ lưu vào invoice_history.")
 
     @model_validator(mode="after")
-    def ensure_reason_for_completed_invoice_edits(self):
+    def validate_invoice_update(self):
         return self
+
+
+class InvoiceCancel(ORMBase):
+    reason: str = Field(min_length=1, max_length=500)
 
 
 class InvoiceRead(ORMBase):

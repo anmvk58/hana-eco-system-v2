@@ -1,9 +1,12 @@
-import { Minus, Plus, Save, Search, Settings } from "lucide-react";
+import { ChevronDown, ChevronUp, Minus, Plus, Save, Search, Settings } from "lucide-react";
 import { FormEvent, KeyboardEvent, useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
 import { api } from "../api/client";
+import { useAuth } from "../auth/AuthContext";
+import { InvoiceReceipt } from "../components/InvoiceReceipt";
 import { Modal } from "../components/Modal";
+import { ToastNotification } from "../components/ToastNotification";
 import type { Customer, ExtraChargeSetting, ExtraChargeType, Invoice, InvoiceStatus, Product } from "../types";
 import { formatNumberInput, localTimeValue, money, normalizeNumberInput, todayInputValue } from "../utils/format";
 
@@ -21,9 +24,9 @@ interface DraftCharge {
 
 const blankLine: DraftLine = { product_id: "", quantity: "1", unit_price: "0" };
 const defaultCharges: DraftCharge[] = [
-  { charge_type: "shipping", name: "Phi ship", amount: "0" },
-  { charge_type: "packing", name: "Phi dong hang", amount: "0" },
-  { charge_type: "other", name: "Phu thu khac", amount: "0" },
+  { charge_type: "shipping", name: "Phí ship", amount: "0" },
+  { charge_type: "packing", name: "Phí đóng hàng", amount: "0" },
+  { charge_type: "other", name: "Phụ thu khác", amount: "0" },
 ];
 const blankCustomerForm = {
   code: "",
@@ -37,12 +40,13 @@ function buildChargesFromSettings(settings: ExtraChargeSetting[]) {
   return defaultCharges.map((charge) => {
     const setting = settings.find((item) => item.charge_type === charge.charge_type);
     return setting
-      ? { charge_type: setting.charge_type, name: setting.name, amount: setting.default_amount }
+      ? { charge_type: setting.charge_type, name: charge.name, amount: setting.default_amount }
       : { ...charge };
   });
 }
 
 export function InvoiceFormPage() {
+  const { hasPermission } = useAuth();
   const { invoiceId } = useParams();
   const navigate = useNavigate();
   const editingId = invoiceId ? Number(invoiceId) : null;
@@ -55,7 +59,6 @@ export function InvoiceFormPage() {
   const [customerFocused, setCustomerFocused] = useState(false);
   const [customerModalOpen, setCustomerModalOpen] = useState(false);
   const [customerForm, setCustomerForm] = useState(blankCustomerForm);
-  const [status, setStatus] = useState<InvoiceStatus>("draft");
   const [note, setNote] = useState("");
   const [reason, setReason] = useState("");
   const [lines, setLines] = useState<DraftLine[]>([{ ...blankLine }]);
@@ -67,6 +70,27 @@ export function InvoiceFormPage() {
   const [searchFocused, setSearchFocused] = useState(false);
   const [highlightedProductIndex, setHighlightedProductIndex] = useState(0);
   const [error, setError] = useState("");
+  const [toastMessage, setToastMessage] = useState("");
+  const [invoiceToPrint, setInvoiceToPrint] = useState<Invoice | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (!invoiceToPrint) return;
+    let secondFrame = 0;
+    const firstFrame = window.requestAnimationFrame(() => {
+      secondFrame = window.requestAnimationFrame(() => window.print());
+    });
+    const clearPrintedInvoice = () => {
+      setToastMessage(`Hóa đơn ${invoiceToPrint.code} đã được lưu.`);
+      setInvoiceToPrint(null);
+    };
+    window.addEventListener("afterprint", clearPrintedInvoice, { once: true });
+    return () => {
+      window.cancelAnimationFrame(firstFrame);
+      window.cancelAnimationFrame(secondFrame);
+      window.removeEventListener("afterprint", clearPrintedInvoice);
+    };
+  }, [invoiceToPrint]);
 
   useEffect(() => {
     async function loadBaseData() {
@@ -83,7 +107,7 @@ export function InvoiceFormPage() {
         setCharges(buildChargesFromSettings(chargeSettingData));
       }
     }
-    void loadBaseData().catch((err) => setError(err instanceof Error ? err.message : "Khong tai duoc du lieu nen"));
+    void loadBaseData().catch((err) => setError(err instanceof Error ? err.message : "Không tải được dữ liệu nền"));
   }, [editingId]);
 
   useEffect(() => {
@@ -93,7 +117,6 @@ export function InvoiceFormPage() {
       setInvoice(data);
       setCustomerId(data.customer_id ? String(data.customer_id) : "");
       setCustomerSearch(data.customer ? `${data.customer.phone ?? data.customer.code} - ${data.customer.name}` : "");
-      setStatus(data.status);
       setNote(data.note ?? "");
       setLines(
         data.items.map((item) => ({
@@ -105,13 +128,13 @@ export function InvoiceFormPage() {
       setCharges(
         defaultCharges.map((charge) => {
           const found = data.extra_charges.find((item) => item.charge_type === charge.charge_type);
-          return found ? { charge_type: found.charge_type, name: found.name, amount: found.amount } : charge;
+          return found ? { charge_type: found.charge_type, name: charge.name, amount: found.amount } : charge;
         }),
       );
       const shippingCharge = data.extra_charges.find((item) => item.charge_type === "shipping");
       setApplyShippingFee(Boolean(shippingCharge && Number(shippingCharge.amount || 0) > 0));
     }
-    void loadInvoice().catch((err) => setError(err instanceof Error ? err.message : "Khong tai duoc hoa don"));
+    void loadInvoice().catch((err) => setError(err instanceof Error ? err.message : "Không tải được hóa đơn"));
   }, [editingId]);
 
   const productMap = useMemo(() => new Map(products.map((product) => [product.id, product])), [products]);
@@ -198,7 +221,7 @@ export function InvoiceFormPage() {
     event.preventDefault();
     const product = suggestedProducts[highlightedProductIndex] ?? suggestedProducts[0];
     if (!product) {
-      setError("Khong tim thay san pham phu hop");
+      setError("Không tìm thấy sản phẩm phù hợp");
       return;
     }
     setError("");
@@ -239,7 +262,7 @@ export function InvoiceFormPage() {
       setCustomerModalOpen(false);
       setCustomerForm(blankCustomerForm);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Khong tao duoc khach hang");
+      setError(err instanceof Error ? err.message : "Không tạo được khách hàng");
     }
   }
 
@@ -247,12 +270,20 @@ export function InvoiceFormPage() {
     setLines(lines.length === 1 ? [{ ...blankLine }] : lines.filter((_, lineIndex) => lineIndex !== index));
   }
 
+  function adjustQuantity(index: number, delta: 1 | -1) {
+    const current = Number(lines[index]?.quantity || 0);
+    if (delta === -1 && current <= 1) return;
+    const next = Number((current + delta).toFixed(3));
+    updateLine(index, { quantity: String(next) });
+  }
+
   async function submit(event: FormEvent) {
     event.preventDefault();
     setError("");
+    setToastMessage("");
     const cleanLines = lines.filter((line) => line.product_id);
     if (cleanLines.length === 0) {
-      setError("Hoa don can it nhat mot san pham");
+      setError("Hóa đơn cần ít nhất một sản phẩm");
       return;
     }
 
@@ -260,7 +291,7 @@ export function InvoiceFormPage() {
     const effectiveCharges = charges.filter((charge) => charge.charge_type !== "shipping" || applyShippingFee);
     const payload = {
       customer_id: isEditing && invoice ? invoice.customer_id ?? null : customerId ? Number(customerId) : null,
-      status: isEditing ? status : "draft",
+      status: "created" as InvoiceStatus,
       sold_at: soldAt,
       note,
       items: cleanLines.map((line) => ({
@@ -275,15 +306,43 @@ export function InvoiceFormPage() {
           name: charge.name,
           amount: charge.amount,
         })),
-      reason: reason || (isEditing ? "Cap nhat hang hoa va phi hoa don" : "Tao hoa don"),
+      reason: reason || (isEditing ? "Cập nhật hàng hóa và phí hóa đơn" : "Tạo hóa đơn"),
     };
 
+    setSubmitting(true);
     try {
       const saved = isEditing ? await api.invoices.update(editingId!, payload) : await api.invoices.create(payload);
-      if (!isEditing) setApplyShippingFee(true);
-      navigate(`/invoices/${saved.id}`);
+      if (isEditing) {
+        navigate(`/invoices/${saved.id}`);
+        return;
+      }
+
+      setCustomerId("");
+      setCustomerSearch("");
+      setNote("");
+      setReason("");
+      setLines([{ ...blankLine }]);
+      setProductSearch("");
+      setApplyShippingFee(true);
+      setCharges((current) => current.map((charge) => ({
+        ...charge,
+        amount: charge.charge_type === "shipping" ? shippingDefaultAmount : "0",
+      })));
+      setProducts((current) => current.map((product) => {
+        const soldItem = saved.items.find((item) => item.product_id === product.id);
+        return soldItem
+          ? { ...product, stock_quantity: String(Number(product.stock_quantity) - Number(soldItem.quantity)) }
+          : product;
+      }));
+      if (hasPermission("invoices.print")) {
+        setInvoiceToPrint(saved);
+      } else {
+        setToastMessage(`Hóa đơn ${saved.code} đã được lưu.`);
+      }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Khong luu duoc hoa don");
+      setError(err instanceof Error ? err.message : "Không lưu được hóa đơn");
+    } finally {
+      setSubmitting(false);
     }
   }
 
@@ -296,7 +355,7 @@ export function InvoiceFormPage() {
     setError("");
     try {
       const setting = await api.extraChargeSettings.update("shipping", {
-        name: "Phi ship",
+        name: "Phí ship",
         default_amount: shippingDefaultAmount,
         is_active: true,
       });
@@ -308,7 +367,7 @@ export function InvoiceFormPage() {
       setApplyShippingFee(true);
       setShippingSettingsOpen(false);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Khong luu duoc cai dat phi ship");
+      setError(err instanceof Error ? err.message : "Không lưu được cài đặt phí ship");
     }
   }
 
@@ -318,24 +377,25 @@ export function InvoiceFormPage() {
         <section className="sell-panel">
           <div className="panel-header">
             <div>
-              <h2>{isEditing ? `Sua hoa don ${invoice?.code ?? ""}` : "Tao hoa don moi"}</h2>
-              <span>{isEditing ? "Chi duoc sua hang hoa, so luong, don gia va cac khoan phi" : "Chon san pham, so luong, phi phat sinh va trang thai don"}</span>
+              <h2>{isEditing ? `Sửa hóa đơn ${invoice?.code ?? ""}` : "Tạo hóa đơn mới"}</h2>
+              <span>{isEditing ? "Chỉ được sửa hàng hóa, số lượng, đơn giá và các khoản phí" : "Chọn sản phẩm, số lượng và các khoản phí phát sinh"}</span>
             </div>
-            <button className="primary-button" type="submit">
+            <button className="primary-button" type="submit" disabled={submitting}>
               <Save size={17} />
-              Luu hoa don
+              {submitting ? "Đang lưu..." : "Lưu hóa đơn"}
             </button>
           </div>
 
           {error ? <div className="alert error">{error}</div> : null}
 
-          <div className="invoice-meta">
-            <label>
-              Khach hang
+          <div className="sales-search-section">
+            <div className="sales-search-field">
+              <label htmlFor="customer-search">Khách hàng</label>
               <div className="customer-search-wrapper">
                 <div className="line-search">
                   <Search size={17} />
                   <input
+                    id="customer-search"
                     disabled={isEditing}
                     value={customerSearch}
                     onBlur={() => window.setTimeout(() => setCustomerFocused(false), 120)}
@@ -349,7 +409,7 @@ export function InvoiceFormPage() {
                       if (!isEditing) setCustomerFocused(true);
                     }}
                     onKeyDown={handleCustomerSearchKeyDown}
-                    placeholder={isEditing ? "Khong cho phep sua khach hang" : "Nhap so dien thoai/ma khach hang, de trong la Khach le"}
+                    placeholder={isEditing ? "Không cho phép sửa khách hàng" : "Nhập số điện thoại hoặc mã khách hàng; để trống nếu là khách lẻ"}
                   />
                 </div>
                 {!isEditing && customerFocused && customerSearch.trim() ? (
@@ -365,108 +425,122 @@ export function InvoiceFormPage() {
                     ))}
                     {filteredCustomers.length === 0 ? (
                       <div className="suggestion-empty">
-                        <span>Khong tim thay khach hang</span>
-                        <button className="secondary-button suggestion-action" type="button" onMouseDown={openCreateCustomer}>
+                        <span>Không tìm thấy khách hàng</span>
+                        {hasPermission("customers.create") ? <button className="secondary-button suggestion-action" type="button" onMouseDown={openCreateCustomer}>
                           <Plus size={16} />
-                          Tao khach hang moi
-                        </button>
+                          Tạo khách hàng mới
+                        </button> : null}
                       </div>
                     ) : null}
                   </div>
                 ) : null}
               </div>
-            </label>
-          </div>
-
-          <div className="line-search-wrapper">
-            <div className="line-search">
-              <Search size={17} />
-              <input
-                value={productSearch}
-                onBlur={() => window.setTimeout(() => setSearchFocused(false), 120)}
-                onChange={(event) => {
-                  setProductSearch(event.target.value);
-                  setSearchFocused(true);
-                  setHighlightedProductIndex(0);
-                }}
-                onFocus={() => {
-                  setSearchFocused(true);
-                  setHighlightedProductIndex(0);
-                }}
-                onKeyDown={handleProductSearchKeyDown}
-                placeholder="Nhap ma hoac ten san pham, bam Enter de them"
-              />
             </div>
-            {searchFocused && productSearch.trim() ? (
-              <div className="product-suggestions">
-                {suggestedProducts.map((product, index) => (
-                  <button
-                    aria-selected={index === highlightedProductIndex}
-                    className={index === highlightedProductIndex ? "is-highlighted" : undefined}
-                    key={product.id}
-                    onMouseDown={() => addProductToInvoice(product)}
-                    onMouseEnter={() => setHighlightedProductIndex(index)}
-                    type="button"
-                  >
-                    <span>
-                      <strong>{product.code}</strong>
-                      {product.name}
-                    </span>
-                    <span>{money(product.sale_price)}</span>
-                  </button>
-                ))}
-                {suggestedProducts.length === 0 ? <div className="suggestion-empty">Khong tim thay san pham phu hop</div> : null}
+
+            <div className="sales-search-field">
+              <label htmlFor="product-search">Sản phẩm</label>
+              <div className="line-search-wrapper">
+                <div className="line-search">
+                  <Search size={17} />
+                  <input
+                    id="product-search"
+                    value={productSearch}
+                    onBlur={() => window.setTimeout(() => setSearchFocused(false), 120)}
+                    onChange={(event) => {
+                      setProductSearch(event.target.value);
+                      setSearchFocused(true);
+                      setHighlightedProductIndex(0);
+                    }}
+                    onFocus={() => {
+                      setSearchFocused(true);
+                      setHighlightedProductIndex(0);
+                    }}
+                    onKeyDown={handleProductSearchKeyDown}
+                    placeholder="Nhập mã hoặc tên sản phẩm, bấm Enter để thêm"
+                  />
+                </div>
+                {searchFocused && productSearch.trim() ? (
+                  <div className="product-suggestions">
+                    {suggestedProducts.map((product, index) => (
+                      <button
+                        aria-selected={index === highlightedProductIndex}
+                        className={index === highlightedProductIndex ? "is-highlighted" : undefined}
+                        key={product.id}
+                        onMouseDown={() => addProductToInvoice(product)}
+                        onMouseEnter={() => setHighlightedProductIndex(index)}
+                        type="button"
+                      >
+                        <span>
+                          <strong>{product.code}</strong>
+                          {product.name}
+                        </span>
+                        <span>{money(product.sale_price)}</span>
+                      </button>
+                    ))}
+                    {suggestedProducts.length === 0 ? <div className="suggestion-empty">Không tìm thấy sản phẩm phù hợp</div> : null}
+                  </div>
+                ) : null}
               </div>
-            ) : null}
+            </div>
           </div>
 
           <div className="line-table">
             <div className="line-head">
-              <span>San pham</span>
-              <span>So luong</span>
-              <span>Don gia</span>
-              <span>Thanh tien</span>
+              <span>Sản phẩm</span>
+              <span>Số lượng</span>
+              <span>Đơn giá</span>
+              <span>Thành tiền</span>
               <span></span>
             </div>
             {lines.map((line, index) => (
               <div className="line-row" key={`${index}-${line.product_id}`}>
                 <select value={line.product_id} onChange={(event) => updateLine(index, { product_id: event.target.value })}>
-                  <option value="">Chon san pham</option>
+                  <option value="">Chọn sản phẩm</option>
                   {products.map((product) => (
                     <option key={product.id} value={product.id}>
                       {product.code} - {product.name} ({money(product.sale_price)})
                     </option>
                   ))}
                 </select>
-                <input
-                  inputMode="decimal"
-                  value={formatNumberInput(line.quantity)}
-                  onChange={(event) => updateLine(index, { quantity: normalizeNumberInput(event.target.value) })}
-                />
+                <div className="quantity-stepper">
+                  <input
+                    inputMode="decimal"
+                    value={formatNumberInput(line.quantity)}
+                    onChange={(event) => updateLine(index, { quantity: normalizeNumberInput(event.target.value) })}
+                  />
+                  <div className="quantity-stepper-controls">
+                    <button type="button" onClick={() => adjustQuantity(index, 1)} aria-label="Tăng số lượng thêm 1">
+                      <ChevronUp size={14} />
+                    </button>
+                    <button type="button" disabled={Number(line.quantity || 0) <= 1} onClick={() => adjustQuantity(index, -1)} aria-label="Giảm số lượng đi 1">
+                      <ChevronDown size={14} />
+                    </button>
+                  </div>
+                </div>
                 <input
                   inputMode="numeric"
                   value={formatNumberInput(line.unit_price, false)}
                   onChange={(event) => updateLine(index, { unit_price: normalizeNumberInput(event.target.value, false) })}
                 />
                 <strong>{money(Number(line.quantity || 0) * Number(line.unit_price || 0))}</strong>
-                <button className="icon-button danger" type="button" onClick={() => removeLine(index)} aria-label="Xoa dong">
+                <button className="icon-button danger" type="button" onClick={() => removeLine(index)} aria-label="Xóa dòng">
                   <Minus size={16} />
                 </button>
               </div>
             ))}
             <button className="add-line-button" type="button" onClick={() => setLines([...lines, { ...blankLine }])}>
               <Plus size={16} />
-              Them dong san pham
+              Thêm dòng sản phẩm
             </button>
           </div>
         </section>
 
         <aside className="checkout-panel">
           <div className="checkout-title">
-            <h2>Thanh toan</h2>
-            <button className="icon-button" type="button" onClick={() => setShippingSettingsOpen(true)} aria-label="Cai dat phi ship mac dinh">
+            <h2>Thanh toán</h2>
+            {hasPermission("extra_charges.update") ? <button className="icon-button" type="button" onClick={() => setShippingSettingsOpen(true)} aria-label="Cài đặt phí ship mặc định">
               <Settings size={16} />
-            </button>
+            </button> : null}
           </div>
           <div className="charge-list">
             {charges.map((charge, index) => (
@@ -475,7 +549,7 @@ export function InvoiceFormPage() {
                   <span>{charge.name}</span>
                   {charge.charge_type === "shipping" ? (
                     <span className="toggle-wrap">
-                      <span>{applyShippingFee ? "Ap dung" : "Khong ap dung"}</span>
+                      <span>{applyShippingFee ? "Áp dụng" : "Không áp dụng"}</span>
                       <input
                         checked={applyShippingFee}
                         onChange={(event) => setApplyShippingFee(event.target.checked)}
@@ -494,24 +568,24 @@ export function InvoiceFormPage() {
             ))}
           </div>
           <label>
-            Ly do sua / ghi chu audit
-            <textarea value={reason} onChange={(event) => setReason(event.target.value)} placeholder="Vi du: Khach doi so luong" />
+            Lý do sửa / ghi chú lịch sử
+            <textarea value={reason} onChange={(event) => setReason(event.target.value)} placeholder="Ví dụ: Khách đổi số lượng" />
           </label>
           <label>
-            Ghi chu hoa don
+            Ghi chú hóa đơn
             <textarea value={note} onChange={(event) => setNote(event.target.value)} />
           </label>
           <div className="summary-lines">
             <div>
-              <span>Tong tien hang</span>
+              <span>Tổng tiền hàng</span>
               <strong>{money(totals.subtotal)}</strong>
             </div>
             <div>
-              <span>Thu khac</span>
+              <span>Thu khác</span>
               <strong>{money(totals.extra)}</strong>
             </div>
             <div className="summary-total">
-              <span>Tong thanh toan</span>
+              <span>Tổng thanh toán</span>
               <strong>{money(totals.total)}</strong>
             </div>
           </div>
@@ -520,7 +594,7 @@ export function InvoiceFormPage() {
 
       {customerModalOpen ? (
         <Modal
-          title="Tao khach hang moi"
+          title="Tạo khách hàng mới"
           onClose={() => {
             setCustomerModalOpen(false);
             setCustomerForm(blankCustomerForm);
@@ -528,31 +602,31 @@ export function InvoiceFormPage() {
         >
           <form className="form-grid" onSubmit={(event) => void createCustomer(event)}>
             <label>
-              Ma khach hang
+              Mã khách hàng
               <input required value={customerForm.code} onChange={(event) => setCustomerForm({ ...customerForm, code: event.target.value })} />
             </label>
             <label>
-              So dien thoai
+              Số điện thoại
               <input value={customerForm.phone} onChange={(event) => setCustomerForm({ ...customerForm, phone: event.target.value })} />
             </label>
             <label>
-              Ten khach hang
+              Tên khách hàng
               <input required value={customerForm.name} onChange={(event) => setCustomerForm({ ...customerForm, name: event.target.value })} />
             </label>
             <label>
-              Dia chi
+              Địa chỉ
               <input value={customerForm.address} onChange={(event) => setCustomerForm({ ...customerForm, address: event.target.value })} />
             </label>
             <label className="span-2">
-              Ghi chu
+              Ghi chú
               <textarea value={customerForm.note} onChange={(event) => setCustomerForm({ ...customerForm, note: event.target.value })} />
             </label>
             <div className="form-actions span-2">
               <button className="secondary-button" type="button" onClick={() => setCustomerForm(blankCustomerForm)}>
-                Lam moi
+                Làm mới
               </button>
               <button className="primary-button" type="submit">
-                Luu khach hang
+                Lưu khách hàng
               </button>
             </div>
           </form>
@@ -560,10 +634,10 @@ export function InvoiceFormPage() {
       ) : null}
 
       {shippingSettingsOpen ? (
-        <Modal title="Cai dat phi ship mac dinh" onClose={() => setShippingSettingsOpen(false)}>
+        <Modal title="Cài đặt phí ship mặc định" onClose={() => setShippingSettingsOpen(false)}>
           <form className="form-grid" onSubmit={(event) => void saveShippingSettings(event)}>
             <label className="span-2">
-              Phi ship mac dinh
+              Phí ship mặc định
               <input
                 inputMode="numeric"
                 value={formatNumberInput(shippingDefaultAmount, false)}
@@ -572,15 +646,18 @@ export function InvoiceFormPage() {
             </label>
             <div className="form-actions span-2">
               <button className="secondary-button" type="button" onClick={() => setShippingSettingsOpen(false)}>
-                Huy
+                Hủy
               </button>
               <button className="primary-button" type="submit">
-                Luu cai dat
+                Lưu cài đặt
               </button>
             </div>
           </form>
         </Modal>
       ) : null}
+
+      {invoiceToPrint ? <InvoiceReceipt invoice={invoiceToPrint} className="auto-print-receipt" /> : null}
+      {toastMessage ? <ToastNotification message={toastMessage} onClose={() => setToastMessage("")} /> : null}
     </>
   );
 }

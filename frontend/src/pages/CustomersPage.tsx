@@ -2,6 +2,7 @@ import { Edit2, Plus, Search, Trash2 } from "lucide-react";
 import { FormEvent, useEffect, useState } from "react";
 
 import { api } from "../api/client";
+import { useAuth } from "../auth/AuthContext";
 import { EmptyState } from "../components/EmptyState";
 import { Modal } from "../components/Modal";
 import type { Customer, CustomerPayload } from "../types";
@@ -16,6 +17,7 @@ const blankCustomer: CustomerPayload = {
 };
 
 export function CustomersPage() {
+  const { hasPermission } = useAuth();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(false);
@@ -101,10 +103,10 @@ export function CustomersPage() {
         <button className="secondary-button" type="button" onClick={() => void loadCustomers()}>
           Tìm kiếm
         </button>
-        <button className="primary-button" type="button" onClick={openCreate}>
+        {hasPermission("customers.create") ? <button className="primary-button" type="button" onClick={openCreate}>
           <Plus size={17} />
           Thêm khách hàng
-        </button>
+        </button> : null}
       </section>
 
       {error ? <div className="alert error">{error}</div> : null}
@@ -132,12 +134,12 @@ export function CustomersPage() {
                 <td>{customer.note}</td>
                 <td>{dateTime(customer.updated_at)}</td>
                 <td className="row-actions">
-                  <button className="icon-button" type="button" onClick={() => openEdit(customer)} aria-label="Sửa">
+                  {hasPermission("customers.update") ? <button className="icon-button" type="button" onClick={() => openEdit(customer)} aria-label="Sửa">
                     <Edit2 size={16} />
-                  </button>
-                  <button className="icon-button danger" type="button" onClick={() => void remove(customer)} aria-label="Xóa">
+                  </button> : null}
+                  {hasPermission("customers.delete") ? <button className="icon-button danger" type="button" onClick={() => void remove(customer)} aria-label="Xóa">
                     <Trash2 size={16} />
-                  </button>
+                  </button> : null}
                 </td>
               </tr>
             ))}

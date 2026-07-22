@@ -1,6 +1,40 @@
 export type ProductStatus = "active" | "inactive";
-export type InvoiceStatus = "draft" | "completed" | "cancelled";
+export type InvoiceStatus = "created" | "cancelled";
 export type ExtraChargeType = "shipping" | "packing" | "other";
+
+export interface Permission {
+  id: number;
+  code: string;
+  name: string;
+  module: string;
+}
+
+export interface RoleSummary { id: number; name: string; }
+export interface Role extends RoleSummary {
+  description?: string | null;
+  is_system: boolean;
+  permissions: Permission[];
+  created_at: string;
+  updated_at: string;
+}
+export interface UserSummary { id: number; username: string; display_name: string; }
+export interface User extends UserSummary {
+  is_active: boolean;
+  roles: RoleSummary[];
+  permissions: string[];
+  created_at: string;
+  updated_at: string;
+}
+export interface RolePayload { name: string; description?: string; permission_codes: string[]; }
+export interface UserPayload { username: string; display_name: string; password?: string; is_active: boolean; role_ids: number[]; }
+export interface LoginResponse { access_token: string; token_type: string; expires_at: string; user: User; }
+export interface SoldProductReportRow {
+  product_code: string;
+  product_name: string;
+  unit: string;
+  quantity_sold: string;
+  sales_revenue: string;
+}
 
 export interface Customer {
   id: number;

@@ -1,14 +1,17 @@
-import { Eye, Search, Trash2 } from "lucide-react";
+import { Eye, Search, XCircle } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
 import { api } from "../api/client";
+import { useAuth } from "../auth/AuthContext";
+import { DateRangePicker } from "../components/DateRangePicker";
 import { EmptyState } from "../components/EmptyState";
 import { StatusBadge } from "../components/StatusBadge";
 import type { Invoice, InvoiceStatus } from "../types";
 import { dateTime, money, todayInputValue } from "../utils/format";
 
 export function InvoicesPage() {
+  const { hasPermission } = useAuth();
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [status, setStatus] = useState<InvoiceStatus | "">("");
   const [fromDate, setFromDate] = useState("");
@@ -34,11 +37,12 @@ export function InvoicesPage() {
     void loadInvoices();
   }, []);
 
-  async function remove(invoice: Invoice) {
-    const reason = window.prompt(`Lý do xóa mềm hóa đơn ${invoice.code}`, "Xoa nham hoa don");
+  async function cancel(invoice: Invoice) {
+    const reason = window.prompt(`Lý do hủy hóa đơn ${invoice.code}`, "Khách hủy đơn");
     if (reason === null) return;
-    await api.invoices.remove(invoice.id, reason);
-    await loadInvoices();
+    if (!reason.trim()) { setError("Vui lòng nhập lý do hủy hóa đơn"); return; }
+    try { await api.invoices.cancel(invoice.id, reason.trim()); await loadInvoices(); }
+    catch (err) { setError(err instanceof Error ? err.message : "Không hủy được hóa đơn"); }
   }
 
   return (
@@ -46,19 +50,17 @@ export function InvoicesPage() {
       <section className="toolbar">
         <select value={status} onChange={(event) => setStatus(event.target.value as InvoiceStatus | "")}>
           <option value="">Tất cả trạng thái</option>
-          <option value="draft">Nháp</option>
-          <option value="completed">Hoàn thành</option>
+          <option value="created">Đã tạo</option>
           <option value="cancelled">Đã hủy</option>
         </select>
-        <input type="date" value={fromDate} onChange={(event) => setFromDate(event.target.value)} />
-        <input type="date" value={toDate} onChange={(event) => setToDate(event.target.value)} />
+        <DateRangePicker from={fromDate} to={toDate} onChange={(from, to) => { setFromDate(from); setToDate(to); }} />
         <button className="secondary-button" type="button" onClick={() => void loadInvoices()}>
           <Search size={17} />
           Lọc hóa đơn
         </button>
-        <Link className="primary-button link-button" to="/invoices/new">
+        {hasPermission("invoices.create") ? <Link className="primary-button link-button" to="/invoices/new">
           Tạo hóa đơn
-        </Link>
+        </Link> : null}
       </section>
 
       {error ? <div className="alert error">{error}</div> : null}
@@ -93,9 +95,9 @@ export function InvoicesPage() {
                   <Link className="icon-button" to={`/invoices/${invoice.id}`} aria-label="Xem">
                     <Eye size={16} />
                   </Link>
-                  <button className="icon-button danger" type="button" onClick={() => void remove(invoice)} aria-label="Xóa">
-                    <Trash2 size={16} />
-                  </button>
+                  {hasPermission("invoices.cancel") && invoice.status === "created" ? <button className="icon-button danger" type="button" onClick={() => void cancel(invoice)} aria-label="Hủy hóa đơn">
+                    <XCircle size={16} />
+                  </button> : null}
                 </td>
               </tr>
             ))}

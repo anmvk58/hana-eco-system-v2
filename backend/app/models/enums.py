@@ -7,8 +7,7 @@ class ProductStatus(str, Enum):
 
 
 class InvoiceStatus(str, Enum):
-    draft = "draft"
-    completed = "completed"
+    created = "created"
     cancelled = "cancelled"
 
 

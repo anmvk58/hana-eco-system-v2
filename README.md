@@ -19,10 +19,15 @@ MVP cho phần mềm bán hàng web app đơn giản, lấy cảm hứng từ lu
 - `invoices` có nhiều `invoice_items`, nhiều `invoice_extra_charges`, nhiều `invoice_history`.
 - `invoice_extra_charges` lưu các khoản `shipping`, `packing`, `other`.
 - `invoice_history` lưu `before_data` và `after_data` dạng JSON, kèm người sửa, thời gian sửa và lý do.
-- `users` hiện chỉ dùng nhẹ cho audit. Chưa có authentication; API nhận `X-User-Id` hoặc `X-User-Name` nếu client muốn ghi người sửa.
+- `users`, `roles`, `permissions`, `user_roles`, `role_permissions` quản lý RBAC. Mọi API nghiệp vụ yêu cầu Bearer token; user phải hoạt động và có quyền qua ít nhất một role.
+- Khi khởi động, hệ thống tự đồng bộ danh mục quyền và gắn user `admin` vào role hệ thống toàn quyền. Lần nâng cấp đầu tiên sẽ đặt tài khoản mặc định `admin` / `admin` nếu admin chưa có mật khẩu.
+- Mọi thao tác yêu cầu đăng nhập. API login cấp Bearer token có thời hạn 24 giờ; mật khẩu được hash PBKDF2 và logout thu hồi token phía server.
 
 ## API chính
 
+- `POST /api/auth/login`
+- `POST /api/auth/logout`
+- `GET /api/auth/me`
 - `GET /api/customers?search=...`
 - `POST /api/customers`
 - `GET /api/customers/{id}`
@@ -38,13 +43,14 @@ MVP cho phần mềm bán hàng web app đơn giản, lấy cảm hứng từ lu
 - `GET /api/product-categories/{id}`
 - `PUT /api/product-categories/{id}`
 - `DELETE /api/product-categories/{id}`
-- `GET /api/invoices?status=completed&from_date=2026-06-01&to_date=2026-06-30`
+- `GET /api/invoices?status=created&from_date=2026-06-01&to_date=2026-06-30`
 - `POST /api/invoices`
 - `GET /api/invoices/{id}`
 - `PUT /api/invoices/{id}`
 - `DELETE /api/invoices/{id}?reason=...`
 - `GET /api/invoices/{id}/history`
 - `GET /api/invoices/{id}/print`
+- `GET /api/reports/sold-products?from_date=2026-07-01&to_date=2026-07-31`
 
 Swagger UI: `http://localhost:8000/docs`
 
@@ -95,7 +101,7 @@ Docker Compose sẽ chạy:
 ```json
 {
   "customer_id": 1,
-  "status": "completed",
+  "status": "created",
   "items": [
     {
       "product_id": 1,
@@ -117,4 +123,4 @@ Docker Compose sẽ chạy:
 }
 ```
 
-Khi invoice ở trạng thái `completed`, tồn kho sản phẩm sẽ giảm. Nếu sửa hóa đơn completed, hệ thống hoàn tồn kho theo dữ liệu cũ rồi trừ lại theo dữ liệu mới. Mọi lần tạo/sửa/xóa mềm invoice đều ghi vào `invoice_history`.
+Hóa đơn mới luôn ở trạng thái `created` (Đã tạo) và tồn kho sản phẩm sẽ giảm ngay. Khi hủy, trạng thái chuyển thành `cancelled` (Đã hủy), tồn kho được hoàn lại và hóa đơn không còn được tính trong dashboard/báo cáo. Mọi lần tạo/sửa/hủy/xóa mềm invoice đều ghi vào `invoice_history`.
