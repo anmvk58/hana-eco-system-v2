@@ -1,0 +1,7 @@
+node_modules/
+dist/
+*.tsbuildinfo
+.pnpm-store/
+pnpm-workspace.yaml
+npm-debug.log*
+

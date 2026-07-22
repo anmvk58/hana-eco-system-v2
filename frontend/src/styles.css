@@ -1662,8 +1662,8 @@ label {
 .toast-notification {
   align-items: flex-start;
   animation: toast-in 180ms ease-out;
-  background: #fff;
-  border: 1px solid #cde9df;
+  background: var(--teal);
+  border: 1px solid var(--teal-dark);
   border-radius: 10px;
   bottom: 22px;
   box-shadow: 0 14px 36px rgba(22, 48, 57, 0.2);
@@ -1699,9 +1699,9 @@ label {
 
 .toast-icon {
   align-items: center;
-  background: #e8f7f1;
+  background: rgba(255, 255, 255, 0.16);
   border-radius: 50%;
-  color: #087346;
+  color: #fff;
   display: flex;
   height: 34px;
   justify-content: center;
@@ -1715,12 +1715,12 @@ label {
 }
 
 .toast-content strong {
-  color: #18312d;
+  color: #fff;
   font-size: 14px;
 }
 
 .toast-content span {
-  color: var(--muted);
+  color: rgba(255, 255, 255, 0.82);
   font-size: 13px;
 }
 
@@ -1728,7 +1728,7 @@ label {
   align-items: center;
   background: transparent;
   border: 0;
-  color: #77848b;
+  color: rgba(255, 255, 255, 0.82);
   cursor: pointer;
   display: flex;
   padding: 2px;
@@ -1736,7 +1736,7 @@ label {
 
 .toast-progress {
   animation: toast-progress linear forwards;
-  background: var(--teal);
+  background: rgba(255, 255, 255, 0.72);
   bottom: 0;
   height: 3px;
   left: 0;
