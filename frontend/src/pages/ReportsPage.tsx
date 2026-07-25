@@ -15,7 +15,7 @@ interface ProductRevenue {
 }
 
 export function ReportsPage() {
-  const [fromDate, setFromDate] = useState("");
+  const [fromDate, setFromDate] = useState(todayInputValue());
   const [toDate, setToDate] = useState(todayInputValue());
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [error, setError] = useState("");

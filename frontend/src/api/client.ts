@@ -98,7 +98,7 @@ export const api = {
     removeUser: (id: number) => request<void>(`/users/${id}`, { method: "DELETE" }),
   },
   customers: {
-    list: (search?: string) => request<Customer[]>("/customers", {}, { search }),
+    list: (search?: string, limit = 50) => request<Customer[]>("/customers", {}, { search, limit }),
     create: (payload: CustomerPayload) => request<Customer>("/customers", { method: "POST", body: JSON.stringify(payload) }),
     update: (id: number, payload: Partial<CustomerPayload>) =>
       request<Customer>(`/customers/${id}`, { method: "PUT", body: JSON.stringify(payload) }),

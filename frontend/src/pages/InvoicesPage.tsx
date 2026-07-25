@@ -1,4 +1,4 @@
-import { Eye, Search, XCircle } from "lucide-react";
+import { Eye, LoaderCircle, Search, XCircle } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
@@ -14,22 +14,27 @@ export function InvoicesPage() {
   const { hasPermission } = useAuth();
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [status, setStatus] = useState<InvoiceStatus | "">("");
-  const [fromDate, setFromDate] = useState("");
+  const [fromDate, setFromDate] = useState(todayInputValue());
   const [toDate, setToDate] = useState(todayInputValue());
+  const [loading, setLoading] = useState(false);
+  const [refreshVersion, setRefreshVersion] = useState(0);
   const [error, setError] = useState("");
 
   async function loadInvoices() {
+    setLoading(true);
     setError("");
     try {
-      setInvoices(
-        await api.invoices.list({
+      const data = await api.invoices.list({
           status: status || undefined,
           from_date: fromDate || undefined,
           to_date: toDate || undefined,
-        }),
-      );
+        });
+      setInvoices(data);
+      setRefreshVersion((version) => version + 1);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Không tải được hóa đơn");
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -54,9 +59,9 @@ export function InvoicesPage() {
           <option value="cancelled">Đã hủy</option>
         </select>
         <DateRangePicker from={fromDate} to={toDate} onChange={(from, to) => { setFromDate(from); setToDate(to); }} />
-        <button className="secondary-button" type="button" onClick={() => void loadInvoices()}>
-          <Search size={17} />
-          Lọc hóa đơn
+        <button className="secondary-button" type="button" disabled={loading} onClick={() => void loadInvoices()}>
+          {loading ? <LoaderCircle className="loading-spinner" size={17} /> : <Search size={17} />}
+          {loading ? "Đang lọc..." : "Lọc hóa đơn"}
         </button>
         {hasPermission("invoices.create") ? <Link className="primary-button link-button" to="/invoices/new">
           Tạo hóa đơn
@@ -65,17 +70,18 @@ export function InvoicesPage() {
 
       {error ? <div className="alert error">{error}</div> : null}
 
-      <section className="table-panel">
-        <table className="data-table">
+      <section className="table-panel invoice-table-refresh" key={refreshVersion}>
+        <table className="data-table invoice-list-table">
           <thead>
             <tr>
               <th>Mã hóa đơn</th>
-              <th>Khách hàng</th>
               <th>Ngày bán</th>
+              <th>Khách hàng</th>
+              <th>Địa chỉ</th>
               <th>Trạng thái</th>
-              <th>Tiền hàng</th>
-              <th>Thu khác</th>
-              <th>Tổng thanh toán</th>
+              <th className="numeric">Tiền hàng</th>
+              <th className="numeric">Thu khác</th>
+              <th className="numeric">Tổng thanh toán</th>
               <th></th>
             </tr>
           </thead>
@@ -83,8 +89,9 @@ export function InvoicesPage() {
             {invoices.map((invoice) => (
               <tr key={invoice.id}>
                 <td className="code-cell">{invoice.code}</td>
-                <td>{invoice.customer?.name ?? "Khách lẻ"}</td>
                 <td>{dateTime(invoice.sold_at)}</td>
+                <td>{invoice.customer?.name ?? "Khách lẻ"}</td>
+                <td>{invoice.customer?.address || "-"}</td>
                 <td>
                   <StatusBadge status={invoice.status} />
                 </td>

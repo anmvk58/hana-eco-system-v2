@@ -1,6 +1,8 @@
 from datetime import datetime
 
-from pydantic import Field
+import re
+
+from pydantic import Field, field_validator
 
 from app.schemas.common import ORMBase
 
@@ -11,6 +13,14 @@ class CustomerBase(ORMBase):
     phone: str | None = Field(default=None, max_length=30)
     address: str | None = Field(default=None, max_length=500)
     note: str | None = None
+
+    @field_validator("phone", mode="before")
+    @classmethod
+    def normalize_phone(cls, value):
+        if value is None:
+            return None
+        normalized = re.sub(r"\s+", "", str(value))
+        return normalized or None
 
 
 class CustomerCreate(CustomerBase):
@@ -23,6 +33,14 @@ class CustomerUpdate(ORMBase):
     phone: str | None = Field(default=None, max_length=30)
     address: str | None = Field(default=None, max_length=500)
     note: str | None = None
+
+    @field_validator("phone", mode="before")
+    @classmethod
+    def normalize_phone(cls, value):
+        if value is None:
+            return None
+        normalized = re.sub(r"\s+", "", str(value))
+        return normalized or None
 
 
 class CustomerRead(CustomerBase):

@@ -37,6 +37,7 @@ def create_app() -> FastAPI:
         Base.metadata.create_all(bind=engine)
         ensure_product_category_column()
         ensure_user_password_column()
+        ensure_unique_customer_phone()
         ensure_invoice_status_values()
         with SessionLocal() as db:
             ensure_access_control_defaults(db)
@@ -69,6 +70,31 @@ def ensure_user_password_column() -> None:
         return
     with engine.begin() as connection:
         connection.execute(text("ALTER TABLE users ADD COLUMN password_hash VARCHAR(255) NULL"))
+
+
+def ensure_unique_customer_phone() -> None:
+    inspector = inspect(engine)
+    if not inspector.has_table("customers"):
+        return
+    phone_index = next((index for index in inspector.get_indexes("customers") if index["name"] == "ix_customers_phone"), None)
+    if phone_index and phone_index.get("unique"):
+        return
+    with engine.begin() as connection:
+        connection.execute(text("UPDATE customers SET phone = NULL WHERE phone IS NOT NULL AND TRIM(phone) = ''"))
+        connection.execute(text("UPDATE customers SET phone = REPLACE(TRIM(phone), ' ', '') WHERE phone IS NOT NULL"))
+        duplicates = connection.execute(text("""
+            SELECT phone
+            FROM customers
+            WHERE phone IS NOT NULL
+            GROUP BY phone
+            HAVING COUNT(*) > 1
+            LIMIT 1
+        """)).scalar()
+        if duplicates:
+            raise RuntimeError(f"Không thể tạo unique index vì số điện thoại {duplicates} đang bị trùng")
+        if phone_index:
+            connection.execute(text("DROP INDEX ix_customers_phone ON customers"))
+        connection.execute(text("CREATE UNIQUE INDEX ix_customers_phone ON customers (phone)"))
 
 
 def ensure_invoice_status_values() -> None:

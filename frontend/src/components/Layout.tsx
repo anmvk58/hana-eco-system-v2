@@ -5,12 +5,14 @@ import {
   ChevronLeft,
   ChevronRight,
   ClipboardList,
-  FileText,
   Gauge,
+  LibraryBig,
+  LoaderCircle,
+  LogOut,
   Menu,
-  PlusCircle,
   PackageSearch,
   ShieldCheck,
+  ShoppingCart,
   Users,
 } from "lucide-react";
 import type { ReactNode } from "react";
@@ -20,10 +22,13 @@ import { useAuth } from "../auth/AuthContext";
 
 const navItems = [
   { to: "/", label: "Tổng quan", icon: Gauge, permissions: ["dashboard.view"] },
+  { to: "/invoices/new", label: "Bán hàng", icon: ShoppingCart, permissions: ["invoices.create"] },
+  { to: "/invoices", label: "Hóa đơn", icon: ClipboardList, permissions: ["invoices.view"] },
+];
+
+const catalogNavItems = [
   { to: "/customers", label: "Khách hàng", icon: Users, permissions: ["customers.view"] },
   { to: "/products", label: "Sản phẩm", icon: Boxes, permissions: ["products.view"] },
-  { to: "/invoices/new", label: "Bán hàng", icon: PlusCircle, permissions: ["invoices.create"] },
-  { to: "/invoices", label: "Hóa đơn", icon: ClipboardList, permissions: ["invoices.view"] },
 ];
 
 const reportNavItems = [
@@ -54,21 +59,40 @@ export function Layout({ children }: { children: ReactNode }) {
   const location = useLocation();
   const navigate = useNavigate();
   const { currentUser, hasPermission, logout } = useAuth();
+  const [isCatalogOpen, setIsCatalogOpen] = useState(
+    () => location.pathname === "/customers" || location.pathname === "/products",
+  );
   const [isReportsOpen, setIsReportsOpen] = useState(() => location.pathname.startsWith("/reports"));
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(
     () => window.localStorage.getItem("hana-sidebar-collapsed") === "true",
   );
   const title = routeTitles[location.pathname] ?? (location.pathname.startsWith("/invoices/") ? "Chi tiết hóa đơn" : "Hana POS");
   const isSalesPage = location.pathname === "/invoices/new";
+  const visibleCatalogItems = catalogNavItems.filter((item) => item.permissions.every(hasPermission));
   const visibleReportItems = reportNavItems.filter((item) => item.permissions.every(hasPermission));
 
   useEffect(() => {
     window.localStorage.setItem("hana-sidebar-collapsed", String(isSidebarCollapsed));
   }, [isSidebarCollapsed]);
 
+  useEffect(() => {
+    setIsMobileSidebarOpen(false);
+  }, [location.pathname]);
+
+  async function handleLogout() {
+    if (isLoggingOut) return;
+    setIsLoggingOut(true);
+    if (!window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      await new Promise((resolve) => window.setTimeout(resolve, 340));
+    }
+    await logout();
+  }
+
   return (
-    <div className={`app-shell${isSidebarCollapsed ? " sidebar-collapsed" : ""}`}>
-      <aside className="sidebar">
+    <div className={`app-shell${isSidebarCollapsed ? " sidebar-collapsed" : ""}${isLoggingOut ? " auth-logging-out" : ""}`}>
+      <aside className={`sidebar${isMobileSidebarOpen ? " mobile-open" : ""}`}>
         <div className="brand">
           <div className="brand-mark">H</div>
           <div className="brand-copy">
@@ -95,6 +119,40 @@ export function Layout({ children }: { children: ReactNode }) {
               </NavLink>
             );
           })}
+          {visibleCatalogItems.length > 0 ? (
+            <div className="nav-group">
+              <button
+                className={`nav-group-toggle${location.pathname === "/customers" || location.pathname === "/products" ? " active" : ""}`}
+                type="button"
+                aria-expanded={isCatalogOpen}
+                aria-controls="catalog-navigation"
+                title="Danh mục"
+                onClick={() => {
+                  if (isSidebarCollapsed) {
+                    setIsSidebarCollapsed(false);
+                    setIsCatalogOpen(true);
+                    return;
+                  }
+                  setIsCatalogOpen((open) => !open);
+                }}
+              >
+                <LibraryBig size={18} />
+                <span>Danh mục</span>
+                <ChevronDown className={`nav-group-chevron${isCatalogOpen ? " open" : ""}`} size={17} />
+              </button>
+              {isCatalogOpen ? <div className="nav-group-items" id="catalog-navigation">
+                {visibleCatalogItems.map((item) => {
+                  const Icon = item.icon;
+                  return (
+                    <NavLink key={item.to} to={item.to} title={item.label}>
+                      <Icon size={17} />
+                      <span>{item.label}</span>
+                    </NavLink>
+                  );
+                })}
+              </div> : null}
+            </div>
+          ) : null}
           {visibleReportItems.length > 0 ? (
             <div className="nav-group">
               <button
@@ -137,11 +195,23 @@ export function Layout({ children }: { children: ReactNode }) {
           ) : null}
         </nav>
       </aside>
+      <button
+        className={`sidebar-backdrop${isMobileSidebarOpen ? " visible" : ""}`}
+        type="button"
+        aria-label="Đóng menu"
+        onClick={() => setIsMobileSidebarOpen(false)}
+      />
 
       <main className="main-area">
         <header className="topbar">
           <div className="topbar-left">
-            <button className="icon-button mobile-menu" type="button" aria-label="Mở menu">
+            <button
+              className="icon-button mobile-menu"
+              type="button"
+              aria-label={isMobileSidebarOpen ? "Đóng menu" : "Mở menu"}
+              aria-expanded={isMobileSidebarOpen}
+              onClick={() => setIsMobileSidebarOpen((open) => !open)}
+            >
               <Menu size={20} />
             </button>
             <div>
@@ -153,11 +223,13 @@ export function Layout({ children }: { children: ReactNode }) {
             <div className="user-switcher"><span>Xin chào</span><strong>{currentUser?.display_name}</strong></div>
           {!isSalesPage && hasPermission("invoices.create") ? (
               <button className="primary-button" type="button" onClick={() => navigate("/invoices/new")}>
-                <FileText size={17} />
-                Tạo hóa đơn
+                <ShoppingCart size={17} />
+                Bán hàng
               </button>
           ) : null}
-            <button className="secondary-button" type="button" onClick={() => void logout()}>Đăng xuất</button>
+            <button className="icon-button topbar-logout-button" type="button" disabled={isLoggingOut} onClick={() => void handleLogout()} aria-label="Đăng xuất" title="Đăng xuất">
+              {isLoggingOut ? <LoaderCircle className="loading-spinner" size={18} /> : <LogOut size={18} />}
+            </button>
           </div>
         </header>
         <div className="content">{children}</div>

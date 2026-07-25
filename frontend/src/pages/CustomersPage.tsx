@@ -97,7 +97,7 @@ export function CustomersPage() {
             onKeyDown={(event) => {
               if (event.key === "Enter") void loadCustomers();
             }}
-            placeholder="Tìm theo tên hoặc số điện thoại"
+            placeholder="Tìm theo số điện thoại"
           />
         </div>
         <button className="secondary-button" type="button" onClick={() => void loadCustomers()}>

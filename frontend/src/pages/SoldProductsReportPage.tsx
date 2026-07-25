@@ -5,10 +5,10 @@ import { api } from "../api/client";
 import { DateRangePicker } from "../components/DateRangePicker";
 import { EmptyState } from "../components/EmptyState";
 import type { SoldProductReportRow } from "../types";
-import { firstDayOfCurrentMonthInputValue, money, numberText, todayInputValue } from "../utils/format";
+import { money, numberText, todayInputValue } from "../utils/format";
 
 export function SoldProductsReportPage() {
-  const [fromDate, setFromDate] = useState(firstDayOfCurrentMonthInputValue());
+  const [fromDate, setFromDate] = useState(todayInputValue());
   const [toDate, setToDate] = useState(todayInputValue());
   const [rows, setRows] = useState<SoldProductReportRow[]>([]);
   const [loading, setLoading] = useState(false);

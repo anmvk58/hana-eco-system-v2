@@ -45,8 +45,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const result = await api.auth.login(username, password);
       localStorage.setItem("hana-access-token", result.access_token);
+      const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      if (!reduceMotion) {
+        document.documentElement.classList.add("auth-login-success");
+        await new Promise((resolve) => window.setTimeout(resolve, 360));
+      }
       setCurrentUser(result.user);
+      window.setTimeout(() => document.documentElement.classList.remove("auth-login-success"), 0);
     } catch (err) {
+      document.documentElement.classList.remove("auth-login-success");
       const message = err instanceof Error ? err.message : "Đăng nhập không thành công";
       setError(message); throw err;
     }

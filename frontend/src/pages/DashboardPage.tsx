@@ -1,4 +1,4 @@
-import { CalendarDays, ClipboardCheck, ReceiptText, Users } from "lucide-react";
+import { CalendarDays, CircleDollarSign, ClipboardCheck, ReceiptText, Users } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
@@ -8,7 +8,7 @@ import { useAuth } from "../auth/AuthContext";
 import { EmptyState } from "../components/EmptyState";
 import { StatusBadge } from "../components/StatusBadge";
 import type { Customer, Invoice } from "../types";
-import { money } from "../utils/format";
+import { money, numberText } from "../utils/format";
 
 type TimePreset = "today" | "7days" | "month" | "year";
 
@@ -25,6 +25,13 @@ interface RevenueChartPoint {
   fullLabel: string;
   value: number;
   showLabel: boolean;
+}
+
+interface ProductSalesSummary {
+  key: string;
+  name: string;
+  quantity: number;
+  revenue: number;
 }
 
 function localDateKey(date: Date) {
@@ -103,7 +110,33 @@ export function DashboardPage() {
     }),
     [customers, timeRange],
   );
-  const revenue = revenueInvoices.reduce((sum, invoice) => sum + Number(invoice.total_amount), 0);
+  const productRevenue = revenueInvoices.reduce((sum, invoice) => sum + Number(invoice.subtotal), 0);
+  const extraChargeRevenue = revenueInvoices.reduce((sum, invoice) => sum + Number(invoice.total_extra_charges), 0);
+  const productSales = useMemo<ProductSalesSummary[]>(() => {
+    const products = new Map<string, ProductSalesSummary>();
+    revenueInvoices.forEach((invoice) => {
+      invoice.items.forEach((item) => {
+        const current = products.get(item.product_code) ?? {
+          key: item.product_code,
+          name: item.product_name,
+          quantity: 0,
+          revenue: 0,
+        };
+        current.quantity += Number(item.quantity);
+        current.revenue += Number(item.line_total);
+        products.set(item.product_code, current);
+      });
+    });
+    return Array.from(products.values());
+  }, [revenueInvoices]);
+  const topProductsByQuantity = useMemo(
+    () => [...productSales].sort((a, b) => b.quantity - a.quantity || b.revenue - a.revenue).slice(0, 10),
+    [productSales],
+  );
+  const topProductsByRevenue = useMemo(
+    () => [...productSales].sort((a, b) => b.revenue - a.revenue || b.quantity - a.quantity).slice(0, 10),
+    [productSales],
+  );
   const revenueChartData = useMemo<RevenueChartPoint[]>(() => {
     const totals = new Map<string, number>();
     revenueInvoices.forEach((invoice) => {
@@ -113,7 +146,7 @@ export function DashboardPage() {
         : timePreset === "year"
           ? monthKey(soldAt)
           : localDateKey(soldAt);
-      totals.set(key, (totals.get(key) ?? 0) + Number(invoice.total_amount));
+      totals.set(key, (totals.get(key) ?? 0) + Number(invoice.subtotal));
     });
 
     if (timePreset === "today") {
@@ -179,12 +212,28 @@ export function DashboardPage() {
       </section>
 
       <section className="metric-grid dashboard-metrics dashboard-metrics-refresh" key={timePreset}>
-        <MetricCard icon={<ReceiptText />} label="Doanh thu" value={money(revenue)} />
+        <MetricCard icon={<ReceiptText />} label="Doanh thu thuần sản phẩm" value={money(productRevenue)} />
+        <MetricCard icon={<CircleDollarSign />} label="Tổng tiền thu khác" value={money(extraChargeRevenue)} />
         <MetricCard icon={<ClipboardCheck />} label="Hóa đơn đã tạo" value={String(createdInvoices.length)} />
         <MetricCard icon={<Users />} label="Khách hàng đã tạo" value={String(createdCustomers.length)} />
       </section>
 
       <RevenueChart data={revenueChartData} preset={timePreset} />
+
+      <section className="dashboard-top-charts" key={`top-products-${timePreset}`}>
+        <HorizontalTopChart
+          title="Top 10 sản phẩm theo số lượng"
+          subtitle="Sản phẩm bán được nhiều nhất"
+          data={topProductsByQuantity.map((product) => ({ key: product.key, name: product.name, value: product.quantity }))}
+          valueType="quantity"
+        />
+        <HorizontalTopChart
+          title="Top 10 sản phẩm theo doanh thu"
+          subtitle="Sản phẩm có doanh thu cao nhất"
+          data={topProductsByRevenue.map((product) => ({ key: product.key, name: product.name, value: product.revenue }))}
+          valueType="revenue"
+        />
+      </section>
 
       <section className="dashboard-grid dashboard-single">
         <div className="table-panel">
@@ -219,6 +268,55 @@ export function DashboardPage() {
         </div>
 
       </section>
+    </div>
+  );
+}
+
+function HorizontalTopChart({
+  title,
+  subtitle,
+  data,
+  valueType,
+}: {
+  title: string;
+  subtitle: string;
+  data: Array<{ key: string; name: string; value: number }>;
+  valueType: "quantity" | "revenue";
+}) {
+  const maxValue = Math.max(...data.map((item) => item.value), 0);
+  const formatValue = (value: number) => valueType === "revenue" ? money(value) : numberText(value, 3);
+  const formatAxisValue = (value: number) => valueType === "revenue" ? compactMoney(value) : numberText(value, 3);
+
+  return (
+    <div className="horizontal-chart-panel">
+      <div className="panel-header">
+        <div>
+          <h2>{title}</h2>
+          <span>{subtitle}</span>
+        </div>
+      </div>
+      {data.length ? (
+        <div className="horizontal-chart">
+          <div className="horizontal-chart-rows">
+            {data.map((item, index) => (
+              <div className="horizontal-bar-row" key={item.key} title={`${item.name}: ${formatValue(item.value)}`}>
+                <div className="horizontal-bar-track">
+                  <div
+                    className="horizontal-bar-fill"
+                    style={{
+                      animationDelay: `${index * 35}ms`,
+                      width: maxValue > 0 ? `${Math.max(2, (item.value / maxValue) * 100)}%` : "0%",
+                    }}
+                  />
+                  <span className="horizontal-bar-name"><strong>{index + 1}.</strong> {item.name}</span>
+                  <span className="horizontal-bar-value">{formatValue(item.value)}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="horizontal-chart-axis"><span>0</span><span>{formatAxisValue(maxValue)}</span></div>
+        </div>
+      ) : <EmptyState title="Chưa có dữ liệu trong khoảng thời gian này" />}
     </div>
   );
 }

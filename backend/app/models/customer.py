@@ -11,7 +11,7 @@ class Customer(Base, TimestampMixin, SoftDeleteMixin):
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
     code: Mapped[str] = mapped_column(String(40), unique=True, index=True, nullable=False)
     name: Mapped[str] = mapped_column(String(200), index=True, nullable=False)
-    phone: Mapped[str | None] = mapped_column(String(30), index=True, nullable=True)
+    phone: Mapped[str | None] = mapped_column(String(30), unique=True, index=True, nullable=True)
     address: Mapped[str | None] = mapped_column(String(500), nullable=True)
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
 

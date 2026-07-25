@@ -1,7 +1,7 @@
 from datetime import datetime
 
 from fastapi import HTTPException, status
-from sqlalchemy import or_, select
+from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -20,8 +20,9 @@ def list_customers(
     if not include_deleted:
         stmt = stmt.where(Customer.deleted_at.is_(None))
     if search:
-        term = f"%{search.strip()}%"
-        stmt = stmt.where(or_(Customer.name.ilike(term), Customer.phone.ilike(term)))
+        phone_prefix = "".join(search.split())
+        if phone_prefix:
+            stmt = stmt.where(Customer.phone.like(f"{phone_prefix}%"))
     stmt = stmt.order_by(Customer.created_at.desc()).offset(skip).limit(limit)
     return list(db.scalars(stmt).all())
 
@@ -43,7 +44,7 @@ def create_customer(db: Session, payload: CustomerCreate) -> Customer:
         db.commit()
     except IntegrityError as exc:
         db.rollback()
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Customer code already exists") from exc
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Mã khách hàng hoặc số điện thoại đã tồn tại") from exc
     db.refresh(customer)
     return customer
 
@@ -56,7 +57,7 @@ def update_customer(db: Session, customer_id: int, payload: CustomerUpdate) -> C
         db.commit()
     except IntegrityError as exc:
         db.rollback()
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Customer code already exists") from exc
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Mã khách hàng hoặc số điện thoại đã tồn tại") from exc
     db.refresh(customer)
     return customer
 

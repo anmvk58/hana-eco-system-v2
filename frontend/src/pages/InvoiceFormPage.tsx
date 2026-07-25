@@ -36,6 +36,27 @@ const blankCustomerForm = {
   note: "",
 };
 
+function nextAnimationFrame() {
+  return new Promise<void>((resolve) => window.requestAnimationFrame(() => resolve()));
+}
+
+async function waitForImage(image: HTMLImageElement) {
+  if (!image.complete || image.naturalWidth === 0) {
+    await new Promise<void>((resolve, reject) => {
+      const timeout = window.setTimeout(() => reject(new Error("Image load timeout")), 10000);
+      image.addEventListener("load", () => {
+        window.clearTimeout(timeout);
+        resolve();
+      }, { once: true });
+      image.addEventListener("error", () => {
+        window.clearTimeout(timeout);
+        reject(new Error("Image load failed"));
+      }, { once: true });
+    });
+  }
+  if (typeof image.decode === "function") await image.decode();
+}
+
 function buildChargesFromSettings(settings: ExtraChargeSetting[]) {
   return defaultCharges.map((charge) => {
     const setting = settings.find((item) => item.charge_type === charge.charge_type);
@@ -64,6 +85,7 @@ export function InvoiceFormPage() {
   const [lines, setLines] = useState<DraftLine[]>([{ ...blankLine }]);
   const [charges, setCharges] = useState<DraftCharge[]>(defaultCharges);
   const [applyShippingFee, setApplyShippingFee] = useState(true);
+  const [printTwoCopies, setPrintTwoCopies] = useState(true);
   const [shippingSettingsOpen, setShippingSettingsOpen] = useState(false);
   const [shippingDefaultAmount, setShippingDefaultAmount] = useState("0");
   const [productSearch, setProductSearch] = useState("");
@@ -76,30 +98,43 @@ export function InvoiceFormPage() {
 
   useEffect(() => {
     if (!invoiceToPrint) return;
-    let secondFrame = 0;
-    const firstFrame = window.requestAnimationFrame(() => {
-      secondFrame = window.requestAnimationFrame(() => window.print());
-    });
+    let cancelled = false;
     const clearPrintedInvoice = () => {
       setToastMessage(`Hóa đơn ${invoiceToPrint.code} đã được lưu.`);
       setInvoiceToPrint(null);
     };
     window.addEventListener("afterprint", clearPrintedInvoice, { once: true });
+
+    async function prepareAndPrint() {
+      try {
+        await nextAnimationFrame();
+        const printContainer = document.querySelector(".auto-print-receipts");
+        const images = printContainer ? Array.from(printContainer.querySelectorAll("img")) : [];
+        await Promise.all(images.map(waitForImage));
+        if (document.fonts?.ready) await document.fonts.ready;
+        await nextAnimationFrame();
+        await nextAnimationFrame();
+        if (!cancelled) window.print();
+      } catch {
+        if (cancelled) return;
+        setError("Không tải được logo hóa đơn. Hóa đơn đã được lưu, vui lòng thử in lại.");
+        setInvoiceToPrint(null);
+      }
+    }
+    void prepareAndPrint();
+
     return () => {
-      window.cancelAnimationFrame(firstFrame);
-      window.cancelAnimationFrame(secondFrame);
+      cancelled = true;
       window.removeEventListener("afterprint", clearPrintedInvoice);
     };
   }, [invoiceToPrint]);
 
   useEffect(() => {
     async function loadBaseData() {
-      const [customerData, productData, chargeSettingData] = await Promise.all([
-        api.customers.list(),
+      const [productData, chargeSettingData] = await Promise.all([
         api.products.list(),
         api.extraChargeSettings.list(),
       ]);
-      setCustomers(customerData);
       setProducts(productData);
       const shipping = chargeSettingData.find((setting) => setting.charge_type === "shipping");
       setShippingDefaultAmount(shipping?.default_amount ?? "0");
@@ -109,6 +144,25 @@ export function InvoiceFormPage() {
     }
     void loadBaseData().catch((err) => setError(err instanceof Error ? err.message : "Không tải được dữ liệu nền"));
   }, [editingId]);
+
+  useEffect(() => {
+    if (isEditing || !customerFocused || customerId) return;
+    const phonePrefix = customerSearch.replace(/\s+/g, "");
+    if (phonePrefix.length < 5) {
+      setCustomers([]);
+      return;
+    }
+    let cancelled = false;
+    const timer = window.setTimeout(() => {
+      void api.customers.list(phonePrefix, 20)
+        .then((data) => { if (!cancelled) setCustomers(data); })
+        .catch((err) => { if (!cancelled) setError(err instanceof Error ? err.message : "Không tìm được khách hàng"); });
+    }, 300);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [customerFocused, customerId, customerSearch, isEditing]);
 
   useEffect(() => {
     if (!editingId) return;
@@ -140,11 +194,9 @@ export function InvoiceFormPage() {
   const productMap = useMemo(() => new Map(products.map((product) => [product.id, product])), [products]);
 
   const filteredCustomers = useMemo(() => {
-    const keyword = customerSearch.trim().toLowerCase();
+    const keyword = customerSearch.replace(/\s+/g, "");
     if (!keyword) return [];
-    return customers.filter((customer) =>
-      `${customer.code} ${customer.phone ?? ""} ${customer.name}`.toLowerCase().includes(keyword),
-    );
+    return customers.filter((customer) => customer.phone?.startsWith(keyword));
   }, [customerSearch, customers]);
 
   const filteredProducts = useMemo(() => {
@@ -244,6 +296,10 @@ export function InvoiceFormPage() {
   function handleCustomerSearchKeyDown(event: KeyboardEvent<HTMLInputElement>) {
     if (event.key !== "Enter") return;
     event.preventDefault();
+    if (customerSearch.replace(/\s+/g, "").length < 5) {
+      setError("Vui lòng nhập ít nhất 5 ký tự số điện thoại để tìm kiếm");
+      return;
+    }
     const customer = filteredCustomers[0];
     if (customer) {
       selectCustomer(customer);
@@ -257,7 +313,7 @@ export function InvoiceFormPage() {
     setError("");
     try {
       const customer = await api.customers.create(customerForm);
-      setCustomers(await api.customers.list());
+      setCustomers([customer]);
       selectCustomer(customer);
       setCustomerModalOpen(false);
       setCustomerForm(blankCustomerForm);
@@ -396,7 +452,11 @@ export function InvoiceFormPage() {
                   <Search size={17} />
                   <input
                     id="customer-search"
+                    autoComplete="off"
+                    data-1p-ignore="true"
+                    data-lpignore="true"
                     disabled={isEditing}
+                    inputMode="tel"
                     value={customerSearch}
                     onBlur={() => window.setTimeout(() => setCustomerFocused(false), 120)}
                     onChange={(event) => {
@@ -405,14 +465,19 @@ export function InvoiceFormPage() {
                       setCustomerId("");
                       setCustomerFocused(true);
                     }}
-                    onFocus={() => {
-                      if (!isEditing) setCustomerFocused(true);
+                    onFocus={(event) => {
+                      if (isEditing) return;
+                      setCustomerFocused(true);
+                      if (customerSearch) event.currentTarget.select();
+                    }}
+                    onMouseUp={(event) => {
+                      if (!isEditing && customerSearch) event.preventDefault();
                     }}
                     onKeyDown={handleCustomerSearchKeyDown}
-                    placeholder={isEditing ? "Không cho phép sửa khách hàng" : "Nhập số điện thoại hoặc mã khách hàng; để trống nếu là khách lẻ"}
+                    placeholder={isEditing ? "Không cho phép sửa khách hàng" : "Nhập ít nhất 5 chữ số điện thoại; Để trống nếu là khách lẻ"}
                   />
                 </div>
-                {!isEditing && customerFocused && customerSearch.trim() ? (
+                {!isEditing && customerFocused && customerSearch.replace(/\s+/g, "").length >= 5 ? (
                   <div className="product-suggestions">
                     {filteredCustomers.slice(0, 8).map((customer) => (
                       <button key={customer.id} type="button" onMouseDown={() => selectCustomer(customer)}>
@@ -492,16 +557,27 @@ export function InvoiceFormPage() {
               <span>Thành tiền</span>
               <span></span>
             </div>
-            {lines.map((line, index) => (
+            {lines.map((line, index) => {
+              const selectedProduct = products.find((product) => String(product.id) === line.product_id);
+              return (
               <div className="line-row" key={`${index}-${line.product_id}`}>
-                <select value={line.product_id} onChange={(event) => updateLine(index, { product_id: event.target.value })}>
-                  <option value="">Chọn sản phẩm</option>
-                  {products.map((product) => (
-                    <option key={product.id} value={product.id}>
-                      {product.code} - {product.name} ({money(product.sale_price)})
-                    </option>
-                  ))}
-                </select>
+                <div className="product-select">
+                  <select
+                    className="product-select-native"
+                    value={line.product_id}
+                    onChange={(event) => updateLine(index, { product_id: event.target.value })}
+                  >
+                    <option value="">Chọn sản phẩm</option>
+                    {products.map((product) => (
+                      <option key={product.id} value={product.id}>
+                        {product.code} - {product.name} ({money(product.sale_price)})
+                      </option>
+                    ))}
+                  </select>
+                  <span className={selectedProduct ? "product-select-value" : "product-select-value placeholder"}>
+                    {selectedProduct ? `${selectedProduct.code} - ${selectedProduct.name}` : "Chọn sản phẩm"}
+                  </span>
+                </div>
                 <div className="quantity-stepper">
                   <input
                     inputMode="decimal"
@@ -527,7 +603,8 @@ export function InvoiceFormPage() {
                   <Minus size={16} />
                 </button>
               </div>
-            ))}
+              );
+            })}
             <button className="add-line-button" type="button" onClick={() => setLines([...lines, { ...blankLine }])}>
               <Plus size={16} />
               Thêm dòng sản phẩm
@@ -536,6 +613,17 @@ export function InvoiceFormPage() {
         </section>
 
         <aside className="checkout-panel">
+          {!isEditing && hasPermission("invoices.print") ? (
+            <section className="print-settings-section">
+              <label className="print-copy-option">
+                <input checked={printTwoCopies} onChange={(event) => setPrintTwoCopies(event.target.checked)} type="checkbox" />
+                <span>
+                  <strong>In 2 liên</strong>
+                  <small>Tạo hai trang hóa đơn giống nhau khi in</small>
+                </span>
+              </label>
+            </section>
+          ) : null}
           <div className="checkout-title">
             <h2>Thanh toán</h2>
             {hasPermission("extra_charges.update") ? <button className="icon-button" type="button" onClick={() => setShippingSettingsOpen(true)} aria-label="Cài đặt phí ship mặc định">
@@ -656,7 +744,12 @@ export function InvoiceFormPage() {
         </Modal>
       ) : null}
 
-      {invoiceToPrint ? <InvoiceReceipt invoice={invoiceToPrint} className="auto-print-receipt" /> : null}
+      {invoiceToPrint ? (
+        <div className="auto-print-receipts">
+          <InvoiceReceipt invoice={invoiceToPrint} className="auto-print-receipt" />
+          {printTwoCopies ? <InvoiceReceipt invoice={invoiceToPrint} className="auto-print-receipt receipt-copy-next-page" /> : null}
+        </div>
+      ) : null}
       {toastMessage ? <ToastNotification message={toastMessage} onClose={() => setToastMessage("")} /> : null}
     </>
   );
