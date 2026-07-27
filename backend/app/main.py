@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import inspect, text
 
-from app.api.routers import access_control, customers, extra_charge_settings, invoices, product_categories, products, reports
+from app.api.routers import access_control, customers, dashboard, extra_charge_settings, invoices, product_categories, products, reports
 from app.core.config import get_settings
 from app.database import Base, SessionLocal, engine
 from app.models import AuthSession, Customer, ExtraChargeSetting, Invoice, InvoiceCodeSequence, InvoiceExtraCharge, InvoiceHistory, InvoiceItem, Permission, Product, ProductCategory, Role, User
@@ -28,6 +28,7 @@ def create_app() -> FastAPI:
     app.include_router(product_categories.router, prefix=settings.api_prefix)
     app.include_router(products.router, prefix=settings.api_prefix)
     app.include_router(invoices.router, prefix=settings.api_prefix)
+    app.include_router(dashboard.router, prefix=settings.api_prefix)
     app.include_router(extra_charge_settings.router, prefix=settings.api_prefix)
     app.include_router(access_control.router, prefix=settings.api_prefix)
     app.include_router(reports.router, prefix=settings.api_prefix)

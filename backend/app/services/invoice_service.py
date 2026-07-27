@@ -4,7 +4,7 @@ from typing import Any
 
 from fastapi import HTTPException, status
 from fastapi.encoders import jsonable_encoder
-from sqlalchemy import select, text
+from sqlalchemy import func, select, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
@@ -181,25 +181,62 @@ def list_invoices(
     db: Session,
     status_filter: InvoiceStatus | None = None,
     customer_id: int | None = None,
+    code_filter: str | None = None,
+    customer_phone: str | None = None,
     from_date: date | None = None,
     to_date: date | None = None,
     include_deleted: bool = False,
-    skip: int = 0,
-    limit: int = 50,
-) -> list[Invoice]:
-    stmt = select(Invoice).options(selectinload(Invoice.customer), selectinload(Invoice.items), selectinload(Invoice.extra_charges))
+    page: int = 1,
+    page_size: int = 20,
+) -> tuple[list[Invoice], int, int, int]:
+    conditions = []
     if not include_deleted:
-        stmt = stmt.where(Invoice.deleted_at.is_(None))
+        conditions.append(Invoice.deleted_at.is_(None))
     if status_filter:
-        stmt = stmt.where(Invoice.status == status_filter)
+        conditions.append(Invoice.status == status_filter)
     if customer_id:
-        stmt = stmt.where(Invoice.customer_id == customer_id)
+        conditions.append(Invoice.customer_id == customer_id)
+    if code_filter and code_filter.strip():
+        conditions.append(Invoice.code.ilike(f"%{code_filter.strip()}%"))
+    if customer_phone and customer_phone.strip():
+        normalized_phone = customer_phone.replace(" ", "").strip()
+        conditions.append(Invoice.customer.has(Customer.phone.contains(normalized_phone)))
     if from_date:
-        stmt = stmt.where(Invoice.sold_at >= datetime.combine(from_date, time.min))
+        conditions.append(Invoice.sold_at >= datetime.combine(from_date, time.min))
     if to_date:
-        stmt = stmt.where(Invoice.sold_at <= datetime.combine(to_date, time.max))
-    stmt = stmt.order_by(Invoice.sold_at.desc(), Invoice.id.desc()).offset(skip).limit(limit)
-    return list(db.scalars(stmt).all())
+        conditions.append(Invoice.sold_at <= datetime.combine(to_date, time.max))
+
+    total = db.scalar(select(func.count(Invoice.id)).where(*conditions)) or 0
+    total_pages = max(1, (total + page_size - 1) // page_size)
+    current_page = min(page, total_pages)
+    offset = (current_page - 1) * page_size
+
+    stmt = (
+        select(Invoice)
+        .options(selectinload(Invoice.customer), selectinload(Invoice.items), selectinload(Invoice.extra_charges))
+        .where(*conditions)
+        .order_by(Invoice.created_at.desc(), Invoice.id.desc())
+        .offset(offset)
+        .limit(page_size)
+    )
+    invoices = list(db.scalars(stmt).all())
+    invoice_ids = [invoice.id for invoice in invoices]
+    edited_invoice_ids: set[int] = set()
+    if invoice_ids:
+        history_rows = db.execute(
+            select(InvoiceHistory.invoice_id, InvoiceHistory.after_data).where(
+                InvoiceHistory.invoice_id.in_(invoice_ids),
+                InvoiceHistory.action == InvoiceHistoryAction.updated,
+            )
+        ).all()
+        edited_invoice_ids = {
+            invoice_id
+            for invoice_id, after_data in history_rows
+            if not after_data or after_data.get("status") != InvoiceStatus.cancelled.value
+        }
+    for invoice in invoices:
+        invoice.is_edited = invoice.id in edited_invoice_ids
+    return invoices, total, current_page, total_pages
 
 
 def snapshot_invoice(invoice: Invoice) -> dict[str, Any]:

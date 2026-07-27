@@ -23,7 +23,7 @@ export function ReportsPage() {
   async function loadReports() {
     setError("");
     try {
-      setInvoices(await api.invoices.list({ status: "created", from_date: fromDate || undefined, to_date: toDate || undefined }));
+      setInvoices(await api.invoices.listAll({ status: "created", from_date: fromDate || undefined, to_date: toDate || undefined }));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Không tải được báo cáo");
     }

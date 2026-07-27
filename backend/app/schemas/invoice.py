@@ -92,6 +92,18 @@ class InvoiceRead(ORMBase):
     deleted_at: datetime | None = None
 
 
+class InvoiceListItemRead(InvoiceRead):
+    is_edited: bool
+
+
+class InvoicePage(ORMBase):
+    items: list[InvoiceListItemRead]
+    total: int
+    page: int
+    page_size: int
+    total_pages: int
+
+
 class InvoiceHistoryRead(ORMBase):
     id: int
     invoice_id: int

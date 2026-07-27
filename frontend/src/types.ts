@@ -175,6 +175,56 @@ export interface Invoice {
   deleted_at?: string | null;
 }
 
+export interface InvoiceListItem extends Invoice {
+  is_edited: boolean;
+}
+
+export interface InvoicePage {
+  items: InvoiceListItem[];
+  total: number;
+  page: number;
+  page_size: number;
+  total_pages: number;
+}
+
+export type DashboardTimePreset = "today" | "7days" | "month" | "year";
+
+export interface DashboardProductSummary {
+  key: string;
+  name: string;
+  quantity: string;
+  revenue: string;
+}
+
+export interface DashboardRevenuePoint {
+  key: string;
+  label: string;
+  full_label: string;
+  value: string;
+  show_label: boolean;
+}
+
+export interface DashboardRecentInvoice {
+  id: number;
+  code: string;
+  customer?: Customer | null;
+  status: InvoiceStatus;
+  sold_at: string;
+  total_amount: string;
+}
+
+export interface DashboardSummary {
+  period: DashboardTimePreset;
+  product_revenue: string;
+  extra_charge_revenue: string;
+  created_invoice_count: number;
+  created_customer_count: number;
+  revenue_chart: DashboardRevenuePoint[];
+  top_products_by_quantity: DashboardProductSummary[];
+  top_products_by_revenue: DashboardProductSummary[];
+  recent_invoices: DashboardRecentInvoice[];
+}
+
 export interface InvoiceHistory {
   id: number;
   invoice_id: number;

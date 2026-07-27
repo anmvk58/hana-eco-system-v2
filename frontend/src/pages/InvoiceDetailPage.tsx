@@ -1,6 +1,6 @@
-import { Edit, Printer, RotateCcw, XCircle } from "lucide-react";
+import { ArrowLeft, Edit, Printer, RotateCcw, XCircle } from "lucide-react";
 import { useEffect, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useLocation, useParams } from "react-router-dom";
 
 import { api } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
@@ -12,11 +12,14 @@ import { dateTime } from "../utils/format";
 
 export function InvoiceDetailPage() {
   const { hasPermission } = useAuth();
+  const location = useLocation();
   const { invoiceId } = useParams();
   const id = Number(invoiceId);
   const [invoice, setInvoice] = useState<Invoice | null>(null);
   const [history, setHistory] = useState<InvoiceHistory[]>([]);
   const [error, setError] = useState("");
+  const invoiceListSearch = (location.state as { invoiceListSearch?: string } | null)?.invoiceListSearch;
+  const invoiceListPath = invoiceListSearch ? `/invoices?${invoiceListSearch}` : "/invoices";
 
   useEffect(() => {
     async function load() {
@@ -50,6 +53,10 @@ export function InvoiceDetailPage() {
     <div className="page-stack invoice-detail">
       <section className="detail-header">
         <div>
+          <Link className="secondary-button link-button invoice-detail-back" to={invoiceListPath}>
+            <ArrowLeft size={16} />
+            Quay lại danh sách
+          </Link>
           <h2>{invoice.code}</h2>
           <span>{dateTime(invoice.sold_at)} · {customerName}</span>
         </div>

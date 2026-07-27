@@ -89,6 +89,7 @@ MySQL 8.4 (:3306, database hana_pos)
 ### Sales and inventory
 
 - Invoice list, creation, detail, edit, cancel, soft delete, print payload, and history retrieval.
+- Invoice list filtering (status, sale-date range, invoice code, and customer phone) and backend pagination are persisted in the URL, including page-size selection and return navigation from invoice detail. The API returns page metadata, orders invoices by creation time descending, and derives an edited/not-edited indicator from invoice history without treating cancellation alone as an edit.
 - Daily sequential invoice code generation and uniqueness handling.
 - Product snapshot fields on invoice lines.
 - Totals for subtotal, configurable shipping/packing/other charges, and final amount.
@@ -98,7 +99,7 @@ MySQL 8.4 (:3306, database hana_pos)
 
 ### Dashboard and reports
 
-- Dashboard UI based on current customers, products, and invoices.
+- Dashboard summary API performs database-side counts, sums, product rankings, revenue time buckets, and recent-invoice lookup for today, 7-day, 30-day, and 12-month periods; the Dashboard UI renders this compact aggregate response.
 - General reports page.
 - Sold-products report with optional date range, excluding cancelled/deleted invoices.
 
@@ -120,7 +121,7 @@ Priority is an engineering recommendation inferred from the current repository, 
 - Reconcile `docs/database_schema.md` with the current code. It still documents legacy invoice statuses and omits newer authentication/RBAC/session fields.
 - Review inventory concurrency. Invoice code reservation uses row locking, but product stock updates should also have explicit concurrency tests and, if required, product-row locking or atomic guarded updates.
 - Define and enforce the business policy for selling beyond available stock; the current service adjusts quantities but no explicit non-negative-stock rule is documented.
-- Add pagination and stable limits to list endpoints before datasets grow.
+- Add pagination and stable limits to the remaining non-invoice list endpoints before datasets grow.
 - Standardize Vietnamese/English API error messages and verify all tracked text files remain UTF-8.
 
 ### P2 — product follow-up

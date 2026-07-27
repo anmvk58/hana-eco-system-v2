@@ -1,5 +1,5 @@
 import { CalendarDays, CircleDollarSign, ClipboardCheck, ReceiptText, Users } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 
@@ -7,10 +7,10 @@ import { api } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
 import { EmptyState } from "../components/EmptyState";
 import { StatusBadge } from "../components/StatusBadge";
-import type { Customer, Invoice } from "../types";
+import type { DashboardSummary, DashboardTimePreset } from "../types";
 import { money, numberText } from "../utils/format";
 
-type TimePreset = "today" | "7days" | "month" | "year";
+type TimePreset = DashboardTimePreset;
 
 const timePresets: Array<{ value: TimePreset; label: string }> = [
   { value: "today", label: "Hôm nay" },
@@ -27,23 +27,6 @@ interface RevenueChartPoint {
   showLabel: boolean;
 }
 
-interface ProductSalesSummary {
-  key: string;
-  name: string;
-  quantity: number;
-  revenue: number;
-}
-
-function localDateKey(date: Date) {
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${date.getFullYear()}-${month}-${day}`;
-}
-
-function monthKey(date: Date) {
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
-}
-
 function revenueAxisMax(value: number) {
   if (value <= 0) return 0;
   const padded = value / 0.82;
@@ -58,137 +41,39 @@ function compactMoney(value: number) {
 
 export function DashboardPage() {
   const { hasPermission } = useAuth();
-  const [customers, setCustomers] = useState<Customer[]>([]);
-  const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [summary, setSummary] = useState<DashboardSummary | null>(null);
   const [timePreset, setTimePreset] = useState<TimePreset>("today");
   const [error, setError] = useState("");
 
   useEffect(() => {
-    async function load() {
-      const [customerData, invoiceData] = await Promise.all([
-        api.customers.list(),
-        api.invoices.list(),
-      ]);
-      setCustomers(customerData);
-      setInvoices(invoiceData);
-    }
-    void load().catch((err) => setError(err instanceof Error ? err.message : "Không tải được tổng quan"));
-  }, []);
-
-  const timeRange = useMemo(() => {
-    const start = new Date();
-    start.setHours(0, 0, 0, 0);
-    if (timePreset === "7days") start.setDate(start.getDate() - 6);
-    if (timePreset === "month") start.setDate(start.getDate() - 29);
-    if (timePreset === "year") {
-      start.setDate(1);
-      start.setMonth(start.getMonth() - 11);
-    }
-    const end = new Date();
-    end.setHours(23, 59, 59, 999);
-    return { start: start.getTime(), end: end.getTime() };
+    let active = true;
+    setError("");
+    void api.dashboard.summary(timePreset)
+      .then((data) => {
+        if (active) setSummary(data);
+      })
+      .catch((err) => {
+        if (active) setError(err instanceof Error ? err.message : "Không tải được tổng quan");
+      });
+    return () => {
+      active = false;
+    };
   }, [timePreset]);
 
-  const revenueInvoices = useMemo(
-    () => invoices.filter((invoice) => {
-      const soldAt = new Date(invoice.sold_at).getTime();
-      return invoice.status === "created" && soldAt >= timeRange.start && soldAt <= timeRange.end;
-    }),
-    [invoices, timeRange],
-  );
-  const createdInvoices = useMemo(
-    () => invoices.filter((invoice) => {
-      const createdAt = new Date(invoice.created_at).getTime();
-      return invoice.status === "created" && createdAt >= timeRange.start && createdAt <= timeRange.end;
-    }),
-    [invoices, timeRange],
-  );
-  const createdCustomers = useMemo(
-    () => customers.filter((customer) => {
-      const createdAt = new Date(customer.created_at).getTime();
-      return createdAt >= timeRange.start && createdAt <= timeRange.end;
-    }),
-    [customers, timeRange],
-  );
-  const productRevenue = revenueInvoices.reduce((sum, invoice) => sum + Number(invoice.subtotal), 0);
-  const extraChargeRevenue = revenueInvoices.reduce((sum, invoice) => sum + Number(invoice.total_extra_charges), 0);
-  const productSales = useMemo<ProductSalesSummary[]>(() => {
-    const products = new Map<string, ProductSalesSummary>();
-    revenueInvoices.forEach((invoice) => {
-      invoice.items.forEach((item) => {
-        const current = products.get(item.product_code) ?? {
-          key: item.product_code,
-          name: item.product_name,
-          quantity: 0,
-          revenue: 0,
-        };
-        current.quantity += Number(item.quantity);
-        current.revenue += Number(item.line_total);
-        products.set(item.product_code, current);
-      });
-    });
-    return Array.from(products.values());
-  }, [revenueInvoices]);
-  const topProductsByQuantity = useMemo(
-    () => [...productSales].sort((a, b) => b.quantity - a.quantity || b.revenue - a.revenue).slice(0, 10),
-    [productSales],
-  );
-  const topProductsByRevenue = useMemo(
-    () => [...productSales].sort((a, b) => b.revenue - a.revenue || b.quantity - a.quantity).slice(0, 10),
-    [productSales],
-  );
-  const revenueChartData = useMemo<RevenueChartPoint[]>(() => {
-    const totals = new Map<string, number>();
-    revenueInvoices.forEach((invoice) => {
-      const soldAt = new Date(invoice.sold_at);
-      const key = timePreset === "today"
-        ? String(soldAt.getHours())
-        : timePreset === "year"
-          ? monthKey(soldAt)
-          : localDateKey(soldAt);
-      totals.set(key, (totals.get(key) ?? 0) + Number(invoice.subtotal));
-    });
-
-    if (timePreset === "today") {
-      return Array.from({ length: 24 }, (_, hour) => ({
-        key: String(hour),
-        label: `${String(hour).padStart(2, "0")}h`,
-        fullLabel: `${String(hour).padStart(2, "0")}:00 – ${String(hour).padStart(2, "0")}:59`,
-        value: totals.get(String(hour)) ?? 0,
-        showLabel: hour % 2 === 0 || hour === 23,
-      }));
-    }
-
-    if (timePreset === "year") {
-      const firstMonth = new Date(timeRange.start);
-      return Array.from({ length: 12 }, (_, index) => {
-        const date = new Date(firstMonth.getFullYear(), firstMonth.getMonth() + index, 1);
-        const key = monthKey(date);
-        return {
-          key,
-          label: `T${date.getMonth() + 1}`,
-          fullLabel: `Tháng ${date.getMonth() + 1}/${date.getFullYear()}`,
-          value: totals.get(key) ?? 0,
-          showLabel: true,
-        };
-      });
-    }
-
-    const numberOfDays = timePreset === "7days" ? 7 : 30;
-    const firstDay = new Date(timeRange.start);
-    return Array.from({ length: numberOfDays }, (_, index) => {
-      const date = new Date(firstDay);
-      date.setDate(firstDay.getDate() + index);
-      const key = localDateKey(date);
-      return {
-        key,
-        label: `${String(date.getDate()).padStart(2, "0")}/${String(date.getMonth() + 1).padStart(2, "0")}`,
-        fullLabel: new Intl.DateTimeFormat("vi-VN", { weekday: "long", day: "2-digit", month: "2-digit", year: "numeric" }).format(date),
-        value: totals.get(key) ?? 0,
-        showLabel: numberOfDays === 7 || index % 5 === 0 || index === numberOfDays - 1,
-      };
-    });
-  }, [revenueInvoices, timePreset, timeRange]);
+  const productRevenue = summary?.product_revenue ?? "0";
+  const extraChargeRevenue = summary?.extra_charge_revenue ?? "0";
+  const createdInvoiceCount = summary?.created_invoice_count ?? 0;
+  const createdCustomerCount = summary?.created_customer_count ?? 0;
+  const invoices = summary?.recent_invoices ?? [];
+  const topProductsByQuantity = summary?.top_products_by_quantity ?? [];
+  const topProductsByRevenue = summary?.top_products_by_revenue ?? [];
+  const revenueChartData: RevenueChartPoint[] = (summary?.revenue_chart ?? []).map((point) => ({
+    key: point.key,
+    label: point.label,
+    fullLabel: point.full_label,
+    value: Number(point.value),
+    showLabel: point.show_label,
+  }));
 
   return (
     <div className="page-stack">
@@ -214,23 +99,23 @@ export function DashboardPage() {
       <section className="metric-grid dashboard-metrics dashboard-metrics-refresh" key={timePreset}>
         <MetricCard icon={<ReceiptText />} label="Doanh thu thuần sản phẩm" value={money(productRevenue)} />
         <MetricCard icon={<CircleDollarSign />} label="Tổng tiền thu khác" value={money(extraChargeRevenue)} />
-        <MetricCard icon={<ClipboardCheck />} label="Hóa đơn đã tạo" value={String(createdInvoices.length)} />
-        <MetricCard icon={<Users />} label="Khách hàng đã tạo" value={String(createdCustomers.length)} />
+        <MetricCard icon={<ClipboardCheck />} label="Hóa đơn đã tạo" value={String(createdInvoiceCount)} />
+        <MetricCard icon={<Users />} label="Khách hàng đã tạo" value={String(createdCustomerCount)} />
       </section>
 
-      <RevenueChart data={revenueChartData} preset={timePreset} />
+      <RevenueChart data={revenueChartData} preset={timePreset} total={Number(productRevenue)} />
 
       <section className="dashboard-top-charts" key={`top-products-${timePreset}`}>
         <HorizontalTopChart
           title="Top 10 sản phẩm theo số lượng"
           subtitle="Sản phẩm bán được nhiều nhất"
-          data={topProductsByQuantity.map((product) => ({ key: product.key, name: product.name, value: product.quantity }))}
+          data={topProductsByQuantity.map((product) => ({ key: product.key, name: product.name, value: Number(product.quantity) }))}
           valueType="quantity"
         />
         <HorizontalTopChart
           title="Top 10 sản phẩm theo doanh thu"
           subtitle="Sản phẩm có doanh thu cao nhất"
-          data={topProductsByRevenue.map((product) => ({ key: product.key, name: product.name, value: product.revenue }))}
+          data={topProductsByRevenue.map((product) => ({ key: product.key, name: product.name, value: Number(product.revenue) }))}
           valueType="revenue"
         />
       </section>
@@ -321,7 +206,7 @@ function HorizontalTopChart({
   );
 }
 
-function RevenueChart({ data, preset }: { data: RevenueChartPoint[]; preset: TimePreset }) {
+function RevenueChart({ data, preset, total }: { data: RevenueChartPoint[]; preset: TimePreset; total: number }) {
   const maxValue = Math.max(...data.map((point) => point.value), 0);
   const axisMax = revenueAxisMax(maxValue);
   const axisTicks = Array.from({ length: 5 }, (_, index) => axisMax * (1 - index / 4));
@@ -334,7 +219,7 @@ function RevenueChart({ data, preset }: { data: RevenueChartPoint[]; preset: Tim
           <h2>Doanh thu theo thời gian</h2>
           <span>{periodLabel} · {preset === "today" ? "Theo giờ" : preset === "year" ? "Theo tháng" : "Theo ngày"}</span>
         </div>
-        <strong className="revenue-chart-total">{money(data.reduce((sum, point) => sum + point.value, 0))}</strong>
+        <strong className="revenue-chart-total">{money(total)}</strong>
       </div>
       <div className="revenue-chart-body">
         <div className="revenue-y-axis" aria-label="Trục doanh thu">

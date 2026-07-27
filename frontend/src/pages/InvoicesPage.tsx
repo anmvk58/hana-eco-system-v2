@@ -1,46 +1,165 @@
-import { Eye, LoaderCircle, Search, XCircle } from "lucide-react";
-import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { ChevronLeft, ChevronRight, Eye, LoaderCircle, Search, XCircle } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Link, useSearchParams } from "react-router-dom";
 
 import { api } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
 import { DateRangePicker } from "../components/DateRangePicker";
 import { EmptyState } from "../components/EmptyState";
 import { StatusBadge } from "../components/StatusBadge";
-import type { Invoice, InvoiceStatus } from "../types";
+import type { Invoice, InvoiceListItem, InvoiceStatus } from "../types";
 import { dateTime, money, todayInputValue } from "../utils/format";
+
+const PAGE_SIZE_OPTIONS = [10, 20, 50, 100];
+
+function positiveInteger(value: string | null, fallback: number) {
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
+}
 
 export function InvoicesPage() {
   const { hasPermission } = useAuth();
-  const [invoices, setInvoices] = useState<Invoice[]>([]);
-  const [status, setStatus] = useState<InvoiceStatus | "">("");
-  const [fromDate, setFromDate] = useState(todayInputValue());
-  const [toDate, setToDate] = useState(todayInputValue());
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [invoices, setInvoices] = useState<InvoiceListItem[]>([]);
+  const initialStatus = searchParams.get("status");
+  const [status, setStatus] = useState<InvoiceStatus | "">(
+    initialStatus === "created" || initialStatus === "cancelled" ? initialStatus : "",
+  );
+  const [fromDate, setFromDate] = useState(searchParams.get("from_date") ?? todayInputValue());
+  const [toDate, setToDate] = useState(searchParams.get("to_date") ?? todayInputValue());
+  const initialInvoiceCode = searchParams.get("code") ?? "";
+  const initialCustomerPhone = searchParams.get("customer_phone") ?? "";
+  const [invoiceCode, setInvoiceCode] = useState(initialInvoiceCode);
+  const [customerPhone, setCustomerPhone] = useState(initialCustomerPhone);
+  const [appliedInvoiceCode, setAppliedInvoiceCode] = useState(initialInvoiceCode);
+  const [appliedCustomerPhone, setAppliedCustomerPhone] = useState(initialCustomerPhone);
+  const [page, setPage] = useState(positiveInteger(searchParams.get("page"), 1));
+  const initialPageSize = positiveInteger(searchParams.get("page_size"), 20);
+  const [pageSize, setPageSize] = useState(PAGE_SIZE_OPTIONS.includes(initialPageSize) ? initialPageSize : 20);
+  const [total, setTotal] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(false);
   const [refreshVersion, setRefreshVersion] = useState(0);
   const [error, setError] = useState("");
+  const loadRequestId = useRef(0);
 
-  async function loadInvoices() {
+  async function loadInvoices(
+    requestedPage = page,
+    requestedPageSize = pageSize,
+    selectedStatus = status,
+    selectedFromDate = fromDate,
+    selectedToDate = toDate,
+    selectedInvoiceCode = appliedInvoiceCode,
+    selectedCustomerPhone = appliedCustomerPhone,
+  ) {
+    const requestId = ++loadRequestId.current;
     setLoading(true);
     setError("");
     try {
       const data = await api.invoices.list({
-          status: status || undefined,
-          from_date: fromDate || undefined,
-          to_date: toDate || undefined,
+          status: selectedStatus || undefined,
+          code: selectedInvoiceCode.trim() || undefined,
+          customer_phone: selectedCustomerPhone.trim() || undefined,
+          from_date: selectedFromDate || undefined,
+          to_date: selectedToDate || undefined,
+          page: requestedPage,
+          page_size: requestedPageSize,
         });
-      setInvoices(data);
+      if (requestId !== loadRequestId.current) return;
+      setInvoices(data.items);
+      setTotal(data.total);
+      setTotalPages(data.total_pages);
+      if (requestedPage !== data.page) {
+        const nextSearchParams = new URLSearchParams(searchParams);
+        nextSearchParams.set("page", String(data.page));
+        nextSearchParams.set("page_size", String(requestedPageSize));
+        setPage(data.page);
+        setSearchParams(nextSearchParams, { replace: true });
+      }
       setRefreshVersion((version) => version + 1);
     } catch (err) {
+      if (requestId !== loadRequestId.current) return;
       setError(err instanceof Error ? err.message : "Không tải được hóa đơn");
     } finally {
-      setLoading(false);
+      if (requestId === loadRequestId.current) setLoading(false);
     }
   }
 
   useEffect(() => {
     void loadInvoices();
   }, []);
+
+  function applyFilters(
+    selectedStatus: InvoiceStatus | "",
+    selectedFromDate: string,
+    selectedToDate: string,
+    selectedInvoiceCode = invoiceCode,
+    selectedCustomerPhone = customerPhone,
+  ) {
+    const nextSearchParams = new URLSearchParams();
+    if (selectedStatus) nextSearchParams.set("status", selectedStatus);
+    if (selectedFromDate) nextSearchParams.set("from_date", selectedFromDate);
+    if (selectedToDate) nextSearchParams.set("to_date", selectedToDate);
+    if (selectedInvoiceCode.trim()) nextSearchParams.set("code", selectedInvoiceCode.trim());
+    if (selectedCustomerPhone.trim()) nextSearchParams.set("customer_phone", selectedCustomerPhone.trim());
+    nextSearchParams.set("page", "1");
+    nextSearchParams.set("page_size", String(pageSize));
+    setStatus(selectedStatus);
+    setFromDate(selectedFromDate);
+    setToDate(selectedToDate);
+    setAppliedInvoiceCode(selectedInvoiceCode.trim());
+    setAppliedCustomerPhone(selectedCustomerPhone.trim());
+    setPage(1);
+    setSearchParams(nextSearchParams, { replace: true });
+    void loadInvoices(
+      1,
+      pageSize,
+      selectedStatus,
+      selectedFromDate,
+      selectedToDate,
+      selectedInvoiceCode,
+      selectedCustomerPhone,
+    );
+  }
+
+  function changeDateRange(selectedFromDate: string, selectedToDate: string) {
+    setFromDate(selectedFromDate);
+    setToDate(selectedToDate);
+    const rangeIsComplete = Boolean(selectedFromDate && selectedToDate);
+    const rangeWasCleared = !selectedFromDate && !selectedToDate;
+    if (rangeIsComplete || rangeWasCleared) {
+      applyFilters(
+        status,
+        selectedFromDate,
+        selectedToDate,
+        invoiceCode,
+        customerPhone,
+      );
+    }
+  }
+
+  function searchInvoices() {
+    applyFilters(status, fromDate, toDate, invoiceCode, customerPhone);
+  }
+
+  function changePage(nextPage: number) {
+    const nextSearchParams = new URLSearchParams(searchParams);
+    nextSearchParams.set("page", String(nextPage));
+    nextSearchParams.set("page_size", String(pageSize));
+    setPage(nextPage);
+    setSearchParams(nextSearchParams, { replace: true });
+    void loadInvoices(nextPage, pageSize);
+  }
+
+  function changePageSize(nextPageSize: number) {
+    const nextSearchParams = new URLSearchParams(searchParams);
+    nextSearchParams.set("page", "1");
+    nextSearchParams.set("page_size", String(nextPageSize));
+    setPage(1);
+    setPageSize(nextPageSize);
+    setSearchParams(nextSearchParams, { replace: true });
+    void loadInvoices(1, nextPageSize);
+  }
 
   async function cancel(invoice: Invoice) {
     const reason = window.prompt(`Lý do hủy hóa đơn ${invoice.code}`, "Khách hủy đơn");
@@ -50,22 +169,61 @@ export function InvoicesPage() {
     catch (err) { setError(err instanceof Error ? err.message : "Không hủy được hóa đơn"); }
   }
 
+  const currentPage = Math.min(page, totalPages);
+  const firstIndex = (currentPage - 1) * pageSize;
+  const visiblePageStart = Math.max(1, Math.min(currentPage - 2, totalPages - 4));
+  const visiblePageEnd = Math.min(totalPages, visiblePageStart + 4);
+  const visiblePages = Array.from(
+    { length: visiblePageEnd - visiblePageStart + 1 },
+    (_, index) => visiblePageStart + index,
+  );
+
   return (
     <div className="page-stack">
       <section className="toolbar">
-        <select value={status} onChange={(event) => setStatus(event.target.value as InvoiceStatus | "")}>
+        <div className="search-box invoice-search-box">
+          <Search size={17} />
+          <input
+            value={invoiceCode}
+            onChange={(event) => setInvoiceCode(event.target.value)}
+            maxLength={60}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") searchInvoices();
+            }}
+            placeholder="Tìm theo mã hóa đơn"
+            aria-label="Tìm theo mã hóa đơn"
+          />
+        </div>
+        <div className="search-box invoice-search-box">
+          <Search size={17} />
+          <input
+            value={customerPhone}
+            onChange={(event) => setCustomerPhone(event.target.value)}
+            maxLength={30}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") searchInvoices();
+            }}
+            placeholder="Tìm theo số điện thoại"
+            aria-label="Tìm theo số điện thoại khách hàng"
+          />
+        </div>
+        <button className="secondary-button" type="button" disabled={loading} onClick={searchInvoices}>
+          <Search size={17} />
+          Tìm kiếm
+        </button>
+        <select
+          value={status}
+          onChange={(event) => applyFilters(event.target.value as InvoiceStatus | "", fromDate, toDate)}
+        >
           <option value="">Tất cả trạng thái</option>
           <option value="created">Đã tạo</option>
           <option value="cancelled">Đã hủy</option>
         </select>
-        <DateRangePicker from={fromDate} to={toDate} onChange={(from, to) => { setFromDate(from); setToDate(to); }} />
-        <button className="secondary-button" type="button" disabled={loading} onClick={() => void loadInvoices()}>
-          {loading ? <LoaderCircle className="loading-spinner" size={17} /> : <Search size={17} />}
-          {loading ? "Đang lọc..." : "Lọc hóa đơn"}
-        </button>
-        {hasPermission("invoices.create") ? <Link className="primary-button link-button" to="/invoices/new">
-          Tạo hóa đơn
-        </Link> : null}
+        <DateRangePicker from={fromDate} to={toDate} onChange={changeDateRange} />
+        {loading ? <span className="invoice-filter-loading" role="status">
+          <LoaderCircle className="loading-spinner" size={17} />
+          Đang tải...
+        </span> : null}
       </section>
 
       {error ? <div className="alert error">{error}</div> : null}
@@ -77,8 +235,10 @@ export function InvoicesPage() {
               <th>Mã hóa đơn</th>
               <th>Ngày bán</th>
               <th>Khách hàng</th>
+              <th>Số điện thoại</th>
               <th>Địa chỉ</th>
               <th>Trạng thái</th>
+              <th>Chỉnh sửa</th>
               <th className="numeric">Tiền hàng</th>
               <th className="numeric">Thu khác</th>
               <th className="numeric">Tổng thanh toán</th>
@@ -88,18 +248,36 @@ export function InvoicesPage() {
           <tbody>
             {invoices.map((invoice) => (
               <tr key={invoice.id}>
-                <td className="code-cell">{invoice.code}</td>
+                <td className="code-cell">
+                  <Link
+                    to={`/invoices/${invoice.id}`}
+                    state={{ invoiceListSearch: searchParams.toString() }}
+                  >
+                    {invoice.code}
+                  </Link>
+                </td>
                 <td>{dateTime(invoice.sold_at)}</td>
                 <td>{invoice.customer?.name ?? "Khách lẻ"}</td>
+                <td>{invoice.customer?.phone ?? ""}</td>
                 <td>{invoice.customer?.address || "-"}</td>
                 <td>
                   <StatusBadge status={invoice.status} />
+                </td>
+                <td>
+                  <span className={`edit-status ${invoice.is_edited ? "edited" : "unchanged"}`}>
+                    {invoice.is_edited ? "Đã chỉnh sửa" : "Chưa chỉnh sửa"}
+                  </span>
                 </td>
                 <td className="numeric">{money(invoice.subtotal)}</td>
                 <td className="numeric">{money(invoice.total_extra_charges)}</td>
                 <td className="numeric strong">{money(invoice.total_amount)}</td>
                 <td className="row-actions">
-                  <Link className="icon-button" to={`/invoices/${invoice.id}`} aria-label="Xem">
+                  <Link
+                    className="icon-button"
+                    to={`/invoices/${invoice.id}`}
+                    state={{ invoiceListSearch: searchParams.toString() }}
+                    aria-label="Xem"
+                  >
                     <Eye size={16} />
                   </Link>
                   {hasPermission("invoices.cancel") && invoice.status === "created" ? <button className="icon-button danger" type="button" onClick={() => void cancel(invoice)} aria-label="Hủy hóa đơn">
@@ -112,6 +290,53 @@ export function InvoicesPage() {
         </table>
         {invoices.length === 0 ? <EmptyState title="Chưa có hóa đơn" description="Tạo hóa đơn bán hàng để xem dữ liệu tại đây." /> : null}
       </section>
+
+      {total > 0 ? <section className="pagination-bar" aria-label="Phân trang hóa đơn">
+        <span className="pagination-summary">
+          Hiển thị {firstIndex + 1}–{Math.min(firstIndex + pageSize, total)} trong {total} hóa đơn
+        </span>
+        <label className="page-size-control">
+          <span>Số bản ghi / trang</span>
+          <select
+            value={pageSize}
+            onChange={(event) => changePageSize(Number(event.target.value))}
+            aria-label="Số bản ghi trên mỗi trang"
+          >
+            {PAGE_SIZE_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}
+          </select>
+        </label>
+        <div className="pagination-controls">
+          <button
+            type="button"
+            className="pagination-button"
+            disabled={currentPage === 1}
+            onClick={() => changePage(currentPage - 1)}
+            aria-label="Trang trước"
+          >
+            <ChevronLeft size={17} />
+          </button>
+          {visiblePages.map((pageNumber) => (
+            <button
+              key={pageNumber}
+              type="button"
+              className={`pagination-button${pageNumber === currentPage ? " active" : ""}`}
+              onClick={() => changePage(pageNumber)}
+              aria-current={pageNumber === currentPage ? "page" : undefined}
+            >
+              {pageNumber}
+            </button>
+          ))}
+          <button
+            type="button"
+            className="pagination-button"
+            disabled={currentPage === totalPages}
+            onClick={() => changePage(currentPage + 1)}
+            aria-label="Trang sau"
+          >
+            <ChevronRight size={17} />
+          </button>
+        </div>
+      </section> : null}
     </div>
   );
 }
