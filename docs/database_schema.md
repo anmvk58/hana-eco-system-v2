@@ -49,8 +49,22 @@
 | id | integer | Primary key |
 | code | varchar(60) | Unique, indexed |
 | customer_id | integer | FK customers.id, nullable |
-| status | enum(draft, completed, cancelled) | Indexed |
+| status | enum(created, completed, cancelled) | Indexed; completed khi shipper xác nhận giao thành công |
 | sold_at | datetime | Indexed |
+| audit_label | enum(retail, internal_shipper, external_shipper) | Nullable; NULL means not audited |
+| assigned_shipper_id | integer | FK shippers.id; only populated for Ship Ruột |
+| audited_at | datetime | Nullable |
+| audited_by_user_id | integer | FK users.id, nullable |
+| delivered_at | datetime | Nullable; thời điểm shipper xác nhận giao thành công |
+| delivered_by_user_id | integer | FK users.id, nullable; người xác nhận giao thành công |
+| is_paid_by_transfer | boolean | Đã thanh toán chuyển khoản; shipper không thu tiền khách |
+| external_shipper_name | varchar(160) | Tên/đơn vị Ship Ngoài nhận bàn giao, nullable |
+| external_shipper_phone | varchar(30) | SĐT Ship Ngoài, nullable |
+| external_advance_method | enum(transfer, cash, mixed) | Hình thức ứng tiền khi bàn giao Ship Ngoài, nullable |
+| external_transfer_amount | numeric(14,2) | Số tiền chuyển khoản thực tế khi bàn giao |
+| external_cash_amount | numeric(14,2) | Số tiền mặt thực tế khi bàn giao |
+| external_shipping_fee | numeric(14,2) | Tiền ship thực tế phải trả cho Ship Ngoài |
+| external_advance_amount | numeric(14,2) | Số tiền Ship Ngoài phải ứng cho đợt bàn giao |
 | note | text | Nullable |
 | subtotal | numeric(14,2) | Tổng tiền hàng |
 | total_extra_charges | numeric(14,2) | Tổng phí ship/đóng hàng/phụ thu |
@@ -120,5 +134,17 @@
 | username | varchar(80) | Unique |
 | display_name | varchar(160) | Required |
 | is_active | boolean | Required |
+| created_at | datetime | Required |
+| updated_at | datetime | Required |
+
+## shippers
+
+| Column | Type | Notes |
+| --- | --- | --- |
+| id | integer | Primary key |
+| user_id | integer | Unique FK users.id; one login per shipper |
+| phone | varchar(30) | Nullable |
+| note | text | Nullable |
+| is_active | boolean | Required; synchronized with the linked user |
 | created_at | datetime | Required |
 | updated_at | datetime | Required |

@@ -27,6 +27,7 @@ class Settings(BaseModel):
     api_prefix: str = "/api"
     database_url: str = "mysql+pymysql://hana:hana_password@localhost:3306/hana_pos?charset=utf8mb4"
     cors_origins: list[str] = Field(default_factory=lambda: ["http://localhost:5173", "http://127.0.0.1:5173"])
+    cors_origin_regex: str | None = None
 
 
 @lru_cache
@@ -45,4 +46,5 @@ def get_settings() -> Settings:
         api_prefix=os.getenv("API_PREFIX", "/api"),
         database_url=os.getenv("DATABASE_URL", "mysql+pymysql://hana:hana_password@localhost:3306/hana_pos?charset=utf8mb4"),
         cors_origins=parsed_origins,
+        cors_origin_regex=os.getenv("CORS_ORIGIN_REGEX") or None,
     )

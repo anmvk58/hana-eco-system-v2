@@ -37,6 +37,17 @@ def ensure_defaults(db: Session) -> None:
         db.add(admin_role)
     admin_role.permissions = list(existing.values())
 
+    shipper_role = db.scalar(role_query().where(Role.name == "Shipper nội bộ"))
+    if not shipper_role:
+        shipper_role = Role(
+            name="Shipper nội bộ",
+            description="Nhận các đơn giao hàng được tạo trong ngày",
+            is_system=True,
+        )
+        db.add(shipper_role)
+    shipper_role.is_system = True
+    shipper_role.permissions = [existing["shipping.claim"]]
+
     admin = db.scalar(user_query().where(User.username == "admin"))
     if not admin:
         admin = User(username="admin", display_name="Admin", password_hash=hash_password("admin"))
@@ -177,6 +188,7 @@ def serialize_user(user: User) -> dict:
         "username": user.username,
         "display_name": user.display_name,
         "is_active": user.is_active,
+        "shipper_id": user.shipper.id if user.shipper else None,
         "roles": user.roles,
         "permissions": sorted(permission_codes(user)),
         "created_at": user.created_at,

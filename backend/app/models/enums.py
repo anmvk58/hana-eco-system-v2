@@ -8,7 +8,20 @@ class ProductStatus(str, Enum):
 
 class InvoiceStatus(str, Enum):
     created = "created"
+    completed = "completed"
     cancelled = "cancelled"
+
+
+class InvoiceAuditLabel(str, Enum):
+    retail = "retail"
+    internal_shipper = "internal_shipper"
+    external_shipper = "external_shipper"
+
+
+class ExternalAdvanceMethod(str, Enum):
+    transfer = "transfer"
+    cash = "cash"
+    mixed = "mixed"
 
 
 class ExtraChargeType(str, Enum):

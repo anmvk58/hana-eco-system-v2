@@ -1,4 +1,4 @@
-import { ChevronLeft, ChevronRight, Eye, LoaderCircle, Search, XCircle } from "lucide-react";
+import { ChevronLeft, ChevronRight, Eye, LoaderCircle, Minus, Pencil, Search, XCircle } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 
@@ -7,6 +7,7 @@ import { useAuth } from "../auth/AuthContext";
 import { DateRangePicker } from "../components/DateRangePicker";
 import { EmptyState } from "../components/EmptyState";
 import { StatusBadge } from "../components/StatusBadge";
+import { AuditBadge } from "../components/AuditBadge";
 import type { Invoice, InvoiceListItem, InvoiceStatus } from "../types";
 import { dateTime, money, todayInputValue } from "../utils/format";
 
@@ -23,7 +24,7 @@ export function InvoicesPage() {
   const [invoices, setInvoices] = useState<InvoiceListItem[]>([]);
   const initialStatus = searchParams.get("status");
   const [status, setStatus] = useState<InvoiceStatus | "">(
-    initialStatus === "created" || initialStatus === "cancelled" ? initialStatus : "",
+    initialStatus === "created" || initialStatus === "completed" || initialStatus === "cancelled" ? initialStatus : "",
   );
   const [fromDate, setFromDate] = useState(searchParams.get("from_date") ?? todayInputValue());
   const [toDate, setToDate] = useState(searchParams.get("to_date") ?? todayInputValue());
@@ -217,6 +218,7 @@ export function InvoicesPage() {
         >
           <option value="">Tất cả trạng thái</option>
           <option value="created">Đã tạo</option>
+          <option value="completed">Hoàn thành</option>
           <option value="cancelled">Đã hủy</option>
         </select>
         <DateRangePicker from={fromDate} to={toDate} onChange={changeDateRange} />
@@ -238,7 +240,8 @@ export function InvoicesPage() {
               <th>Số điện thoại</th>
               <th>Địa chỉ</th>
               <th>Trạng thái</th>
-              <th>Chỉnh sửa</th>
+              <th>Audit</th>
+              <th className="edit-status-column">Sửa</th>
               <th className="numeric">Tiền hàng</th>
               <th className="numeric">Thu khác</th>
               <th className="numeric">Tổng thanh toán</th>
@@ -263,9 +266,15 @@ export function InvoicesPage() {
                 <td>
                   <StatusBadge status={invoice.status} />
                 </td>
-                <td>
-                  <span className={`edit-status ${invoice.is_edited ? "edited" : "unchanged"}`}>
-                    {invoice.is_edited ? "Đã chỉnh sửa" : "Chưa chỉnh sửa"}
+                <td><AuditBadge label={invoice.audit_label} /></td>
+                <td className="edit-status-column">
+                  <span
+                    className={`edit-status-icon ${invoice.is_edited ? "edited" : "unchanged"}`}
+                    role="img"
+                    aria-label={invoice.is_edited ? "Đã chỉnh sửa" : "Chưa chỉnh sửa"}
+                    title={invoice.is_edited ? "Đã chỉnh sửa" : "Chưa chỉnh sửa"}
+                  >
+                    {invoice.is_edited ? <Pencil size={15}/> : <Minus size={17}/>}
                   </span>
                 </td>
                 <td className="numeric">{money(invoice.subtotal)}</td>

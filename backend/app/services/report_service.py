@@ -21,7 +21,7 @@ def sold_products(db: Session, from_date: date | None, to_date: date | None):
             func.sum(InvoiceItem.line_total).label("sales_revenue"),
         )
         .join(Invoice, Invoice.id == InvoiceItem.invoice_id)
-        .where(Invoice.status == InvoiceStatus.created, Invoice.deleted_at.is_(None))
+        .where(Invoice.status.in_((InvoiceStatus.created, InvoiceStatus.completed)), Invoice.deleted_at.is_(None))
         .group_by(InvoiceItem.product_code)
         .order_by(func.sum(InvoiceItem.quantity).desc(), InvoiceItem.product_code)
     )

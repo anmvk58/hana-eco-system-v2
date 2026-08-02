@@ -1,12 +1,16 @@
-import { CheckCircle2, X } from "lucide-react";
+import { CheckCircle2, CircleAlert, X, XCircle } from "lucide-react";
 import { useEffect } from "react";
 
 export function ToastNotification({
   message,
+  title = "Tạo hóa đơn thành công",
+  variant = "success",
   onClose,
   duration = 2500,
 }: {
   message: string;
+  title?: string;
+  variant?: "success" | "warning" | "error";
   onClose: () => void;
   duration?: number;
 }) {
@@ -16,10 +20,10 @@ export function ToastNotification({
   }, [duration, message, onClose]);
 
   return (
-    <div className="toast-notification" role="status" aria-live="polite">
-      <div className="toast-icon"><CheckCircle2 size={21} /></div>
+    <div className={`toast-notification ${variant}`} role={variant === "error" ? "alert" : "status"} aria-live="polite">
+      <div className="toast-icon">{variant === "warning" ? <CircleAlert size={21} /> : variant === "error" ? <XCircle size={21} /> : <CheckCircle2 size={21} />}</div>
       <div className="toast-content">
-        <strong>Tạo hóa đơn thành công</strong>
+        <strong>{title}</strong>
         <span>{message}</span>
       </div>
       <button type="button" onClick={onClose} aria-label="Đóng thông báo">

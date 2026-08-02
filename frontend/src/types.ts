@@ -1,5 +1,7 @@
 export type ProductStatus = "active" | "inactive";
-export type InvoiceStatus = "created" | "cancelled";
+export type InvoiceStatus = "created" | "completed" | "cancelled";
+export type InvoiceAuditLabel = "retail" | "internal_shipper" | "external_shipper";
+export type ExternalAdvanceMethod = "transfer" | "cash" | "mixed";
 export type ExtraChargeType = "shipping" | "packing" | "other";
 
 export interface Permission {
@@ -20,6 +22,7 @@ export interface Role extends RoleSummary {
 export interface UserSummary { id: number; username: string; display_name: string; }
 export interface User extends UserSummary {
   is_active: boolean;
+  shipper_id?: number | null;
   roles: RoleSummary[];
   permissions: string[];
   created_at: string;
@@ -27,6 +30,24 @@ export interface User extends UserSummary {
 }
 export interface RolePayload { name: string; description?: string; permission_codes: string[]; }
 export interface UserPayload { username: string; display_name: string; password?: string; is_active: boolean; role_ids: number[]; }
+export interface Shipper {
+  id: number;
+  user_id: number;
+  user: UserSummary;
+  phone?: string | null;
+  note?: string | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+export interface ShipperPayload {
+  username?: string;
+  display_name?: string;
+  password?: string;
+  phone?: string;
+  note?: string;
+  is_active?: boolean;
+}
 export interface LoginResponse { access_token: string; token_type: string; expires_at: string; user: User; }
 export interface SoldProductReportRow {
   product_code: string;
@@ -132,6 +153,7 @@ export interface InvoicePayload {
   customer_id?: number | null;
   status: InvoiceStatus;
   sold_at?: string | null;
+  is_paid_by_transfer?: boolean;
   note?: string;
   items: InvoiceItemPayload[];
   extra_charges: InvoiceExtraChargePayload[];
@@ -164,6 +186,21 @@ export interface Invoice {
   customer?: Customer | null;
   status: InvoiceStatus;
   sold_at: string;
+  audit_label?: InvoiceAuditLabel | null;
+  assigned_shipper_id?: number | null;
+  assigned_shipper?: Shipper | null;
+  audited_at?: string | null;
+  audited_by_user_id?: number | null;
+  delivered_at?: string | null;
+  delivered_by_user_id?: number | null;
+  is_paid_by_transfer: boolean;
+  external_shipper_name?: string | null;
+  external_shipper_phone?: string | null;
+  external_advance_method?: ExternalAdvanceMethod | null;
+  external_transfer_amount: string;
+  external_cash_amount: string;
+  external_shipping_fee: string;
+  external_advance_amount: string;
   note?: string | null;
   subtotal: string;
   total_extra_charges: string;
@@ -185,6 +222,19 @@ export interface InvoicePage {
   page: number;
   page_size: number;
   total_pages: number;
+}
+
+export interface ExternalHandoffPayload {
+  advance_method: ExternalAdvanceMethod;
+  shipping_fee: string;
+  transfer_amount: string;
+  cash_amount: string;
+}
+
+export interface ShipHandoverPayload {
+  invoice_ids: number[];
+  audit_label: "retail" | "external_shipper";
+  external_handoff?: ExternalHandoffPayload;
 }
 
 export type DashboardTimePreset = "today" | "7days" | "month" | "year";
@@ -210,6 +260,11 @@ export interface DashboardRecentInvoice {
   customer?: Customer | null;
   status: InvoiceStatus;
   sold_at: string;
+  audit_label?: InvoiceAuditLabel | null;
+  assigned_shipper_id?: number | null;
+  assigned_shipper?: Shipper | null;
+  audited_at?: string | null;
+  audited_by_user_id?: number | null;
   total_amount: string;
 }
 

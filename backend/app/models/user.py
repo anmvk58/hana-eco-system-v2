@@ -56,6 +56,7 @@ class User(Base, TimestampMixin):
 
     invoice_histories = relationship("InvoiceHistory", back_populates="changed_by_user")
     roles = relationship("Role", secondary=user_roles, back_populates="users", lazy="selectin")
+    shipper = relationship("Shipper", back_populates="user", uselist=False)
 
 
 class AuthSession(Base):

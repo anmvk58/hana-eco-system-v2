@@ -4,6 +4,7 @@ const labels: Record<InvoiceStatus | ProductStatus, string> = {
   active: "Đang bán",
   inactive: "Ngừng bán",
   created: "Đã tạo",
+  completed: "Hoàn thành",
   cancelled: "Đã hủy",
 };
 

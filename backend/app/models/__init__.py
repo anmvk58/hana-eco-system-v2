@@ -4,6 +4,7 @@ from app.models.extra_charge_setting import ExtraChargeSetting
 from app.models.invoice import Invoice, InvoiceCodeSequence, InvoiceExtraCharge, InvoiceHistory, InvoiceItem
 from app.models.product import Product
 from app.models.product_category import ProductCategory
+from app.models.shipper import Shipper
 from app.models.user import AuthSession, Permission, Role, User, role_permissions, user_roles
 
 __all__ = [
@@ -17,6 +18,7 @@ __all__ = [
     "InvoiceItem",
     "InvoiceExtraCharge",
     "InvoiceHistory",
+    "Shipper",
     "User",
     "Role",
     "Permission",

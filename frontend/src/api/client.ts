@@ -7,6 +7,7 @@ import type {
   ExtraChargeSettingPayload,
   ExtraChargeType,
   Invoice,
+  InvoiceAuditLabel,
   InvoiceHistory,
   InvoicePage,
   InvoicePayload,
@@ -20,13 +21,25 @@ import type {
   RolePayload,
   User,
   UserPayload,
+  Shipper,
+  ShipperPayload,
   LoginResponse,
   SoldProductReportRow,
+  ShipHandoverPayload,
 } from "../types";
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000/api";
+const runtimeApiUrl = new URL("/api", window.location.origin);
+runtimeApiUrl.port = "8000";
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || runtimeApiUrl.toString();
 
 type QueryValue = string | number | boolean | null | undefined;
+
+export class ApiError extends Error {
+  constructor(message: string, readonly status: number) {
+    super(message);
+    this.name = "ApiError";
+  }
+}
 
 type InvoiceListFilters = {
   status?: InvoiceStatus;
@@ -37,6 +50,8 @@ type InvoiceListFilters = {
   to_date?: string;
   page?: number;
   page_size?: number;
+  audit_label?: InvoiceAuditLabel;
+  unaudited?: boolean;
 };
 
 function buildUrl(path: string, query?: Record<string, QueryValue>) {
@@ -84,7 +99,7 @@ async function request<T>(path: string, options: RequestInit = {}, query?: Recor
     if (response.status === 401 && token && path !== "/auth/login") {
       window.dispatchEvent(new Event("hana-auth-expired"));
     }
-    throw new Error(message);
+    throw new ApiError(message, response.status);
   }
 
   if (response.status === 204) {
@@ -120,6 +135,23 @@ export const api = {
     createUser: (payload: UserPayload) => request<User>("/users", { method: "POST", body: JSON.stringify(payload) }),
     updateUser: (id: number, payload: Partial<UserPayload>) => request<User>(`/users/${id}`, { method: "PUT", body: JSON.stringify(payload) }),
     removeUser: (id: number) => request<void>(`/users/${id}`, { method: "DELETE" }),
+  },
+  shippers: {
+    list: () => request<Shipper[]>("/shippers"),
+    create: (payload: ShipperPayload) => request<Shipper>("/shippers", { method: "POST", body: JSON.stringify(payload) }),
+    update: (id: number, payload: ShipperPayload) => request<Shipper>(`/shippers/${id}`, { method: "PUT", body: JSON.stringify(payload) }),
+    remove: (id: number) => request<void>(`/shippers/${id}`, { method: "DELETE" }),
+  },
+  shipping: {
+    availableInvoices: () => request<Invoice[]>("/shipping/available-invoices"),
+    claimedInvoices: (fromDate?: string, toDate?: string) => request<Invoice[]>("/shipping/claimed-invoices", {}, { from_date: fromDate, to_date: toDate }),
+    claim: (invoiceIds: number[]) => request<Invoice[]>("/shipping/claim", { method: "POST", body: JSON.stringify({ invoice_ids: invoiceIds }) }),
+    markDelivered: (invoiceId: number) => request<Invoice>(`/shipping/invoices/${invoiceId}/delivered`, { method: "POST" }),
+  },
+  shipManagement: {
+    unauditedInvoices: (fromDate?: string, toDate?: string) =>
+      request<Invoice[]>("/ship-management/unaudited-invoices", {}, { from_date: fromDate, to_date: toDate }),
+    handover: (payload: ShipHandoverPayload) => request<Invoice[]>("/ship-management/handover", { method: "POST", body: JSON.stringify(payload) }),
   },
   customers: {
     list: (search?: string, limit = 50) => request<Customer[]>("/customers", {}, { search, limit }),
@@ -166,5 +198,7 @@ export const api = {
     cancel: (id: number, reason: string) => request<Invoice>(`/invoices/${id}/cancel`, { method: "POST", body: JSON.stringify({ reason }) }),
     history: (id: number) => request<InvoiceHistory[]>(`/invoices/${id}/history`),
     print: (id: number) => request<Invoice>(`/invoices/${id}/print`),
+    audit: (id: number, auditLabel: Exclude<InvoiceAuditLabel, "internal_shipper">) =>
+      request<Invoice>(`/invoices/${id}/audit`, { method: "POST", body: JSON.stringify({ audit_label: auditLabel }) }),
   },
 };

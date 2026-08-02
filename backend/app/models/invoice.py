@@ -1,11 +1,11 @@
 from datetime import datetime
 from decimal import Decimal
 
-from sqlalchemy import DateTime, Enum, ForeignKey, Integer, JSON, Numeric, String, Text
+from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, Integer, JSON, Numeric, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
-from app.models.enums import ExtraChargeType, InvoiceHistoryAction, InvoiceStatus
+from app.models.enums import ExternalAdvanceMethod, ExtraChargeType, InvoiceAuditLabel, InvoiceHistoryAction, InvoiceStatus
 from app.models.mixins import SoftDeleteMixin, TimestampMixin
 
 
@@ -17,12 +17,29 @@ class Invoice(Base, TimestampMixin, SoftDeleteMixin):
     customer_id: Mapped[int | None] = mapped_column(ForeignKey("customers.id"), nullable=True, index=True)
     status: Mapped[InvoiceStatus] = mapped_column(Enum(InvoiceStatus), default=InvoiceStatus.created, index=True, nullable=False)
     sold_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True, nullable=False)
+    audit_label: Mapped[InvoiceAuditLabel | None] = mapped_column(Enum(InvoiceAuditLabel), index=True, nullable=True)
+    assigned_shipper_id: Mapped[int | None] = mapped_column(ForeignKey("shippers.id"), index=True, nullable=True)
+    audited_at: Mapped[datetime | None] = mapped_column(DateTime, index=True, nullable=True)
+    audited_by_user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), index=True, nullable=True)
+    delivered_at: Mapped[datetime | None] = mapped_column(DateTime, index=True, nullable=True)
+    delivered_by_user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), index=True, nullable=True)
+    is_paid_by_transfer: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0", nullable=False)
+    external_shipper_name: Mapped[str | None] = mapped_column(String(160), nullable=True)
+    external_shipper_phone: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    external_advance_method: Mapped[ExternalAdvanceMethod | None] = mapped_column(Enum(ExternalAdvanceMethod), nullable=True)
+    external_transfer_amount: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=0, server_default="0", nullable=False)
+    external_cash_amount: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=0, server_default="0", nullable=False)
+    external_shipping_fee: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=0, server_default="0", nullable=False)
+    external_advance_amount: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=0, server_default="0", nullable=False)
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
     subtotal: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=0, nullable=False)
     total_extra_charges: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=0, nullable=False)
     total_amount: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=0, nullable=False)
 
     customer = relationship("Customer", back_populates="invoices")
+    assigned_shipper = relationship("Shipper", back_populates="invoices", foreign_keys=[assigned_shipper_id])
+    audited_by_user = relationship("User", foreign_keys=[audited_by_user_id])
+    delivered_by_user = relationship("User", foreign_keys=[delivered_by_user_id])
     items = relationship("InvoiceItem", back_populates="invoice", cascade="all, delete-orphan")
     extra_charges = relationship("InvoiceExtraCharge", back_populates="invoice", cascade="all, delete-orphan")
     histories = relationship("InvoiceHistory", back_populates="invoice", cascade="all, delete-orphan")

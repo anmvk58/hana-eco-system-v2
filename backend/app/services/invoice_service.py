@@ -9,9 +9,10 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
 from app.models.customer import Customer
-from app.models.enums import ExtraChargeType, InvoiceHistoryAction, InvoiceStatus
+from app.models.enums import ExtraChargeType, InvoiceAuditLabel, InvoiceHistoryAction, InvoiceStatus
 from app.models.invoice import Invoice, InvoiceCodeSequence, InvoiceExtraCharge, InvoiceHistory, InvoiceItem
 from app.models.product import Product
+from app.models.shipper import Shipper
 from app.models.user import User
 from app.schemas.invoice import InvoiceCreate, InvoiceExtraChargeCreate, InvoiceItemCreate, InvoiceUpdate
 
@@ -162,6 +163,7 @@ def invoice_query(invoice_id: int):
             selectinload(Invoice.customer),
             selectinload(Invoice.items),
             selectinload(Invoice.extra_charges),
+            selectinload(Invoice.assigned_shipper).selectinload(Shipper.user),
         )
         .where(Invoice.id == invoice_id)
     )
@@ -183,6 +185,8 @@ def list_invoices(
     customer_id: int | None = None,
     code_filter: str | None = None,
     customer_phone: str | None = None,
+    audit_label: InvoiceAuditLabel | None = None,
+    unaudited: bool = False,
     from_date: date | None = None,
     to_date: date | None = None,
     include_deleted: bool = False,
@@ -201,6 +205,10 @@ def list_invoices(
     if customer_phone and customer_phone.strip():
         normalized_phone = customer_phone.replace(" ", "").strip()
         conditions.append(Invoice.customer.has(Customer.phone.contains(normalized_phone)))
+    if unaudited:
+        conditions.append(Invoice.audit_label.is_(None))
+    elif audit_label:
+        conditions.append(Invoice.audit_label == audit_label)
     if from_date:
         conditions.append(Invoice.sold_at >= datetime.combine(from_date, time.min))
     if to_date:
@@ -213,7 +221,12 @@ def list_invoices(
 
     stmt = (
         select(Invoice)
-        .options(selectinload(Invoice.customer), selectinload(Invoice.items), selectinload(Invoice.extra_charges))
+        .options(
+            selectinload(Invoice.customer),
+            selectinload(Invoice.items),
+            selectinload(Invoice.extra_charges),
+            selectinload(Invoice.assigned_shipper).selectinload(Shipper.user),
+        )
         .where(*conditions)
         .order_by(Invoice.created_at.desc(), Invoice.id.desc())
         .offset(offset)
@@ -224,15 +237,32 @@ def list_invoices(
     edited_invoice_ids: set[int] = set()
     if invoice_ids:
         history_rows = db.execute(
-            select(InvoiceHistory.invoice_id, InvoiceHistory.after_data).where(
+            select(InvoiceHistory.invoice_id, InvoiceHistory.before_data, InvoiceHistory.after_data).where(
                 InvoiceHistory.invoice_id.in_(invoice_ids),
                 InvoiceHistory.action == InvoiceHistoryAction.updated,
             )
         ).all()
         edited_invoice_ids = {
             invoice_id
-            for invoice_id, after_data in history_rows
-            if not after_data or after_data.get("status") != InvoiceStatus.cancelled.value
+            for invoice_id, before_data, after_data in history_rows
+            if not after_data
+            or (
+                after_data.get("status") != InvoiceStatus.cancelled.value
+                and any(
+                    after_data.get(field) != (before_data or {}).get(field)
+                    for field in (
+                        "customer_id",
+                        "sold_at",
+                        "is_paid_by_transfer",
+                        "note",
+                        "subtotal",
+                        "total_extra_charges",
+                        "total_amount",
+                        "items",
+                        "extra_charges",
+                    )
+                )
+            )
         }
     for invoice in invoices:
         invoice.is_edited = invoice.id in edited_invoice_ids
@@ -246,6 +276,20 @@ def snapshot_invoice(invoice: Invoice) -> dict[str, Any]:
         "customer_id": invoice.customer_id,
         "status": invoice.status,
         "sold_at": invoice.sold_at,
+        "audit_label": invoice.audit_label,
+        "assigned_shipper_id": invoice.assigned_shipper_id,
+        "audited_at": invoice.audited_at,
+        "audited_by_user_id": invoice.audited_by_user_id,
+        "delivered_at": invoice.delivered_at,
+        "delivered_by_user_id": invoice.delivered_by_user_id,
+        "is_paid_by_transfer": invoice.is_paid_by_transfer,
+        "external_shipper_name": invoice.external_shipper_name,
+        "external_shipper_phone": invoice.external_shipper_phone,
+        "external_advance_method": invoice.external_advance_method,
+        "external_transfer_amount": invoice.external_transfer_amount,
+        "external_cash_amount": invoice.external_cash_amount,
+        "external_shipping_fee": invoice.external_shipping_fee,
+        "external_advance_amount": invoice.external_advance_amount,
         "note": invoice.note,
         "subtotal": invoice.subtotal,
         "total_extra_charges": invoice.total_extra_charges,
@@ -311,6 +355,7 @@ def create_invoice(db: Session, payload: InvoiceCreate, user_id: int | None, use
             customer_id=payload.customer_id,
             status=InvoiceStatus.created,
             sold_at=sold_at,
+            is_paid_by_transfer=payload.is_paid_by_transfer,
             note=payload.note,
         )
         invoice.items = build_invoice_items(db, payload.items)
@@ -343,6 +388,8 @@ def update_invoice(db: Session, invoice_id: int, payload: InvoiceUpdate, user_id
     invoice = get_invoice(db, invoice_id)
     if invoice.status == InvoiceStatus.cancelled:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Không thể sửa hóa đơn đã hủy")
+    if invoice.status == InvoiceStatus.completed:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Không thể sửa hóa đơn đã hoàn thành")
     if payload.customer_id != invoice.customer_id:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cannot change invoice customer")
     if payload.sold_at is not None and not same_datetime_to_second(payload.sold_at, invoice.sold_at):
@@ -353,6 +400,8 @@ def update_invoice(db: Session, invoice_id: int, payload: InvoiceUpdate, user_id
         apply_stock_change(db, invoice.items, direction=1)
 
         invoice.status = InvoiceStatus.created
+        if payload.is_paid_by_transfer is not None:
+            invoice.is_paid_by_transfer = payload.is_paid_by_transfer
         invoice.note = payload.note
         invoice.items.clear()
         invoice.extra_charges.clear()
@@ -388,7 +437,7 @@ def update_invoice(db: Session, invoice_id: int, payload: InvoiceUpdate, user_id
 def soft_delete_invoice(db: Session, invoice_id: int, user_id: int | None, user_name: str | None, reason: str | None = None) -> None:
     invoice = get_invoice(db, invoice_id)
     before_data = snapshot_invoice(invoice)
-    if invoice.status == InvoiceStatus.created:
+    if invoice.status in (InvoiceStatus.created, InvoiceStatus.completed):
         apply_stock_change(db, invoice.items, direction=1)
     invoice.deleted_at = datetime.utcnow()
     after_data = snapshot_invoice(invoice)
@@ -411,6 +460,8 @@ def cancel_invoice(db: Session, invoice_id: int, user_id: int, user_name: str, r
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Invoice not found")
     if invoice.status == InvoiceStatus.cancelled:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Hóa đơn đã được hủy trước đó")
+    if invoice.status == InvoiceStatus.completed:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Không thể hủy hóa đơn đã hoàn thành")
     before_data = snapshot_invoice(invoice)
     try:
         apply_stock_change(db, invoice.items, direction=1)
@@ -425,6 +476,49 @@ def cancel_invoice(db: Session, invoice_id: int, user_id: int, user_name: str, r
             user_id=user_id,
             user_name=user_name,
             reason=reason,
+        )
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+    return get_invoice(db, invoice.id)
+
+
+def assign_audit_label(
+    db: Session,
+    invoice_id: int,
+    audit_label: InvoiceAuditLabel,
+    current_user: User,
+) -> Invoice:
+    if audit_label == InvoiceAuditLabel.internal_shipper:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Nhãn Ship Ruột chỉ được gán khi shipper nhận đơn",
+        )
+    invoice = db.scalar(invoice_query(invoice_id).where(Invoice.deleted_at.is_(None)).with_for_update())
+    if not invoice:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Hóa đơn không tồn tại")
+    if invoice.status == InvoiceStatus.cancelled:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Không thể audit hóa đơn đã hủy")
+    if invoice.audit_label is not None:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Hóa đơn đã được gán nhãn audit")
+    before_data = snapshot_invoice(invoice)
+    try:
+        invoice.audit_label = audit_label
+        invoice.assigned_shipper_id = None
+        invoice.audited_at = datetime.utcnow()
+        invoice.audited_by_user_id = current_user.id
+        db.flush()
+        label_name = "Khách lẻ" if audit_label == InvoiceAuditLabel.retail else "Ship Ngoài"
+        add_history(
+            db,
+            invoice,
+            InvoiceHistoryAction.updated,
+            before_data=before_data,
+            after_data=snapshot_invoice(invoice),
+            user_id=current_user.id,
+            user_name=current_user.display_name,
+            reason=f"Gán nhãn audit {label_name}",
         )
         db.commit()
     except Exception:

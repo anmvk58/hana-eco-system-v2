@@ -41,6 +41,7 @@ class UserSummary(ORMBase):
 
 class UserRead(UserSummary):
     is_active: bool
+    shipper_id: int | None = None
     roles: list[RoleSummary]
     permissions: list[str] = Field(default_factory=list)
     created_at: datetime

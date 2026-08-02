@@ -1,4 +1,4 @@
-import { Route, Routes } from "react-router-dom";
+import { Navigate, Route, Routes } from "react-router-dom";
 import type { ReactNode } from "react";
 
 import { Layout } from "./components/Layout";
@@ -14,17 +14,21 @@ import { ProductsPage } from "./pages/ProductsPage";
 import { ReportsPage } from "./pages/ReportsPage";
 import { LoginPage } from "./pages/LoginPage";
 import { SoldProductsReportPage } from "./pages/SoldProductsReportPage";
+import { ShippersPage } from "./pages/ShippersPage";
+import { ShippingClaimPage } from "./pages/ShippingClaimPage";
+import { ShippingReceivedPage } from "./pages/ShippingReceivedPage";
+import { ShipManagementPage } from "./pages/ShipManagementPage";
 import { useAuth } from "./auth/AuthContext";
 
 export default function App() {
-  const { currentUser, loading } = useAuth();
+  const { currentUser, loading, hasPermission } = useAuth();
   if (loading) return <main className="login-page"><div className="login-card">Đang kiểm tra phiên đăng nhập...</div></main>;
   if (!currentUser) return <LoginPage />;
   const protect = (permission: string | string[], page: ReactNode) => <ProtectedRoute permissions={Array.isArray(permission) ? permission : [permission]}>{page}</ProtectedRoute>;
   return (
     <Layout>
       <Routes>
-        <Route path="/" element={protect("dashboard.view", <DashboardPage />)} />
+        <Route path="/" element={hasPermission("dashboard.view") ? <DashboardPage /> : hasPermission("shipping.claim") ? <Navigate to="/shipping/claim" replace /> : <Navigate to="/forbidden" replace />} />
         <Route path="/customers" element={protect("customers.view", <CustomersPage />)} />
         <Route path="/products" element={protect("products.view", <ProductsPage />)} />
         <Route path="/invoices" element={protect("invoices.view", <InvoicesPage />)} />
@@ -34,6 +38,10 @@ export default function App() {
         <Route path="/reports" element={protect("reports.view", <ReportsPage />)} />
         <Route path="/reports/sold-products" element={protect("reports.sold_products.view", <SoldProductsReportPage />)} />
         <Route path="/access-control" element={protect(["users.view", "roles.view"], <AccessControlPage />)} />
+        <Route path="/shippers" element={protect("shippers.view", <ShippersPage />)} />
+        <Route path="/shipping/claim" element={protect("shipping.claim", <ShippingClaimPage />)} />
+        <Route path="/shipping/received" element={protect("shipping.claim", <ShippingReceivedPage />)} />
+        <Route path="/ship-management" element={protect("shipping.manage", <ShipManagementPage />)} />
         <Route path="/forbidden" element={<ForbiddenPage />} />
       </Routes>
     </Layout>

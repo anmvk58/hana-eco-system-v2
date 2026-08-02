@@ -1,17 +1,19 @@
 import { LoaderCircle, LockKeyhole } from "lucide-react";
 import { FormEvent, useState } from "react";
+import { useNavigate } from "react-router-dom";
 
 import { useAuth } from "../auth/AuthContext";
 
 export function LoginPage() {
   const { login, error } = useAuth();
+  const navigate = useNavigate();
   const [username, setUsername] = useState("admin");
   const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
   async function submit(event: FormEvent) {
     event.preventDefault(); setSubmitting(true);
-    try { await login(username, password); } catch { /* Lỗi được hiển thị từ AuthContext. */ }
+    try { await login(username, password); navigate("/", { replace: true }); } catch { /* Lỗi được hiển thị từ AuthContext. */ }
     finally { setSubmitting(false); }
   }
 

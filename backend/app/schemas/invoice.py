@@ -4,9 +4,10 @@ from typing import Any
 
 from pydantic import Field, model_validator
 
-from app.models.enums import ExtraChargeType, InvoiceHistoryAction, InvoiceStatus
+from app.models.enums import ExternalAdvanceMethod, ExtraChargeType, InvoiceAuditLabel, InvoiceHistoryAction, InvoiceStatus
 from app.schemas.common import ORMBase
 from app.schemas.customer import CustomerRead
+from app.schemas.shipper import ShipperRead
 
 
 class InvoiceItemCreate(ORMBase):
@@ -50,6 +51,7 @@ class InvoiceCreate(ORMBase):
     customer_id: int | None = None
     status: InvoiceStatus = InvoiceStatus.created
     sold_at: datetime | None = None
+    is_paid_by_transfer: bool = False
     note: str | None = None
     items: list[InvoiceItemCreate] = Field(min_length=1)
     extra_charges: list[InvoiceExtraChargeCreate] = Field(default_factory=list)
@@ -60,6 +62,7 @@ class InvoiceUpdate(ORMBase):
     customer_id: int | None = None
     status: InvoiceStatus = InvoiceStatus.created
     sold_at: datetime | None = None
+    is_paid_by_transfer: bool | None = None
     note: str | None = None
     items: list[InvoiceItemCreate] = Field(min_length=1)
     extra_charges: list[InvoiceExtraChargeCreate] = Field(default_factory=list)
@@ -74,6 +77,53 @@ class InvoiceCancel(ORMBase):
     reason: str = Field(min_length=1, max_length=500)
 
 
+class InvoiceAuditAssign(ORMBase):
+    audit_label: InvoiceAuditLabel
+
+    @model_validator(mode="after")
+    def reject_internal_shipper_label(self):
+        if self.audit_label == InvoiceAuditLabel.internal_shipper:
+            raise ValueError("Nhãn Ship Ruột chỉ được gán khi shipper nhận đơn")
+        return self
+
+
+class InvoiceClaim(ORMBase):
+    invoice_ids: list[int] = Field(min_length=1, max_length=100)
+
+
+class ExternalHandoffCreate(ORMBase):
+    advance_method: ExternalAdvanceMethod
+    shipping_fee: Decimal = Field(ge=0)
+    transfer_amount: Decimal = Field(default=Decimal("0"), ge=0)
+    cash_amount: Decimal = Field(default=Decimal("0"), ge=0)
+
+    @model_validator(mode="after")
+    def validate_amounts(self):
+        if self.advance_method == ExternalAdvanceMethod.transfer and (self.transfer_amount <= 0 or self.cash_amount != 0):
+            raise ValueError("Chuyển khoản yêu cầu số tiền chuyển khoản lớn hơn 0 và tiền mặt bằng 0")
+        if self.advance_method == ExternalAdvanceMethod.cash and (self.cash_amount <= 0 or self.transfer_amount != 0):
+            raise ValueError("Tiền mặt yêu cầu số tiền mặt lớn hơn 0 và chuyển khoản bằng 0")
+        if self.advance_method == ExternalAdvanceMethod.mixed and (self.transfer_amount <= 0 or self.cash_amount <= 0):
+            raise ValueError("Hình thức kết hợp yêu cầu cả tiền chuyển khoản và tiền mặt lớn hơn 0")
+        return self
+
+
+class InvoiceBulkAuditAssign(ORMBase):
+    invoice_ids: list[int] = Field(min_length=1, max_length=100)
+    audit_label: InvoiceAuditLabel
+    external_handoff: ExternalHandoffCreate | None = None
+
+    @model_validator(mode="after")
+    def validate_handover(self):
+        if self.audit_label == InvoiceAuditLabel.internal_shipper:
+            raise ValueError("Không thể bàn giao Ship Ruột từ màn hình quản lý")
+        if self.audit_label == InvoiceAuditLabel.external_shipper and self.external_handoff is None:
+            raise ValueError("Vui lòng nhập thông tin ứng tiền")
+        if self.audit_label == InvoiceAuditLabel.retail and self.external_handoff is not None:
+            raise ValueError("Đơn khách lẻ không cần thông tin shipper ngoài")
+        return self
+
+
 class InvoiceRead(ORMBase):
     id: int
     code: str
@@ -81,6 +131,21 @@ class InvoiceRead(ORMBase):
     customer: CustomerRead | None = None
     status: InvoiceStatus
     sold_at: datetime
+    audit_label: InvoiceAuditLabel | None
+    assigned_shipper_id: int | None
+    assigned_shipper: ShipperRead | None = None
+    audited_at: datetime | None
+    audited_by_user_id: int | None
+    delivered_at: datetime | None
+    delivered_by_user_id: int | None
+    is_paid_by_transfer: bool
+    external_shipper_name: str | None
+    external_shipper_phone: str | None
+    external_advance_method: ExternalAdvanceMethod | None
+    external_transfer_amount: Decimal
+    external_cash_amount: Decimal
+    external_shipping_fee: Decimal
+    external_advance_amount: Decimal
     note: str | None
     subtotal: Decimal
     total_extra_charges: Decimal

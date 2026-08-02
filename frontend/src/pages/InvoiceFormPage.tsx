@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronUp, Minus, Plus, Save, Search, Settings } from "lucide-react";
+import { BadgeCheck, ChevronDown, ChevronUp, Minus, Plus, Save, Search, Settings } from "lucide-react";
 import { FormEvent, KeyboardEvent, useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
@@ -85,6 +85,7 @@ export function InvoiceFormPage() {
   const [lines, setLines] = useState<DraftLine[]>([{ ...blankLine }]);
   const [charges, setCharges] = useState<DraftCharge[]>(defaultCharges);
   const [applyShippingFee, setApplyShippingFee] = useState(true);
+  const [isPaidByTransfer, setIsPaidByTransfer] = useState(false);
   const [printTwoCopies, setPrintTwoCopies] = useState(true);
   const [shippingSettingsOpen, setShippingSettingsOpen] = useState(false);
   const [shippingDefaultAmount, setShippingDefaultAmount] = useState("0");
@@ -171,6 +172,7 @@ export function InvoiceFormPage() {
       setInvoice(data);
       setCustomerId(data.customer_id ? String(data.customer_id) : "");
       setCustomerSearch(data.customer ? `${data.customer.phone ?? data.customer.code} - ${data.customer.name}` : "");
+      setIsPaidByTransfer(data.is_paid_by_transfer);
       setNote(data.note ?? "");
       setLines(
         data.items.map((item) => ({
@@ -349,6 +351,7 @@ export function InvoiceFormPage() {
       customer_id: isEditing && invoice ? invoice.customer_id ?? null : customerId ? Number(customerId) : null,
       status: "created" as InvoiceStatus,
       sold_at: soldAt,
+      is_paid_by_transfer: isPaidByTransfer,
       note,
       items: cleanLines.map((line) => ({
         product_id: Number(line.product_id),
@@ -375,6 +378,7 @@ export function InvoiceFormPage() {
 
       setCustomerId("");
       setCustomerSearch("");
+      setIsPaidByTransfer(false);
       setNote("");
       setReason("");
       setLines([{ ...blankLine }]);
@@ -630,6 +634,14 @@ export function InvoiceFormPage() {
               <Settings size={16} />
             </button> : null}
           </div>
+          <label className={`payment-transfer-option${isPaidByTransfer ? " paid" : ""}`}>
+            <input checked={isPaidByTransfer} onChange={(event) => setIsPaidByTransfer(event.target.checked)} type="checkbox" />
+            <BadgeCheck size={21}/>
+            <span>
+              <strong>Đã thanh toán chuyển khoản</strong>
+              <small>Shipper không cần thu tiền từ khách hàng</small>
+            </span>
+          </label>
           <div className="charge-list">
             {charges.map((charge, index) => (
               <label className={charge.charge_type === "shipping" ? "charge-field shipping-charge" : "charge-field"} key={charge.charge_type}>

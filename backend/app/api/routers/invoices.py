@@ -5,8 +5,8 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import require_any_permission, require_permission
 from app.database import get_db
-from app.models.enums import InvoiceStatus
-from app.schemas.invoice import InvoiceCancel, InvoiceCreate, InvoiceHistoryRead, InvoicePage, InvoiceRead, InvoiceUpdate
+from app.models.enums import InvoiceAuditLabel, InvoiceStatus
+from app.schemas.invoice import InvoiceAuditAssign, InvoiceCancel, InvoiceCreate, InvoiceHistoryRead, InvoicePage, InvoiceRead, InvoiceUpdate
 from app.services import invoice_service
 from app.models.user import User
 
@@ -20,6 +20,8 @@ def list_invoices(
     customer_id: int | None = None,
     code_filter: str | None = Query(default=None, alias="code", max_length=60),
     customer_phone: str | None = Query(default=None, max_length=30),
+    audit_label: InvoiceAuditLabel | None = None,
+    unaudited: bool = False,
     from_date: date | None = Query(default=None),
     to_date: date | None = Query(default=None),
     include_deleted: bool = False,
@@ -33,6 +35,8 @@ def list_invoices(
         customer_id,
         code_filter,
         customer_phone,
+        audit_label,
+        unaudited,
         from_date,
         to_date,
         include_deleted,
@@ -80,6 +84,16 @@ def cancel_invoice(
     db: Session = Depends(get_db),
 ):
     return invoice_service.cancel_invoice(db, invoice_id, current_user.id, current_user.display_name, payload.reason)
+
+
+@router.post("/{invoice_id}/audit", response_model=InvoiceRead)
+def assign_audit_label(
+    invoice_id: int,
+    payload: InvoiceAuditAssign,
+    current_user: User = Depends(require_permission("invoices.audit")),
+    db: Session = Depends(get_db),
+):
+    return invoice_service.assign_audit_label(db, invoice_id, payload.audit_label, current_user)
 
 
 @router.delete("/{invoice_id}", status_code=status.HTTP_204_NO_CONTENT)

@@ -1,4 +1,4 @@
-import { ArrowLeft, Edit, Printer, RotateCcw, XCircle } from "lucide-react";
+import { ArrowLeft, BadgeCheck, Edit, Printer, RotateCcw, Store, Truck, XCircle } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, useLocation, useParams } from "react-router-dom";
 
@@ -7,6 +7,8 @@ import { useAuth } from "../auth/AuthContext";
 import { EmptyState } from "../components/EmptyState";
 import { InvoiceReceipt } from "../components/InvoiceReceipt";
 import { StatusBadge } from "../components/StatusBadge";
+import { AuditBadge } from "../components/AuditBadge";
+import type { InvoiceAuditLabel } from "../types";
 import type { Invoice, InvoiceHistory } from "../types";
 import { dateTime } from "../utils/format";
 
@@ -18,8 +20,9 @@ export function InvoiceDetailPage() {
   const [invoice, setInvoice] = useState<Invoice | null>(null);
   const [history, setHistory] = useState<InvoiceHistory[]>([]);
   const [error, setError] = useState("");
-  const invoiceListSearch = (location.state as { invoiceListSearch?: string } | null)?.invoiceListSearch;
-  const invoiceListPath = invoiceListSearch ? `/invoices?${invoiceListSearch}` : "/invoices";
+  const navigationState = location.state as { invoiceListSearch?: string; returnTo?: string } | null;
+  const invoiceListSearch = navigationState?.invoiceListSearch;
+  const invoiceListPath = navigationState?.returnTo ?? (invoiceListSearch ? `/invoices?${invoiceListSearch}` : "/invoices");
 
   useEffect(() => {
     async function load() {
@@ -45,12 +48,21 @@ export function InvoiceDetailPage() {
     } catch (err) { setError(err instanceof Error ? err.message : "Không hủy được hóa đơn"); }
   }
 
-  if (error) return <div className="alert error">{error}</div>;
-  if (!invoice) return <EmptyState title="Đang tải hóa đơn" />;
+  async function assignAuditLabel(label: Exclude<InvoiceAuditLabel, "internal_shipper">) {
+    if (!invoice) return;
+    setError("");
+    try {
+      setInvoice(await api.invoices.audit(invoice.id, label));
+      if (hasPermission("invoices.history")) setHistory(await api.invoices.history(invoice.id));
+    } catch (err) { setError(err instanceof Error ? err.message : "Không gán được nhãn audit"); }
+  }
+
+  if (!invoice) return error ? <div className="alert error">{error}</div> : <EmptyState title="Đang tải hóa đơn" />;
 
   const customerName = invoice.customer?.name ?? "Khách lẻ";
   return (
     <div className="page-stack invoice-detail">
+      {error ? <div className="alert error">{error}</div> : null}
       <section className="detail-header">
         <div>
           <Link className="secondary-button link-button invoice-detail-back" to={invoiceListPath}>
@@ -62,6 +74,8 @@ export function InvoiceDetailPage() {
         </div>
         <div className="detail-actions">
           <StatusBadge status={invoice.status} />
+          <AuditBadge label={invoice.audit_label} />
+          {invoice.is_paid_by_transfer ? <span className="invoice-payment-badge"><BadgeCheck size={16}/>Đã thanh toán chuyển khoản</span> : null}
           {hasPermission("invoices.update") && invoice.status === "created" ? <Link className="secondary-button link-button" to={`/invoices/${invoice.id}/edit`}>
             <Edit size={16} />
             Sửa
@@ -72,6 +86,17 @@ export function InvoiceDetailPage() {
             In hóa đơn
           </button> : null}
         </div>
+      </section>
+
+      <section className="audit-panel">
+        <div>
+          <span className="field-hint">Nhãn audit giao nhận</span>
+          <div className="audit-panel-value"><AuditBadge label={invoice.audit_label} />{invoice.assigned_shipper ? <strong>{invoice.assigned_shipper.user.display_name}</strong> : null}</div>
+        </div>
+        {!invoice.audit_label && invoice.status === "created" && hasPermission("invoices.audit") ? <div className="detail-actions">
+          <button className="secondary-button" type="button" onClick={() => void assignAuditLabel("retail")}><Store size={16}/>Khách lẻ</button>
+          <button className="secondary-button" type="button" onClick={() => void assignAuditLabel("external_shipper")}><Truck size={16}/>Ship Ngoài</button>
+        </div> : <span className="field-hint">{invoice.audit_label ? "Hóa đơn đã được audit." : "Đơn Ship Ruột sẽ được gán khi shipper nhận đơn."}</span>}
       </section>
 
       <InvoiceReceipt invoice={invoice} />

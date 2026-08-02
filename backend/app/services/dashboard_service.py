@@ -49,7 +49,7 @@ def revenue_points(
             func.coalesce(func.sum(Invoice.subtotal), 0).label("value"),
         )
         .where(
-            Invoice.status == InvoiceStatus.created,
+            Invoice.status.in_((InvoiceStatus.created, InvoiceStatus.completed)),
             Invoice.deleted_at.is_(None),
             Invoice.sold_at >= start,
             Invoice.sold_at <= end,
@@ -106,7 +106,7 @@ def revenue_points(
 def get_dashboard_summary(db: Session, period: DashboardPeriod) -> DashboardSummary:
     start, end = period_range(period)
     active_invoice_conditions = (
-        Invoice.status == InvoiceStatus.created,
+        Invoice.status.in_((InvoiceStatus.created, InvoiceStatus.completed)),
         Invoice.deleted_at.is_(None),
         Invoice.sold_at >= start,
         Invoice.sold_at <= end,
@@ -121,7 +121,7 @@ def get_dashboard_summary(db: Session, period: DashboardPeriod) -> DashboardSumm
 
     created_invoice_count = db.scalar(
         select(func.count(Invoice.id)).where(
-            Invoice.status == InvoiceStatus.created,
+            Invoice.status.in_((InvoiceStatus.created, InvoiceStatus.completed)),
             Invoice.deleted_at.is_(None),
             Invoice.created_at >= start,
             Invoice.created_at <= end,

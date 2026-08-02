@@ -81,6 +81,7 @@ export function InvoiceReceipt({ invoice, className = "" }: { invoice: Invoice; 
         {Number(packingFee) > 0 ? <div><span>Phí đóng hàng:</span><strong>{numberText(packingFee)}</strong></div> : null}
         {otherFees > 0 ? <div><span>Phụ thu khác:</span><strong>{numberText(otherFees)}</strong></div> : null}
         <div><span>Tổng thanh toán:</span><strong>{numberText(invoice.total_amount)}</strong></div>
+        {invoice.is_paid_by_transfer ? <div className="k80-payment-status"><span>Thanh toán:</span><strong>CHUYỂN KHOẢN - ĐÃ THANH TOÁN</strong></div> : null}
       </div>
 
       <div className="k80-notes">

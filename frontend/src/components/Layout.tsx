@@ -14,6 +14,10 @@ import {
   ShieldCheck,
   ShoppingCart,
   Users,
+  Truck,
+  PackageCheck,
+  History,
+  Handshake,
 } from "lucide-react";
 import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
@@ -24,6 +28,9 @@ const navItems = [
   { to: "/", label: "Tổng quan", icon: Gauge, permissions: ["dashboard.view"] },
   { to: "/invoices/new", label: "Bán hàng", icon: ShoppingCart, permissions: ["invoices.create"] },
   { to: "/invoices", label: "Hóa đơn", icon: ClipboardList, permissions: ["invoices.view"] },
+  { to: "/ship-management", label: "Quản lý đơn ship", icon: Handshake, permissions: ["shipping.manage"] },
+  { to: "/shipping/claim", label: "Nhận đơn ship", icon: PackageCheck, permissions: ["shipping.claim"], shipperOnly: true },
+  { to: "/shipping/received", label: "Đơn đã nhận", icon: History, permissions: ["shipping.claim"], shipperOnly: true },
 ];
 
 const catalogNavItems = [
@@ -43,6 +50,13 @@ const accessControlNavItem = {
   permissions: ["users.view", "roles.view"],
 };
 
+const shipperManagementNavItem = {
+  to: "/shippers",
+  label: "Shipper nội bộ",
+  icon: Truck,
+  permissions: ["shippers.view"],
+};
+
 const routeTitles: Record<string, string> = {
   "/": "Tổng quan bán hàng",
   "/customers": "Quản lý khách hàng",
@@ -52,6 +66,10 @@ const routeTitles: Record<string, string> = {
   "/reports": "Báo cáo bán hàng",
   "/reports/sold-products": "Báo cáo hàng hóa bán được",
   "/access-control": "Người dùng & phân quyền",
+  "/shippers": "Quản lý shipper nội bộ",
+  "/shipping/claim": "Nhận đơn ship",
+  "/shipping/received": "Đơn đã nhận",
+  "/ship-management": "Quản lý đơn ship",
   "/forbidden": "Không có quyền truy cập",
 };
 
@@ -72,6 +90,7 @@ export function Layout({ children }: { children: ReactNode }) {
   const isSalesPage = location.pathname === "/invoices/new";
   const visibleCatalogItems = catalogNavItems.filter((item) => item.permissions.every(hasPermission));
   const visibleReportItems = reportNavItems.filter((item) => item.permissions.every(hasPermission));
+  const userInitial = currentUser?.display_name.trim().charAt(0).toLocaleUpperCase("vi-VN") || "U";
 
   useEffect(() => {
     window.localStorage.setItem("hana-sidebar-collapsed", String(isSidebarCollapsed));
@@ -110,7 +129,7 @@ export function Layout({ children }: { children: ReactNode }) {
           </button>
         </div>
         <nav className="side-nav">
-          {navItems.filter((item) => item.permissions.every(hasPermission)).map((item) => {
+          {navItems.filter((item) => item.permissions.every(hasPermission) && (!("shipperOnly" in item) || !item.shipperOnly || Boolean(currentUser?.shipper_id))).map((item) => {
             const Icon = item.icon;
             return (
               <NavLink key={item.to} to={item.to} title={item.label} end={item.to === "/" || item.to === "/invoices" || item.to === "/reports"}>
@@ -193,6 +212,12 @@ export function Layout({ children }: { children: ReactNode }) {
               <span>{accessControlNavItem.label}</span>
             </NavLink>
           ) : null}
+          {shipperManagementNavItem.permissions.every(hasPermission) ? (
+            <NavLink to={shipperManagementNavItem.to} title={shipperManagementNavItem.label}>
+              <Truck size={18} />
+              <span>{shipperManagementNavItem.label}</span>
+            </NavLink>
+          ) : null}
         </nav>
       </aside>
       <button
@@ -220,7 +245,10 @@ export function Layout({ children }: { children: ReactNode }) {
             </div>
           </div>
           <div className="global-actions">
-            <div className="user-switcher"><span>Xin chào</span><strong>{currentUser?.display_name}</strong></div>
+            <div className="user-switcher">
+              <span className="user-avatar" aria-hidden="true">{userInitial}</span>
+              <span className="user-copy"><small>Xin chào</small><strong>{currentUser?.display_name}</strong></span>
+            </div>
           {!isSalesPage && hasPermission("invoices.create") ? (
               <button className="primary-button" type="button" onClick={() => navigate("/invoices/new")}>
                 <ShoppingCart size={17} />
