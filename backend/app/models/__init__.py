@@ -1,6 +1,7 @@
 from app.database import Base
 from app.models.customer import Customer
 from app.models.extra_charge_setting import ExtraChargeSetting
+from app.models.external_handover import ExternalHandoverBatch, ExternalHandoverBatchItem
 from app.models.invoice import Invoice, InvoiceCodeSequence, InvoiceExtraCharge, InvoiceHistory, InvoiceItem
 from app.models.product import Product
 from app.models.product_category import ProductCategory
@@ -11,6 +12,8 @@ __all__ = [
     "Base",
     "Customer",
     "ExtraChargeSetting",
+    "ExternalHandoverBatch",
+    "ExternalHandoverBatchItem",
     "Product",
     "ProductCategory",
     "Invoice",

@@ -26,6 +26,8 @@ import type {
   LoginResponse,
   SoldProductReportRow,
   ShipHandoverPayload,
+  ExternalHandoverBatch,
+  ExternalHandoverBatchUpdatePayload,
 } from "../types";
 
 const runtimeApiUrl = new URL("/api", window.location.origin);
@@ -151,7 +153,16 @@ export const api = {
   shipManagement: {
     unauditedInvoices: (fromDate?: string, toDate?: string) =>
       request<Invoice[]>("/ship-management/unaudited-invoices", {}, { from_date: fromDate, to_date: toDate }),
+    unauditedInvoiceByCode: (code: string) =>
+      request<Invoice>("/ship-management/unaudited-invoice-by-code", {}, { code }),
     handover: (payload: ShipHandoverPayload) => request<Invoice[]>("/ship-management/handover", { method: "POST", body: JSON.stringify(payload) }),
+    externalBatches: (fromDate?: string, toDate?: string) =>
+      request<ExternalHandoverBatch[]>("/ship-management/external-handover-batches", {}, { from_date: fromDate, to_date: toDate }),
+    externalBatch: (id: number) => request<ExternalHandoverBatch>(`/ship-management/external-handover-batches/${id}`),
+    updateExternalBatch: (id: number, payload: ExternalHandoverBatchUpdatePayload) =>
+      request<ExternalHandoverBatch>(`/ship-management/external-handover-batches/${id}`, { method: "PUT", body: JSON.stringify(payload) }),
+    cancelExternalBatch: (id: number) =>
+      request<ExternalHandoverBatch>(`/ship-management/external-handover-batches/${id}/cancel`, { method: "POST" }),
   },
   customers: {
     list: (search?: string, limit = 50) => request<Customer[]>("/customers", {}, { search, limit }),

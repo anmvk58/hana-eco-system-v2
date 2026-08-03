@@ -237,6 +237,41 @@ export interface ShipHandoverPayload {
   external_handoff?: ExternalHandoffPayload;
 }
 
+export type ExternalHandoverBatchStatus = "active" | "cancelled";
+
+export interface ExternalHandoverBatchItem {
+  id: number;
+  invoice_id: number;
+  is_active: boolean;
+  added_at: string;
+  removed_at?: string | null;
+  invoice: Invoice;
+}
+
+export interface ExternalHandoverBatch {
+  id: number;
+  code: string;
+  status: ExternalHandoverBatchStatus;
+  handed_over_at: string;
+  advance_method: ExternalAdvanceMethod;
+  transfer_amount: string;
+  cash_amount: string;
+  shipping_fee: string;
+  advance_amount: string;
+  created_by_name?: string | null;
+  updated_by_name?: string | null;
+  cancelled_at?: string | null;
+  cancelled_by_name?: string | null;
+  items: ExternalHandoverBatchItem[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ExternalHandoverBatchUpdatePayload {
+  invoice_ids: number[];
+  external_handoff: ExternalHandoffPayload;
+}
+
 export type DashboardTimePreset = "today" | "7days" | "month" | "year";
 
 export interface DashboardProductSummary {

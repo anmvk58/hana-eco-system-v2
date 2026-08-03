@@ -24,6 +24,11 @@ class ExternalAdvanceMethod(str, Enum):
     mixed = "mixed"
 
 
+class ExternalHandoverBatchStatus(str, Enum):
+    active = "active"
+    cancelled = "cancelled"
+
+
 class ExtraChargeType(str, Enum):
     shipping = "shipping"
     packing = "packing"

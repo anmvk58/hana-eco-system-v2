@@ -99,6 +99,30 @@ export function ShipManagementPage() {
     setCashAmount("");
   }
 
+  function openHandoverModal() {
+    setKind("external_shipper");
+    setAdvanceMethod("transfer");
+    setShippingFee("");
+    setTransferAmount(String(handoverInvoiceTotal));
+    setCashAmount("");
+    setModalOpen(true);
+  }
+
+  function changeShippingFee(value: string) {
+    const normalizedValue = normalizeNumberInput(value, false);
+    setShippingFee(normalizedValue);
+    if (advanceMethod === "transfer") {
+      setTransferAmount(String(handoverInvoiceTotal - Number(normalizedValue || 0)));
+    }
+  }
+
+  function changeAdvanceMethod(method: ExternalAdvanceMethod) {
+    setAdvanceMethod(method);
+    if (method === "transfer") {
+      setTransferAmount(String(calculatedAdvanceAmount));
+    }
+  }
+
   async function submitHandover(event: FormEvent) {
     event.preventDefault();
     if (selectedIds.length === 0) return;
@@ -216,7 +240,7 @@ export function ShipManagementPage() {
         <div className="ship-management-handover-footer">
           <div><span>Tổng số đơn</span><strong>{selectedInvoices.length}</strong></div>
           <div><span>Tổng hóa đơn</span><strong>{money(handoverInvoiceTotal)}</strong></div>
-          <button className="primary-button" disabled={selectedIds.length === 0 || submitting} onClick={() => setModalOpen(true)}><Handshake size={17}/>Bàn giao {selectedIds.length || ""} đơn</button>
+          <button className="primary-button" disabled={selectedIds.length === 0 || submitting} onClick={openHandoverModal}><Handshake size={17}/>Bàn giao {selectedIds.length || ""} đơn</button>
         </div>
         <div className="ship-management-order-list selected-orders">
           {selectedInvoices.map((invoice) => <article key={invoice.id} className="ship-management-order selected-order">
@@ -229,7 +253,7 @@ export function ShipManagementPage() {
         </div>
       </div>
     </section>
-    <div className="shipping-mobile-actions" aria-label="Thao tác bàn giao"><button className="secondary-button shipping-mobile-refresh" disabled={loading || submitting} onClick={() => void load(fromDate, toDate)} aria-label="Làm mới danh sách"><RefreshCw size={19}/></button><button className="primary-button shipping-mobile-claim" disabled={selectedIds.length === 0 || submitting} onClick={() => setModalOpen(true)}><Handshake size={18}/><span>{selectedIds.length > 0 ? `Bàn giao ${selectedIds.length} đơn` : "Chọn đơn để bàn giao"}</span></button></div>
+    <div className="shipping-mobile-actions" aria-label="Thao tác bàn giao"><button className="secondary-button shipping-mobile-refresh" disabled={loading || submitting} onClick={() => void load(fromDate, toDate)} aria-label="Làm mới danh sách"><RefreshCw size={19}/></button><button className="primary-button shipping-mobile-claim" disabled={selectedIds.length === 0 || submitting} onClick={openHandoverModal}><Handshake size={18}/><span>{selectedIds.length > 0 ? `Bàn giao ${selectedIds.length} đơn` : "Chọn đơn để bàn giao"}</span></button></div>
 
     {modalOpen ? <Modal title={`Bàn giao ${selectedIds.length} đơn`} onClose={() => !submitting && setModalOpen(false)}>
       <form className="form-grid ship-handover-form" onSubmit={(event) => void submitHandover(event)}>
@@ -239,14 +263,14 @@ export function ShipManagementPage() {
             <header className="handover-section-heading"><span className="handover-section-icon"><Calculator size={19}/></span><span><strong>Đối soát tiền bàn giao</strong><small>Số tiền cần thu từ các đơn COD đã chọn</small></span></header>
             <div className="handover-invoice-total"><ReceiptText size={22}/><span><small>Tổng tiền hóa đơn</small><strong>{money(handoverInvoiceTotal)}</strong><em>Không bao gồm đơn đã chuyển khoản</em></span></div>
             <div className="handover-calculation-fields">
-              <label><span>Tiền ship thực tế phải trả</span><div className="handover-money-input"><input required autoFocus inputMode="numeric" value={formatNumberInput(shippingFee, false)} onChange={(event) => setShippingFee(normalizeNumberInput(event.target.value, false))}/><b>₫</b></div></label>
+              <label><span>Tiền ship thực tế phải trả</span><div className="handover-money-input"><input required autoFocus inputMode="numeric" value={formatNumberInput(shippingFee, false)} onChange={(event) => changeShippingFee(event.target.value)}/><b>₫</b></div></label>
               <label className="handover-advance-result"><span>Số tiền ship ứng</span><div className="handover-money-input"><input readOnly value={formatNumberInput(calculatedAdvanceAmount, false)}/><b>₫</b></div></label>
             </div>
             <div className="handover-formula"><Calculator size={15}/><span><strong>{money(handoverInvoiceTotal)}</strong> − <strong>{money(Number(shippingFee || 0))}</strong> = <b>{money(calculatedAdvanceAmount)}</b></span></div>
           </section>
           <section className="handover-advance-card span-2">
             <header className="handover-section-heading"><span className="handover-section-icon blue"><HandCoins size={19}/></span><span><strong>Thông tin tiền ứng thực tế</strong><small>Chọn phương thức và nhập số tiền đã nhận</small></span></header>
-            <label>Hình thức ứng<select value={advanceMethod} onChange={(event) => setAdvanceMethod(event.target.value as ExternalAdvanceMethod)}><option value="transfer">Chuyển khoản</option><option value="cash">Tiền mặt</option><option value="mixed">Chuyển khoản &amp; Tiền mặt</option></select></label>
+            <label>Hình thức ứng<select value={advanceMethod} onChange={(event) => changeAdvanceMethod(event.target.value as ExternalAdvanceMethod)}><option value="transfer">Chuyển khoản</option><option value="cash">Tiền mặt</option><option value="mixed">Chuyển khoản &amp; Tiền mặt</option></select></label>
             <div className={`handover-actual-fields ${advanceMethod}`}>
               {advanceMethod !== "cash" ? <label>Tiền chuyển khoản thực tế<div className="handover-money-input"><input required inputMode="numeric" value={formatNumberInput(transferAmount, false)} onChange={(event) => setTransferAmount(normalizeNumberInput(event.target.value, false))}/><b>₫</b></div></label> : null}
               {advanceMethod !== "transfer" ? <label>Tiền mặt thực tế<div className="handover-money-input"><input required inputMode="numeric" value={formatNumberInput(cashAmount, false)} onChange={(event) => setCashAmount(normalizeNumberInput(event.target.value, false))}/><b>₫</b></div></label> : null}

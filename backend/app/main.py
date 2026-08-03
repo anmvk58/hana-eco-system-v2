@@ -5,9 +5,10 @@ from sqlalchemy import inspect, text
 from app.api.routers import access_control, customers, dashboard, extra_charge_settings, invoices, product_categories, products, reports, ship_management, shippers, shipping
 from app.core.config import get_settings
 from app.database import Base, SessionLocal, engine
-from app.models import AuthSession, Customer, ExtraChargeSetting, Invoice, InvoiceCodeSequence, InvoiceExtraCharge, InvoiceHistory, InvoiceItem, Permission, Product, ProductCategory, Role, Shipper, User
+from app.models import AuthSession, Customer, ExternalHandoverBatch, ExternalHandoverBatchItem, ExtraChargeSetting, Invoice, InvoiceCodeSequence, InvoiceExtraCharge, InvoiceHistory, InvoiceItem, Permission, Product, ProductCategory, Role, Shipper, User
 from app.services.access_control_service import ensure_defaults as ensure_access_control_defaults
 from app.services.extra_charge_setting_service import ensure_default_extra_charge_settings
+from app.services.ship_management_service import ensure_legacy_external_handover_batches
 
 
 settings = get_settings()
@@ -50,6 +51,7 @@ def create_app() -> FastAPI:
         with SessionLocal() as db:
             ensure_access_control_defaults(db)
             ensure_default_extra_charge_settings(db)
+            ensure_legacy_external_handover_batches(db)
 
     @app.get("/health", tags=["system"])
     def health_check():
