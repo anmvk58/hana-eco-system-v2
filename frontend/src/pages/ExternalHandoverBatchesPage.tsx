@@ -7,7 +7,7 @@ import { EmptyState } from "../components/EmptyState";
 import { Modal } from "../components/Modal";
 import { ToastNotification } from "../components/ToastNotification";
 import type { ExternalAdvanceMethod, ExternalHandoverBatch, Invoice } from "../types";
-import { dateTime, formatNumberInput, money, normalizeNumberInput, numberText, todayInputValue } from "../utils/format";
+import { dateTime, formatNumberInput, money, normalizeInvoiceCodeSearch, normalizeNumberInput, numberText, todayInputValue } from "../utils/format";
 
 export function ExternalHandoverBatchesPage() {
   const today = todayInputValue();
@@ -64,13 +64,21 @@ export function ExternalHandoverBatchesPage() {
   }
 
   async function addInvoiceByCode() {
-    const normalizedCode = invoiceCode.trim().toUpperCase();
+    const normalizedCode = normalizeInvoiceCodeSearch(invoiceCode).toUpperCase();
+    setInvoiceCode(normalizedCode);
     if (!normalizedCode) {
       setInvoiceCodeError("Vui lòng nhập mã hóa đơn");
       return;
     }
-    if (availableInvoices.some((invoice) => invoice.code.toUpperCase() === normalizedCode)) {
+    const knownInvoice = availableInvoices.find((invoice) => invoice.code.toUpperCase() === normalizedCode);
+    if (knownInvoice && selectedIds.includes(knownInvoice.id)) {
       setInvoiceCodeError("Hóa đơn đã nằm trong bảng kê");
+      return;
+    }
+    if (knownInvoice) {
+      setSelectedIds((ids) => [...ids, knownInvoice.id]);
+      setInvoiceCode("");
+      setInvoiceCodeError("");
       return;
     }
     setAddingInvoice(true);
@@ -89,7 +97,6 @@ export function ExternalHandoverBatchesPage() {
 
   function removeInvoice(invoiceId: number) {
     setSelectedIds((ids) => ids.filter((id) => id !== invoiceId));
-    setAvailableInvoices((items) => items.filter((invoice) => invoice.id !== invoiceId));
   }
 
   async function openView(batch: ExternalHandoverBatch) {

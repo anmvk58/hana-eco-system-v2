@@ -10,6 +10,13 @@ export function numberText(value: string | number | null | undefined, fractionDi
   }).format(number);
 }
 
+export function normalizeInvoiceCodeSearch(value: string) {
+  const trimmedValue = value.trim();
+  if (!/^\d{1,4}$/.test(trimmedValue)) return trimmedValue;
+  const currentDate = todayInputValue().replace(/-/g, "").slice(2);
+  return `HD${currentDate}${trimmedValue.padStart(4, "0")}`;
+}
+
 export function normalizeNumberInput(value: string, allowDecimal = true) {
   const withoutSpaces = value.replace(/\s/g, "");
   const withoutThousandSeparators = withoutSpaces.replace(/,/g, "");

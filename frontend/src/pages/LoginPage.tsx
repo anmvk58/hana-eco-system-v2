@@ -7,7 +7,7 @@ import { useAuth } from "../auth/AuthContext";
 export function LoginPage() {
   const { login, error } = useAuth();
   const navigate = useNavigate();
-  const [username, setUsername] = useState("admin");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
 

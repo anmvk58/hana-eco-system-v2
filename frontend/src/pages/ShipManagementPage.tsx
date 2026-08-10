@@ -8,7 +8,7 @@ import { EmptyState } from "../components/EmptyState";
 import { Modal } from "../components/Modal";
 import { ToastNotification } from "../components/ToastNotification";
 import type { ExternalAdvanceMethod, Invoice, ShipHandoverPayload } from "../types";
-import { formatNumberInput, money, normalizeNumberInput, numberText, todayInputValue } from "../utils/format";
+import { formatNumberInput, money, normalizeInvoiceCodeSearch, normalizeNumberInput, numberText, todayInputValue } from "../utils/format";
 
 type HandoverKind = "retail" | "external_shipper";
 
@@ -67,7 +67,8 @@ export function ShipManagementPage() {
   }
 
   function selectInvoiceByCode() {
-    const normalizedCode = invoiceCode.trim().toUpperCase();
+    const normalizedCode = normalizeInvoiceCodeSearch(invoiceCode).toUpperCase();
+    setInvoiceCode(normalizedCode);
     if (!normalizedCode) {
       setQuickAddError("Vui lòng nhập mã hóa đơn");
       return;

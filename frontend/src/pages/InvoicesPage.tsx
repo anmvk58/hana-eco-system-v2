@@ -9,7 +9,7 @@ import { EmptyState } from "../components/EmptyState";
 import { StatusBadge } from "../components/StatusBadge";
 import { AuditBadge } from "../components/AuditBadge";
 import type { Invoice, InvoiceListItem, InvoiceStatus } from "../types";
-import { dateTime, numberText, todayInputValue } from "../utils/format";
+import { dateTime, normalizeInvoiceCodeSearch, numberText, todayInputValue } from "../utils/format";
 
 const PAGE_SIZE_OPTIONS = [10, 20, 50, 100];
 
@@ -28,7 +28,7 @@ export function InvoicesPage() {
   );
   const [fromDate, setFromDate] = useState(searchParams.get("from_date") ?? todayInputValue());
   const [toDate, setToDate] = useState(searchParams.get("to_date") ?? todayInputValue());
-  const initialInvoiceCode = searchParams.get("code") ?? "";
+  const initialInvoiceCode = normalizeInvoiceCodeSearch(searchParams.get("code") ?? "");
   const initialCustomerPhone = searchParams.get("customer_phone") ?? "";
   const [invoiceCode, setInvoiceCode] = useState(initialInvoiceCode);
   const [customerPhone, setCustomerPhone] = useState(initialCustomerPhone);
@@ -53,13 +53,14 @@ export function InvoicesPage() {
     selectedInvoiceCode = appliedInvoiceCode,
     selectedCustomerPhone = appliedCustomerPhone,
   ) {
+    const normalizedInvoiceCode = normalizeInvoiceCodeSearch(selectedInvoiceCode);
     const requestId = ++loadRequestId.current;
     setLoading(true);
     setError("");
     try {
       const data = await api.invoices.list({
           status: selectedStatus || undefined,
-          code: selectedInvoiceCode.trim() || undefined,
+          code: normalizedInvoiceCode || undefined,
           customer_phone: selectedCustomerPhone.trim() || undefined,
           from_date: selectedFromDate || undefined,
           to_date: selectedToDate || undefined,
@@ -97,18 +98,20 @@ export function InvoicesPage() {
     selectedInvoiceCode = invoiceCode,
     selectedCustomerPhone = customerPhone,
   ) {
+    const normalizedInvoiceCode = normalizeInvoiceCodeSearch(selectedInvoiceCode);
     const nextSearchParams = new URLSearchParams();
     if (selectedStatus) nextSearchParams.set("status", selectedStatus);
     if (selectedFromDate) nextSearchParams.set("from_date", selectedFromDate);
     if (selectedToDate) nextSearchParams.set("to_date", selectedToDate);
-    if (selectedInvoiceCode.trim()) nextSearchParams.set("code", selectedInvoiceCode.trim());
+    if (normalizedInvoiceCode) nextSearchParams.set("code", normalizedInvoiceCode);
     if (selectedCustomerPhone.trim()) nextSearchParams.set("customer_phone", selectedCustomerPhone.trim());
     nextSearchParams.set("page", "1");
     nextSearchParams.set("page_size", String(pageSize));
     setStatus(selectedStatus);
     setFromDate(selectedFromDate);
     setToDate(selectedToDate);
-    setAppliedInvoiceCode(selectedInvoiceCode.trim());
+    setInvoiceCode(normalizedInvoiceCode);
+    setAppliedInvoiceCode(normalizedInvoiceCode);
     setAppliedCustomerPhone(selectedCustomerPhone.trim());
     setPage(1);
     setSearchParams(nextSearchParams, { replace: true });
@@ -118,7 +121,7 @@ export function InvoicesPage() {
       selectedStatus,
       selectedFromDate,
       selectedToDate,
-      selectedInvoiceCode,
+      normalizedInvoiceCode,
       selectedCustomerPhone,
     );
   }
