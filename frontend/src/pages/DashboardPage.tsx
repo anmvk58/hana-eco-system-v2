@@ -144,7 +144,7 @@ export function DashboardPage() {
                   <td className="code-cell">{invoice.code}</td>
                   <td>{invoice.customer?.name ?? "Khách lẻ"}</td>
                   <td><StatusBadge status={invoice.status} /></td>
-                  <td className="numeric strong">{money(invoice.total_amount)}</td>
+                  <td className="numeric strong">{numberText(invoice.total_amount)}</td>
                 </tr>
               ))}
             </tbody>

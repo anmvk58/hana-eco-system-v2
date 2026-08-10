@@ -482,14 +482,18 @@ export function InvoiceFormPage() {
                   />
                 </div>
                 {!isEditing && customerFocused && customerSearch.replace(/\s+/g, "").length >= 5 ? (
-                  <div className="product-suggestions">
+                  <div className="product-suggestions customer-suggestions">
                     {filteredCustomers.slice(0, 8).map((customer) => (
                       <button key={customer.id} type="button" onMouseDown={() => selectCustomer(customer)}>
-                        <span>
-                          <strong>{customer.phone || customer.code}</strong>
-                          {customer.name}
+                        <span className="customer-suggestion-content">
+                          <span className="customer-suggestion-heading">
+                            <strong>{customer.phone || customer.code}</strong>
+                            <span>{customer.name}</span>
+                          </span>
+                          <span className="customer-suggestion-address" title={customer.address || customer.code}>
+                            {customer.address || customer.code}
+                          </span>
                         </span>
-                        <span>{customer.address || customer.code}</span>
                       </button>
                     ))}
                     {filteredCustomers.length === 0 ? (

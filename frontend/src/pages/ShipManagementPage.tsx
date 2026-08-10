@@ -8,7 +8,7 @@ import { EmptyState } from "../components/EmptyState";
 import { Modal } from "../components/Modal";
 import { ToastNotification } from "../components/ToastNotification";
 import type { ExternalAdvanceMethod, Invoice, ShipHandoverPayload } from "../types";
-import { formatNumberInput, money, normalizeNumberInput, todayInputValue } from "../utils/format";
+import { formatNumberInput, money, normalizeNumberInput, numberText, todayInputValue } from "../utils/format";
 
 type HandoverKind = "retail" | "external_shipper";
 
@@ -224,7 +224,7 @@ export function ShipManagementPage() {
           {availableInvoices.map((invoice) => <article key={invoice.id} className={`ship-management-order${handoverIds.includes(invoice.id) ? " handover-success" : ""}`} role="checkbox" aria-checked="false" tabIndex={0} onClick={() => toggle(invoice.id)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); toggle(invoice.id); } }}>
             <div className="ship-management-order-main"><strong>{invoice.customer?.name ?? "Khách lẻ"}</strong><span>{invoice.customer?.phone || "Không có số điện thoại"}</span><small>{invoice.customer?.address || "Chưa có địa chỉ"}</small></div>
             <Link className="ship-management-order-code" to={`/invoices/${invoice.id}`} state={{ returnTo: "/ship-management" }} onClick={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()} aria-label={`Xem chi tiết ${invoice.code}`}>{invoice.code}</Link>
-            <div className="ship-management-order-payment">{invoice.is_paid_by_transfer ? <span className="invoice-payment-badge"><CheckCircle2 size={14}/>Đã chuyển khoản</span> : <span className="invoice-cod-badge">COD</span>}<strong>{money(invoice.total_amount)}</strong></div>
+            <div className="ship-management-order-payment">{invoice.is_paid_by_transfer ? <span className="invoice-payment-badge"><CheckCircle2 size={14}/>Đã chuyển khoản</span> : <span className="invoice-cod-badge">COD</span>}<strong>{numberText(invoice.total_amount)}</strong></div>
             <button className="ship-management-move-button add" type="button" onClick={(event) => { event.stopPropagation(); toggle(invoice.id); }} aria-label={`Chọn ${invoice.code}`}><ArrowRight size={18}/></button>
           </article>)}
           {!loading && availableInvoices.length === 0 ? <EmptyState title={invoices.length === 0 ? "Không còn đơn chưa audit" : "Đã chọn toàn bộ đơn"} description={invoices.length === 0 ? "Không có đơn hợp lệ trong khoảng ngày đã chọn." : "Các đơn đã được chuyển sang danh sách chuẩn bị bàn giao."}/> : null}
@@ -246,7 +246,7 @@ export function ShipManagementPage() {
           {selectedInvoices.map((invoice) => <article key={invoice.id} className="ship-management-order selected-order">
             <div className="ship-management-order-main"><strong>{invoice.customer?.name ?? "Khách lẻ"}</strong><span>{invoice.customer?.phone || "Không có số điện thoại"}</span><small>{invoice.customer?.address || "Chưa có địa chỉ"}</small></div>
             <Link className="ship-management-order-code" to={`/invoices/${invoice.id}`} state={{ returnTo: "/ship-management" }} aria-label={`Xem chi tiết ${invoice.code}`}>{invoice.code}</Link>
-            <div className="ship-management-order-payment">{invoice.is_paid_by_transfer ? <span className="invoice-payment-badge"><CheckCircle2 size={14}/>Đã chuyển khoản</span> : <span className="invoice-cod-badge">COD</span>}<strong>{money(invoice.total_amount)}</strong></div>
+            <div className="ship-management-order-payment">{invoice.is_paid_by_transfer ? <span className="invoice-payment-badge"><CheckCircle2 size={14}/>Đã chuyển khoản</span> : <span className="invoice-cod-badge">COD</span>}<strong>{numberText(invoice.total_amount)}</strong></div>
             <button className="ship-management-move-button remove" type="button" onClick={() => toggle(invoice.id)} aria-label={`Bỏ chọn ${invoice.code}`}><X size={18}/></button>
           </article>)}
           {selectedInvoices.length === 0 ? <EmptyState title="Chưa có đơn được chọn" description="Chọn đơn bên trái hoặc nhập mã hóa đơn để thêm vào danh sách bàn giao."/> : null}

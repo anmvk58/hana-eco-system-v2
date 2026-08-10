@@ -5,7 +5,7 @@ import { ApiError, api } from "../api/client";
 import { EmptyState } from "../components/EmptyState";
 import { ToastNotification } from "../components/ToastNotification";
 import type { Invoice } from "../types";
-import { dateTime, money } from "../utils/format";
+import { dateTime, numberText } from "../utils/format";
 
 export function ShippingClaimPage() {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
@@ -64,7 +64,7 @@ export function ShippingClaimPage() {
     {error ? <div className="alert error">{error}</div> : null}
     <section className="table-panel shipping-orders-panel">
       <table className="data-table shipping-desktop-table"><thead><tr><th><input type="checkbox" checked={allSelected} onChange={() => setSelectedIds(allSelected ? [] : invoices.map((item) => item.id))} aria-label="Chọn tất cả"/></th><th>Khách hàng</th><th>Địa chỉ</th><th>Mã hóa đơn</th><th>Thời điểm tạo</th><th className="numeric">Tổng tiền hàng</th><th className="numeric">Tổng thu khác</th><th className="numeric">Tổng thanh toán</th></tr></thead>
-      <tbody>{invoices.map((invoice) => <tr key={invoice.id} className={`${selectedIds.includes(invoice.id) ? "selected-row" : ""}${claimedIds.includes(invoice.id) ? " claim-success" : ""}`} onClick={() => toggle(invoice.id)}><td><input type="checkbox" checked={selectedIds.includes(invoice.id)} onChange={() => toggle(invoice.id)} onClick={(event) => event.stopPropagation()} aria-label={`Chọn ${invoice.code}`}/></td><td>{invoice.customer?.name ?? "Khách lẻ"}<span className="table-subtext">{invoice.customer?.phone}</span></td><td>{invoice.customer?.address || "-"}</td><td className="code-cell">{invoice.code}</td><td>{dateTime(invoice.created_at)}</td><td className="numeric">{money(invoice.subtotal)}</td><td className="numeric">{money(invoice.total_extra_charges)}</td><td className="numeric strong">{money(invoice.total_amount)}</td></tr>)}</tbody></table>
+      <tbody>{invoices.map((invoice) => <tr key={invoice.id} className={`${selectedIds.includes(invoice.id) ? "selected-row" : ""}${claimedIds.includes(invoice.id) ? " claim-success" : ""}`} onClick={() => toggle(invoice.id)}><td><input type="checkbox" checked={selectedIds.includes(invoice.id)} onChange={() => toggle(invoice.id)} onClick={(event) => event.stopPropagation()} aria-label={`Chọn ${invoice.code}`}/></td><td>{invoice.customer?.name ?? "Khách lẻ"}<span className="table-subtext">{invoice.customer?.phone}</span></td><td>{invoice.customer?.address || "-"}</td><td className="code-cell">{invoice.code}</td><td>{dateTime(invoice.created_at)}</td><td className="numeric">{numberText(invoice.subtotal)}</td><td className="numeric">{numberText(invoice.total_extra_charges)}</td><td className="numeric strong">{numberText(invoice.total_amount)}</td></tr>)}</tbody></table>
 
       {invoices.length > 0 ? <div className="shipping-mobile-list">
         <label className="shipping-mobile-select-all">
@@ -92,7 +92,7 @@ export function ShippingClaimPage() {
             </header>
             <div className="shipping-card-address"><span>Địa chỉ giao hàng</span><strong>{invoice.customer?.address || "Chưa có địa chỉ"}</strong></div>
             <div className="shipping-card-totals">
-              <div className="shipping-card-grand-total"><span>Thanh toán</span><strong>{money(invoice.total_amount)}</strong></div>
+              <div className="shipping-card-grand-total"><span>Thanh toán</span><strong>{numberText(invoice.total_amount)}</strong></div>
             </div>
           </article>;
         })}

@@ -1620,6 +1620,50 @@ label {
   color: var(--teal);
 }
 
+.customer-suggestions {
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+.customer-suggestions button {
+  display: block;
+  min-width: 0;
+  width: 100%;
+}
+
+.product-suggestions.customer-suggestions button > .customer-suggestion-content {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  width: 100%;
+}
+
+.customer-suggestion-heading {
+  align-items: baseline;
+  display: flex;
+  gap: 8px;
+  min-width: 0;
+}
+
+.customer-suggestion-heading > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.customer-suggestion-address {
+  color: var(--muted);
+  display: -webkit-box;
+  font-size: 12px;
+  line-height: 1.35;
+  min-width: 0;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
 .suggestion-empty {
   align-items: center;
   color: var(--muted);

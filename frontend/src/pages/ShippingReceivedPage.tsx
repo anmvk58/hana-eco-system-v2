@@ -8,7 +8,7 @@ import { Modal } from "../components/Modal";
 import { StatusBadge } from "../components/StatusBadge";
 import { ToastNotification } from "../components/ToastNotification";
 import type { Invoice } from "../types";
-import { dateTime, money, todayInputValue } from "../utils/format";
+import { dateTime, money, numberText, todayInputValue } from "../utils/format";
 
 type DeliveryFilter = "pending" | "delivered" | "all" | "cancelled";
 
@@ -143,11 +143,11 @@ export function ShippingReceivedPage() {
                   : <button className="primary-button shipping-call-button" type="button" disabled title="Khách hàng chưa có số điện thoại"><Phone size={15}/><span>Gọi điện</span></button>}
               </div>}
           </td>
-          <td className="numeric">{money(invoice.subtotal)}</td>
-          <td className="numeric">{money(invoice.total_extra_charges)}</td>
+          <td className="numeric">{numberText(invoice.subtotal)}</td>
+          <td className="numeric">{numberText(invoice.total_extra_charges)}</td>
           <td className="numeric strong">{invoice.is_paid_by_transfer
             ? <span className="shipping-payment-status paid"><BadgeCheck size={15}/><strong>Đã thanh toán</strong><small>Không thu tiền khách</small></span>
-            : <span className="shipping-payment-status collect"><HandCoins size={15}/><strong>{money(invoice.total_amount)}</strong><small>Cần thu khách</small></span>}
+            : <span className="shipping-payment-status collect"><HandCoins size={15}/><strong>{numberText(invoice.total_amount)}</strong><small>Cần thu khách</small></span>}
           </td>
         </tr>)}</tbody>
       </table>
@@ -168,7 +168,7 @@ export function ShippingReceivedPage() {
               {invoice.is_paid_by_transfer ? <BadgeCheck size={19}/> : <HandCoins size={19}/>}
               <span>
                 <small>{invoice.is_paid_by_transfer ? "Đã chuyển khoản" : "COD cần thu"}</small>
-                <strong>{invoice.is_paid_by_transfer ? "Không thu" : money(invoice.total_amount)}</strong>
+                <strong>{invoice.is_paid_by_transfer ? "Không thu" : numberText(invoice.total_amount)}</strong>
               </span>
             </div>
             <div className={`shipping-delivery-state${invoice.delivered_at ? " delivered" : ""}`}>

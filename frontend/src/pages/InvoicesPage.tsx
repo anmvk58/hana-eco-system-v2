@@ -9,7 +9,7 @@ import { EmptyState } from "../components/EmptyState";
 import { StatusBadge } from "../components/StatusBadge";
 import { AuditBadge } from "../components/AuditBadge";
 import type { Invoice, InvoiceListItem, InvoiceStatus } from "../types";
-import { dateTime, money, todayInputValue } from "../utils/format";
+import { dateTime, numberText, todayInputValue } from "../utils/format";
 
 const PAGE_SIZE_OPTIONS = [10, 20, 50, 100];
 
@@ -277,9 +277,9 @@ export function InvoicesPage() {
                     {invoice.is_edited ? <Pencil size={15}/> : <Minus size={17}/>}
                   </span>
                 </td>
-                <td className="numeric">{money(invoice.subtotal)}</td>
-                <td className="numeric">{money(invoice.total_extra_charges)}</td>
-                <td className="numeric strong">{money(invoice.total_amount)}</td>
+                <td className="numeric">{numberText(invoice.subtotal)}</td>
+                <td className="numeric">{numberText(invoice.total_extra_charges)}</td>
+                <td className="numeric strong">{numberText(invoice.total_amount)}</td>
                 <td className="row-actions">
                   <Link
                     className="icon-button"
