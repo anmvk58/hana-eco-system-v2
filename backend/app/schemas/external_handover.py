@@ -36,6 +36,7 @@ class ExternalHandoverBatchRead(ORMBase):
     updated_by_name: str | None
     cancelled_at: datetime | None
     cancelled_by_name: str | None
+    is_reconciled: bool
     items: list[ExternalHandoverBatchItemRead]
     created_at: datetime
     updated_at: datetime

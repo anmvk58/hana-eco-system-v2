@@ -91,6 +91,15 @@ class InvoiceClaim(ORMBase):
     invoice_ids: list[int] = Field(min_length=1, max_length=100)
 
 
+class InternalShipperHandover(ORMBase):
+    invoice_ids: list[int] = Field(min_length=1, max_length=100)
+    shipper_id: int = Field(gt=0)
+
+
+class InternalShipperRecall(ORMBase):
+    reason: str | None = Field(default=None, max_length=500)
+
+
 class ExternalHandoffCreate(ORMBase):
     advance_method: ExternalAdvanceMethod
     shipping_fee: Decimal = Field(ge=0)
@@ -155,6 +164,12 @@ class InvoiceRead(ORMBase):
     created_at: datetime
     updated_at: datetime
     deleted_at: datetime | None = None
+
+
+class InternalShipperAssignmentRead(ORMBase):
+    invoice: InvoiceRead
+    can_recall: bool
+    recall_block_reason: str | None
 
 
 class InvoiceListItemRead(InvoiceRead):

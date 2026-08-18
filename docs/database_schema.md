@@ -148,3 +148,64 @@
 | is_active | boolean | Required; synchronized with the linked user |
 | created_at | datetime | Required |
 | updated_at | datetime | Required |
+
+## internal_cod_collection_sessions
+
+| Column | Type | Notes |
+| --- | --- | --- |
+| id | integer | Primary key |
+| code | varchar(40) | Unique; dạng `TT-YYMMDD-NNNN` |
+| shipper_id | integer | FK shippers.id |
+| invoice_count | integer | Snapshot số đơn COD trong phiên |
+| total_amount | numeric(14,2) | Snapshot tổng COD đã thu |
+| collected_at | datetime | Thời điểm xác nhận thu đủ tiền |
+| collected_by_user_id | integer | FK users.id, nullable |
+| note | text | Nullable |
+| created_at | datetime | Required |
+| updated_at | datetime | Required |
+
+## internal_cod_collection_items
+
+| Column | Type | Notes |
+| --- | --- | --- |
+| id | integer | Primary key |
+| session_id | integer | FK internal_cod_collection_sessions.id |
+| invoice_id | integer | Unique FK invoices.id; ngăn thu COD trùng đơn |
+| invoice_code | varchar(60) | Snapshot mã hóa đơn |
+| customer_name | varchar(200) | Snapshot tên khách hàng, nullable |
+| cod_amount | numeric(14,2) | Snapshot COD đã thu |
+| handed_over_at | datetime | Snapshot thời điểm bàn giao cho shipper nội bộ, nullable |
+| delivered_at | datetime | Snapshot thời điểm giao thành công, nullable |
+
+## retail_invoice_collections
+
+| Column | Type | Notes |
+| --- | --- | --- |
+| id | integer | Primary key |
+| invoice_id | integer | Unique FK invoices.id; ngăn xác nhận thu trùng đơn Khách lẻ |
+| invoice_code | varchar(60) | Snapshot mã hóa đơn |
+| customer_name | varchar(200) | Snapshot tên khách hàng, nullable |
+| collected_amount | numeric(14,2) | Snapshot số tiền kiểm kê |
+| is_paid_by_transfer | boolean | Snapshot phương thức thanh toán của đơn |
+| collected_at | datetime | Thời điểm xác nhận đã thu tiền |
+| collected_by_user_id | integer | FK users.id, nullable |
+| note | text | Nullable |
+| created_at | datetime | Required |
+| updated_at | datetime | Required |
+
+## external_handover_batch_reconciliations
+
+| Column | Type | Notes |
+| --- | --- | --- |
+| id | integer | Primary key |
+| batch_id | integer | Unique FK external_handover_batches.id; ngăn kiểm kê trùng phiên |
+| batch_code | varchar(40) | Snapshot mã phiên bàn giao |
+| invoice_count | integer | Snapshot số đơn đang hoạt động trong phiên |
+| expected_amount | numeric(14,2) | Snapshot tiền shipper phải ứng/nộp |
+| received_amount | numeric(14,2) | Snapshot tiền thực tế đã nhận |
+| advance_method | enum(transfer, cash, mixed) | Snapshot phương thức nhận tiền |
+| reconciled_at | datetime | Thời điểm xác nhận kiểm kê |
+| reconciled_by_user_id | integer | FK users.id, nullable |
+| note | text | Nullable |
+| created_at | datetime | Required |
+| updated_at | datetime | Required |

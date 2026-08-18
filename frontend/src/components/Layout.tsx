@@ -1,5 +1,6 @@
 import {
   BarChart3,
+  Banknote,
   Boxes,
   ChevronDown,
   ChevronLeft,
@@ -18,6 +19,7 @@ import {
   PackageCheck,
   History,
   Handshake,
+  ClipboardCheck,
 } from "lucide-react";
 import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
@@ -44,7 +46,14 @@ const reportNavItems = [
 
 const shipManagementNavItems = [
   { to: "/ship-management", label: "Bàn giao đơn", icon: Handshake, permissions: ["shipping.manage"] },
+  { to: "/ship-management/internal-handover", label: "Bàn giao Ship Nội Bộ", icon: Truck, permissions: ["shipping.manage"] },
   { to: "/ship-management/external-batches", label: "Bảng kê Ship Ngoài", icon: ClipboardList, permissions: ["shipping.manage"] },
+];
+
+const codManagementNavItems = [
+  { to: "/cod-management/order-reconciliation", label: "Kiểm kê đơn", icon: ClipboardCheck, permissions: ["shipping.manage"] },
+  { to: "/cod-management/internal-collections", label: "Thu tiền Ship Nội Bộ", icon: Banknote, permissions: ["shipping.manage"] },
+  { to: "/cod-management/internal-collection-history", label: "Lịch sử thu tiền COD", icon: History, permissions: ["shipping.manage"] },
 ];
 
 const accessControlNavItem = {
@@ -74,6 +83,10 @@ const routeTitles: Record<string, string> = {
   "/shipping/claim": "Nhận đơn ship",
   "/shipping/received": "Đơn đã nhận",
   "/ship-management": "Quản lý đơn ship",
+  "/ship-management/internal-handover": "Bàn giao Ship Nội Bộ",
+  "/cod-management/internal-collections": "Thu tiền Ship Nội Bộ",
+  "/cod-management/internal-collection-history": "Lịch sử thu tiền COD",
+  "/cod-management/order-reconciliation": "Kiểm kê đơn",
   "/ship-management/external-batches": "Bảng kê bàn giao Ship Ngoài",
   "/forbidden": "Không có quyền truy cập",
 };
@@ -87,6 +100,7 @@ export function Layout({ children }: { children: ReactNode }) {
   );
   const [isReportsOpen, setIsReportsOpen] = useState(() => location.pathname.startsWith("/reports"));
   const [isShipManagementOpen, setIsShipManagementOpen] = useState(() => location.pathname.startsWith("/ship-management"));
+  const [isCodManagementOpen, setIsCodManagementOpen] = useState(() => location.pathname.startsWith("/cod-management"));
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(
@@ -97,6 +111,7 @@ export function Layout({ children }: { children: ReactNode }) {
   const visibleCatalogItems = catalogNavItems.filter((item) => item.permissions.every(hasPermission));
   const visibleReportItems = reportNavItems.filter((item) => item.permissions.every(hasPermission));
   const visibleShipManagementItems = shipManagementNavItems.filter((item) => item.permissions.every(hasPermission));
+  const visibleCodManagementItems = codManagementNavItems.filter((item) => item.permissions.every(hasPermission));
   const userInitial = currentUser?.display_name.trim().charAt(0).toLocaleUpperCase("vi-VN") || "U";
 
   useEffect(() => {
@@ -202,6 +217,33 @@ export function Layout({ children }: { children: ReactNode }) {
                 {visibleShipManagementItems.map((item) => {
                   const Icon = item.icon;
                   return <NavLink key={item.to} to={item.to} title={item.label} end={item.to === "/ship-management"}><Icon size={17}/><span>{item.label}</span></NavLink>;
+                })}
+              </div> : null}
+            </div>
+          ) : null}
+          {visibleCodManagementItems.length > 0 ? (
+            <div className="nav-group">
+              <button
+                className={`nav-group-toggle${location.pathname.startsWith("/cod-management") ? " active" : ""}`}
+                type="button"
+                aria-expanded={isCodManagementOpen}
+                aria-controls="cod-management-navigation"
+                title="Quản lý tiền COD"
+                onClick={() => {
+                  if (isSidebarCollapsed) {
+                    setIsSidebarCollapsed(false);
+                    setIsCodManagementOpen(true);
+                    return;
+                  }
+                  setIsCodManagementOpen((open) => !open);
+                }}
+              >
+                <Banknote size={18}/><span>Quản lý tiền COD</span><ChevronDown className={`nav-group-chevron${isCodManagementOpen ? " open" : ""}`} size={17}/>
+              </button>
+              {isCodManagementOpen ? <div className="nav-group-items" id="cod-management-navigation">
+                {visibleCodManagementItems.map((item) => {
+                  const Icon = item.icon;
+                  return <NavLink key={item.to} to={item.to} title={item.label}><Icon size={17}/><span>{item.label}</span></NavLink>;
                 })}
               </div> : null}
             </div>

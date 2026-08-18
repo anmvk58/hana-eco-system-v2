@@ -2,10 +2,10 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import inspect, text
 
-from app.api.routers import access_control, customers, dashboard, extra_charge_settings, invoices, product_categories, products, reports, ship_management, shippers, shipping
+from app.api.routers import access_control, customers, dashboard, extra_charge_settings, internal_cod_collections, invoices, order_reconciliation, product_categories, products, reports, ship_management, shippers, shipping
 from app.core.config import get_settings
 from app.database import Base, SessionLocal, engine
-from app.models import AuthSession, Customer, ExternalHandoverBatch, ExternalHandoverBatchItem, ExtraChargeSetting, Invoice, InvoiceCodeSequence, InvoiceExtraCharge, InvoiceHistory, InvoiceItem, Permission, Product, ProductCategory, Role, Shipper, User
+from app.models import AuthSession, Customer, ExternalHandoverBatch, ExternalHandoverBatchItem, ExtraChargeSetting, InternalCodCollectionItem, InternalCodCollectionSession, Invoice, InvoiceCodeSequence, InvoiceExtraCharge, InvoiceHistory, InvoiceItem, Permission, Product, ProductCategory, Role, Shipper, User
 from app.services.access_control_service import ensure_defaults as ensure_access_control_defaults
 from app.services.extra_charge_setting_service import ensure_default_extra_charge_settings
 from app.services.ship_management_service import ensure_legacy_external_handover_batches
@@ -37,6 +37,8 @@ def create_app() -> FastAPI:
     app.include_router(shippers.router, prefix=settings.api_prefix)
     app.include_router(shipping.router, prefix=settings.api_prefix)
     app.include_router(ship_management.router, prefix=settings.api_prefix)
+    app.include_router(internal_cod_collections.router, prefix=settings.api_prefix)
+    app.include_router(order_reconciliation.router, prefix=settings.api_prefix)
 
     @app.on_event("startup")
     def on_startup() -> None:
@@ -48,6 +50,7 @@ def create_app() -> FastAPI:
         ensure_invoice_audit_columns()
         ensure_invoice_payment_column()
         ensure_invoice_external_handoff_columns()
+        ensure_internal_cod_collection_columns()
         with SessionLocal() as db:
             ensure_access_control_defaults(db)
             ensure_default_extra_charge_settings(db)
@@ -194,6 +197,22 @@ def ensure_invoice_external_handoff_columns() -> None:
     with engine.begin() as connection:
         for statement in statements:
             connection.execute(text(statement))
+
+
+def ensure_internal_cod_collection_columns() -> None:
+    inspector = inspect(engine)
+    if not inspector.has_table("internal_cod_collection_items"):
+        return
+    item_columns = {column["name"] for column in inspector.get_columns("internal_cod_collection_items")}
+    with engine.begin() as connection:
+        if "handed_over_at" not in item_columns:
+            connection.execute(text("ALTER TABLE internal_cod_collection_items ADD COLUMN handed_over_at DATETIME NULL"))
+        connection.execute(text("""
+            UPDATE internal_cod_collection_items AS collection_item
+            JOIN invoices AS invoice ON invoice.id = collection_item.invoice_id
+            SET collection_item.handed_over_at = invoice.audited_at
+            WHERE collection_item.handed_over_at IS NULL
+        """))
 
 
 app = create_app()

@@ -1,7 +1,6 @@
 from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import Literal
-from zoneinfo import ZoneInfo
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
@@ -10,14 +9,14 @@ from app.models.customer import Customer
 from app.models.enums import InvoiceStatus
 from app.models.invoice import Invoice, InvoiceItem
 from app.schemas.dashboard import DashboardProductSummary, DashboardRevenuePoint, DashboardSummary
+from app.services.time_service import vietnam_local_range_to_utc, vietnam_now_naive
 
 
 DashboardPeriod = Literal["today", "7days", "month", "year"]
-VIETNAM_TIMEZONE = ZoneInfo("Asia/Ho_Chi_Minh")
 
 
 def period_range(period: DashboardPeriod) -> tuple[datetime, datetime]:
-    now = datetime.now(VIETNAM_TIMEZONE).replace(tzinfo=None)
+    now = vietnam_now_naive()
     start = now.replace(hour=0, minute=0, second=0, microsecond=0)
     if period == "7days":
         start -= timedelta(days=6)
@@ -105,6 +104,7 @@ def revenue_points(
 
 def get_dashboard_summary(db: Session, period: DashboardPeriod) -> DashboardSummary:
     start, end = period_range(period)
+    system_start, system_end = vietnam_local_range_to_utc(start, end)
     active_invoice_conditions = (
         Invoice.status.in_((InvoiceStatus.created, InvoiceStatus.completed)),
         Invoice.deleted_at.is_(None),
@@ -123,15 +123,15 @@ def get_dashboard_summary(db: Session, period: DashboardPeriod) -> DashboardSumm
         select(func.count(Invoice.id)).where(
             Invoice.status.in_((InvoiceStatus.created, InvoiceStatus.completed)),
             Invoice.deleted_at.is_(None),
-            Invoice.created_at >= start,
-            Invoice.created_at <= end,
+            Invoice.created_at >= system_start,
+            Invoice.created_at <= system_end,
         )
     ) or 0
     created_customer_count = db.scalar(
         select(func.count(Customer.id)).where(
             Customer.deleted_at.is_(None),
-            Customer.created_at >= start,
-            Customer.created_at <= end,
+            Customer.created_at >= system_start,
+            Customer.created_at <= system_end,
         )
     ) or 0
 

@@ -237,6 +237,94 @@ export interface ShipHandoverPayload {
   external_handoff?: ExternalHandoffPayload;
 }
 
+export interface InternalShipperHandoverPayload {
+  invoice_ids: number[];
+  shipper_id: number;
+}
+
+export interface InternalShipperAssignment {
+  invoice: Invoice;
+  can_recall: boolean;
+  recall_block_reason?: string | null;
+}
+
+export interface PendingInternalCodInvoice {
+  id: number;
+  code: string;
+  customer_name?: string | null;
+  handed_over_at?: string | null;
+  total_amount: string;
+  is_paid_by_transfer: boolean;
+  is_cod_pending: boolean;
+}
+
+export interface InternalCodShipperSummary {
+  shipper: Shipper;
+  handed_over_invoice_count: number;
+  cod_invoice_count: number;
+  transfer_invoice_count: number;
+  pending_invoice_count: number;
+  pending_cod_amount: string;
+  last_collection_at?: string | null;
+  pending_invoices: PendingInternalCodInvoice[];
+  handed_over_invoices: PendingInternalCodInvoice[];
+}
+
+export interface InternalCodCollectionItem {
+  id: number;
+  invoice_id: number;
+  invoice_code: string;
+  customer_name?: string | null;
+  cod_amount: string;
+  handed_over_at?: string | null;
+  delivered_at?: string | null;
+}
+
+export interface InternalCodCollectionSession {
+  id: number;
+  code: string;
+  shipper_id: number;
+  shipper_name: string;
+  invoice_count: number;
+  total_amount: string;
+  collected_at: string;
+  collected_by_name?: string | null;
+  note?: string | null;
+  items: InternalCodCollectionItem[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface InternalCodCollectionCreatePayload {
+  shipper_id: number;
+  collection_date: string;
+  invoice_ids: number[];
+  note?: string;
+}
+
+export interface RetailInvoiceCollection {
+  id: number;
+  invoice_id: number;
+  invoice_code: string;
+  customer_name?: string | null;
+  collected_amount: string;
+  is_paid_by_transfer: boolean;
+  collected_at: string;
+  collected_by_name?: string | null;
+  note?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface RetailInvoiceReconciliation {
+  invoice: Invoice;
+  collection?: RetailInvoiceCollection | null;
+}
+
+export interface RetailInvoiceCollectPayload {
+  note?: string;
+}
+
 export type ExternalHandoverBatchStatus = "active" | "cancelled";
 
 export interface ExternalHandoverBatchItem {
@@ -262,6 +350,7 @@ export interface ExternalHandoverBatch {
   updated_by_name?: string | null;
   cancelled_at?: string | null;
   cancelled_by_name?: string | null;
+  is_reconciled: boolean;
   items: ExternalHandoverBatchItem[];
   created_at: string;
   updated_at: string;
@@ -270,6 +359,30 @@ export interface ExternalHandoverBatch {
 export interface ExternalHandoverBatchUpdatePayload {
   invoice_ids: number[];
   external_handoff: ExternalHandoffPayload;
+}
+
+export interface ExternalHandoverBatchReconciliation {
+  id: number;
+  batch_id: number;
+  batch_code: string;
+  invoice_count: number;
+  expected_amount: string;
+  received_amount: string;
+  advance_method: ExternalAdvanceMethod;
+  reconciled_at: string;
+  reconciled_by_name?: string | null;
+  note?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ExternalHandoverReconciliationRow {
+  batch: ExternalHandoverBatch;
+  reconciliation?: ExternalHandoverBatchReconciliation | null;
+}
+
+export interface ExternalHandoverReconcilePayload {
+  note?: string;
 }
 
 export type DashboardTimePreset = "today" | "7days" | "month" | "year";

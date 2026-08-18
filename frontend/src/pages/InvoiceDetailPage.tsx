@@ -10,7 +10,7 @@ import { StatusBadge } from "../components/StatusBadge";
 import { AuditBadge } from "../components/AuditBadge";
 import type { InvoiceAuditLabel } from "../types";
 import type { Invoice, InvoiceHistory } from "../types";
-import { dateTime } from "../utils/format";
+import { dateTime, utcDateTime } from "../utils/format";
 
 export function InvoiceDetailPage() {
   const { hasPermission } = useAuth();
@@ -114,7 +114,7 @@ export function InvoiceDetailPage() {
             <article key={item.id} className="history-item">
               <div>
                 <strong>{item.action}</strong>
-                <span>{dateTime(item.created_at)} · {item.changed_by_name ?? "Không rõ người sửa"}</span>
+                <span>{utcDateTime(item.created_at)} · {item.changed_by_name ?? "Không rõ người sửa"}</span>
               </div>
               <p>{item.reason || "Không có lý do"}</p>
               <details>

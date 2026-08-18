@@ -1,4 +1,4 @@
-import { Banknote, Boxes, Edit2, Eye, HandCoins, LoaderCircle, RefreshCw, RotateCcw, Search, Truck, X } from "lucide-react";
+import { Banknote, Boxes, CheckCircle2, Edit2, Eye, HandCoins, LoaderCircle, RefreshCw, RotateCcw, Search, Truck, X } from "lucide-react";
 import { FormEvent, useEffect, useState } from "react";
 
 import { api } from "../api/client";
@@ -7,7 +7,7 @@ import { EmptyState } from "../components/EmptyState";
 import { Modal } from "../components/Modal";
 import { ToastNotification } from "../components/ToastNotification";
 import type { ExternalAdvanceMethod, ExternalHandoverBatch, Invoice } from "../types";
-import { dateTime, formatNumberInput, money, normalizeInvoiceCodeSearch, normalizeNumberInput, numberText, todayInputValue } from "../utils/format";
+import { formatNumberInput, money, normalizeInvoiceCodeSearch, normalizeNumberInput, numberText, todayInputValue, utcDateTime } from "../utils/format";
 
 export function ExternalHandoverBatchesPage() {
   const today = todayInputValue();
@@ -42,12 +42,29 @@ export function ExternalHandoverBatchesPage() {
     }
   }
 
-  useEffect(() => { void load(fromDate, toDate); }, [fromDate, toDate]);
+  useEffect(() => { void load(fromDate, toDate); }, []);
+
+  function changeDateRange(selectedFromDate: string, selectedToDate: string) {
+    setFromDate(selectedFromDate);
+    setToDate(selectedToDate);
+    const rangeIsComplete = Boolean(selectedFromDate && selectedToDate);
+    const rangeWasCleared = !selectedFromDate && !selectedToDate;
+    if (rangeIsComplete || rangeWasCleared) void load(selectedFromDate, selectedToDate);
+  }
 
   async function openEdit(batch: ExternalHandoverBatch) {
     setError("");
+    if (batch.is_reconciled) {
+      setError("Bảng kê đã kiểm kê và nhận tiền, không thể chỉnh sửa");
+      return;
+    }
     try {
       const detail = await api.shipManagement.externalBatch(batch.id);
+      if (detail.is_reconciled) {
+        setError("Bảng kê đã kiểm kê và nhận tiền, không thể chỉnh sửa");
+        await load();
+        return;
+      }
       const currentInvoices = detail.items.filter((item) => item.is_active).map((item) => item.invoice);
       setEditing(detail);
       setAvailableInvoices(currentInvoices);
@@ -134,6 +151,10 @@ export function ExternalHandoverBatchesPage() {
   }
 
   async function cancelBatch(batch: ExternalHandoverBatch) {
+    if (batch.is_reconciled) {
+      setError("Bảng kê đã kiểm kê và nhận tiền, không thể hủy");
+      return;
+    }
     if (!window.confirm(`Hủy bàn giao ${batch.code}? Toàn bộ đơn trong bảng kê sẽ trở lại danh sách chưa audit.`)) return;
     setSaving(true);
     setError("");
@@ -173,7 +194,7 @@ export function ExternalHandoverBatchesPage() {
     <section className="toolbar shipping-toolbar">
       <div className="shipping-toolbar-copy"><h2 className="toolbar-title"><Truck size={20}/>Bảng kê Ship Ngoài</h2><span className="field-hint">Xem và điều chỉnh các phiên đã bàn giao cho ship ngoài.</span></div>
       <span className="toolbar-spacer"/>
-      <DateRangePicker from={fromDate} to={toDate} onChange={(from, to) => { setFromDate(from || today); setToDate(to || today); }}/>
+      <DateRangePicker from={fromDate} to={toDate} onChange={changeDateRange}/>
       <button className="secondary-button" disabled={loading || saving} onClick={() => void load()}><RefreshCw size={17}/>Làm mới</button>
     </section>
     {error ? <div className="alert error">{error}</div> : null}
@@ -183,11 +204,11 @@ export function ExternalHandoverBatchesPage() {
           const activeCount = batch.items.filter((item) => item.is_active).length;
           const actual = Number(batch.transfer_amount) + Number(batch.cash_amount);
           return <tr key={batch.id}>
-            <td className="code-cell">{batch.code}</td><td>{dateTime(batch.handed_over_at)}</td><td>{batch.created_by_name || "—"}</td><td>{activeCount}</td>
+            <td className="code-cell">{batch.code}</td><td>{utcDateTime(batch.handed_over_at)}</td><td>{batch.created_by_name || "—"}</td><td>{activeCount}</td>
             <td>{batch.advance_method === "transfer" ? "Chuyển khoản" : batch.advance_method === "cash" ? "Tiền mặt" : "Kết hợp"}</td>
             <td className="numeric">{numberText(batch.advance_amount)}</td><td className="numeric">{numberText(actual)}</td>
-            <td><span className={`status-badge ${batch.status}`}>{batch.status === "active" ? "Đang hiệu lực" : "Đã hủy"}</span></td>
-            <td className="row-actions"><button className="icon-button" onClick={() => void openView(batch)} aria-label={`Xem ${batch.code}`}><Eye size={16}/></button>{batch.status === "active" ? <><button className="icon-button" onClick={() => void openEdit(batch)} aria-label={`Sửa ${batch.code}`}><Edit2 size={16}/></button><button className="icon-button danger" disabled={saving} onClick={() => void cancelBatch(batch)} aria-label={`Hủy ${batch.code}`}><RotateCcw size={16}/></button></> : null}</td>
+            <td>{batch.is_reconciled ? <span className="status-badge active"><CheckCircle2 size={14}/>Đã kiểm kê</span> : <span className={`status-badge ${batch.status}`}>{batch.status === "active" ? "Đang hiệu lực" : "Đã hủy"}</span>}</td>
+            <td className="row-actions"><button className="icon-button" onClick={() => void openView(batch)} aria-label={`Xem ${batch.code}`}><Eye size={16}/></button>{batch.status === "active" && !batch.is_reconciled ? <><button className="icon-button" onClick={() => void openEdit(batch)} aria-label={`Sửa ${batch.code}`}><Edit2 size={16}/></button><button className="icon-button danger" disabled={saving} onClick={() => void cancelBatch(batch)} aria-label={`Hủy ${batch.code}`}><RotateCcw size={16}/></button></> : null}</td>
           </tr>;
         })}</tbody>
       </table>
@@ -197,7 +218,7 @@ export function ExternalHandoverBatchesPage() {
 
     {viewing ? <Modal title={`Chi tiết ${viewing.code}`} className="external-batch-detail-modal" onClose={() => setViewing(null)}>
       <div className="page-stack external-batch-detail">
-        <div className="external-batch-detail-meta"><span>Bàn giao lúc <strong>{dateTime(viewing.handed_over_at)}</strong></span><span>Người bàn giao <strong>{viewing.created_by_name || "Không rõ"}</strong></span><span className={`status-badge ${viewing.status}`}>{viewing.status === "active" ? "Đang hiệu lực" : "Đã hủy"}</span></div>
+        <div className="external-batch-detail-meta"><span>Bàn giao lúc <strong>{utcDateTime(viewing.handed_over_at)}</strong></span><span>Người bàn giao <strong>{viewing.created_by_name || "Không rõ"}</strong></span>{viewing.is_reconciled ? <span className="status-badge active"><CheckCircle2 size={14}/>Đã kiểm kê · đã khóa</span> : <span className={`status-badge ${viewing.status}`}>{viewing.status === "active" ? "Đang hiệu lực" : "Đã hủy"}</span>}</div>
         <section className="external-batch-detail-summary">
           <article><span className="detail-summary-icon"><Boxes size={22}/></span><small>Tổng số đơn</small><strong>{viewingSummaryItems.length} đơn</strong></article>
           <article><span className="detail-summary-icon"><Banknote size={22}/></span><small>Tổng tiền hàng</small><strong>{money(viewingGoodsTotal)}</strong></article>

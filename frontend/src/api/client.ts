@@ -26,13 +26,20 @@ import type {
   LoginResponse,
   SoldProductReportRow,
   ShipHandoverPayload,
+  InternalShipperHandoverPayload,
+  InternalShipperAssignment,
+  InternalCodCollectionCreatePayload,
+  InternalCodCollectionSession,
+  InternalCodShipperSummary,
   ExternalHandoverBatch,
   ExternalHandoverBatchUpdatePayload,
+  RetailInvoiceCollectPayload,
+  RetailInvoiceReconciliation,
+  ExternalHandoverReconcilePayload,
+  ExternalHandoverReconciliationRow,
 } from "../types";
 
-const runtimeApiUrl = new URL("/api", window.location.origin);
-runtimeApiUrl.port = "8000";
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || runtimeApiUrl.toString();
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || new URL("/api", window.location.origin).toString();
 
 type QueryValue = string | number | boolean | null | undefined;
 
@@ -156,6 +163,16 @@ export const api = {
     unauditedInvoiceByCode: (code: string) =>
       request<Invoice>("/ship-management/unaudited-invoice-by-code", {}, { code }),
     handover: (payload: ShipHandoverPayload) => request<Invoice[]>("/ship-management/handover", { method: "POST", body: JSON.stringify(payload) }),
+    internalShippers: () => request<Shipper[]>("/ship-management/internal-shippers"),
+    handoverToInternalShipper: (payload: InternalShipperHandoverPayload) =>
+      request<Invoice[]>("/ship-management/internal-handover", { method: "POST", body: JSON.stringify(payload) }),
+    internalHandoverInvoices: (fromDate?: string, toDate?: string) =>
+      request<InternalShipperAssignment[]>("/ship-management/internal-handover-invoices", {}, { from_date: fromDate, to_date: toDate }),
+    recallInternalHandover: (invoiceId: number, reason?: string) =>
+      request<Invoice>(`/ship-management/internal-handover-invoices/${invoiceId}/recall`, {
+        method: "POST",
+        body: JSON.stringify({ reason: reason || undefined }),
+      }),
     externalBatches: (fromDate?: string, toDate?: string) =>
       request<ExternalHandoverBatch[]>("/ship-management/external-handover-batches", {}, { from_date: fromDate, to_date: toDate }),
     externalBatch: (id: number) => request<ExternalHandoverBatch>(`/ship-management/external-handover-batches/${id}`),
@@ -163,6 +180,35 @@ export const api = {
       request<ExternalHandoverBatch>(`/ship-management/external-handover-batches/${id}`, { method: "PUT", body: JSON.stringify(payload) }),
     cancelExternalBatch: (id: number) =>
       request<ExternalHandoverBatch>(`/ship-management/external-handover-batches/${id}/cancel`, { method: "POST" }),
+  },
+  internalCodCollections: {
+    summary: (collectionDate?: string) =>
+      request<InternalCodShipperSummary[]>("/internal-cod-collections/summary", {}, { collection_date: collectionDate }),
+    sessions: (fromDate?: string, toDate?: string, shipperId?: number) =>
+      request<InternalCodCollectionSession[]>("/internal-cod-collections/sessions", {}, { from_date: fromDate, to_date: toDate, shipper_id: shipperId }),
+    session: (id: number) => request<InternalCodCollectionSession>(`/internal-cod-collections/sessions/${id}`),
+    createSession: (payload: InternalCodCollectionCreatePayload) =>
+      request<InternalCodCollectionSession>("/internal-cod-collections/sessions", { method: "POST", body: JSON.stringify(payload) }),
+  },
+  orderReconciliation: {
+    unauditedInvoices: (fromDate?: string, toDate?: string) =>
+      request<Invoice[]>("/order-reconciliation/unaudited-invoices", {}, { from_date: fromDate, to_date: toDate }),
+    markRetail: (invoiceId: number) =>
+      request<Invoice>(`/order-reconciliation/unaudited-invoices/${invoiceId}/mark-retail`, { method: "POST" }),
+    retailInvoices: (fromDate?: string, toDate?: string) =>
+      request<RetailInvoiceReconciliation[]>("/order-reconciliation/retail-invoices", {}, { from_date: fromDate, to_date: toDate }),
+    collectRetailInvoice: (invoiceId: number, payload: RetailInvoiceCollectPayload) =>
+      request<RetailInvoiceReconciliation>(`/order-reconciliation/retail-invoices/${invoiceId}/collect`, {
+        method: "POST",
+        body: JSON.stringify(payload),
+      }),
+    externalHandoverBatches: (fromDate?: string, toDate?: string) =>
+      request<ExternalHandoverReconciliationRow[]>("/order-reconciliation/external-handover-batches", {}, { from_date: fromDate, to_date: toDate }),
+    reconcileExternalHandoverBatch: (batchId: number, payload: ExternalHandoverReconcilePayload) =>
+      request<ExternalHandoverReconciliationRow>(`/order-reconciliation/external-handover-batches/${batchId}/reconcile`, {
+        method: "POST",
+        body: JSON.stringify(payload),
+      }),
   },
   customers: {
     list: (search?: string, limit = 50) => request<Customer[]>("/customers", {}, { search, limit }),

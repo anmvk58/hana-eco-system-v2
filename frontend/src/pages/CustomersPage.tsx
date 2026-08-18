@@ -6,7 +6,7 @@ import { useAuth } from "../auth/AuthContext";
 import { EmptyState } from "../components/EmptyState";
 import { Modal } from "../components/Modal";
 import type { Customer, CustomerPayload } from "../types";
-import { dateTime } from "../utils/format";
+import { utcDateTime } from "../utils/format";
 
 const blankCustomer: CustomerPayload = {
   code: "",
@@ -132,7 +132,7 @@ export function CustomersPage() {
                 <td>{customer.phone}</td>
                 <td>{customer.address}</td>
                 <td>{customer.note}</td>
-                <td>{dateTime(customer.updated_at)}</td>
+                <td>{utcDateTime(customer.updated_at)}</td>
                 <td className="row-actions">
                   {hasPermission("customers.update") ? <button className="icon-button" type="button" onClick={() => openEdit(customer)} aria-label="Sửa">
                     <Edit2 size={16} />

@@ -15,6 +15,7 @@ from app.models.product import Product
 from app.models.shipper import Shipper
 from app.models.user import User
 from app.schemas.invoice import InvoiceCreate, InvoiceExtraChargeCreate, InvoiceItemCreate, InvoiceUpdate
+from app.services.time_service import vietnam_local_datetime
 
 
 MONEY_QUANT = Decimal("0.01")
@@ -69,7 +70,7 @@ def ensure_invoice_sequence_row(db: Session, date_key: str) -> None:
 
 
 def reserve_invoice_code(db: Session, sold_at: datetime | None = None) -> str:
-    current = sold_at or datetime.utcnow()
+    current = vietnam_local_datetime(sold_at)
     date_key = current.strftime("%y%m%d")
     ensure_invoice_sequence_row(db, date_key)
     sequence = db.scalar(select(InvoiceCodeSequence).where(InvoiceCodeSequence.date_key == date_key).with_for_update())
@@ -348,7 +349,7 @@ def add_history(
 
 def create_invoice(db: Session, payload: InvoiceCreate, user_id: int | None, user_name: str | None) -> Invoice:
     validate_customer(db, payload.customer_id)
-    sold_at = payload.sold_at or datetime.utcnow()
+    sold_at = vietnam_local_datetime(payload.sold_at)
     try:
         invoice = Invoice(
             code=payload.code or reserve_invoice_code(db, sold_at),
@@ -392,7 +393,7 @@ def update_invoice(db: Session, invoice_id: int, payload: InvoiceUpdate, user_id
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Không thể sửa hóa đơn đã hoàn thành")
     if payload.customer_id != invoice.customer_id:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cannot change invoice customer")
-    if payload.sold_at is not None and not same_datetime_to_second(payload.sold_at, invoice.sold_at):
+    if payload.sold_at is not None and not same_datetime_to_second(vietnam_local_datetime(payload.sold_at), invoice.sold_at):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cannot change invoice sold time")
     before_data = snapshot_invoice(invoice)
 

@@ -1,5 +1,4 @@
-from datetime import date, datetime, time, timedelta, timezone
-from zoneinfo import ZoneInfo
+from datetime import date, datetime
 
 from fastapi import HTTPException, status
 from sqlalchemy import select
@@ -10,15 +9,7 @@ from app.models.invoice import Invoice
 from app.models.shipper import Shipper
 from app.models.user import User
 from app.services import invoice_service, shipper_service
-
-
-VIETNAM_TIMEZONE = ZoneInfo("Asia/Ho_Chi_Minh")
-
-
-def vietnam_day_utc_bounds(target_date: date) -> tuple[datetime, datetime]:
-    start_local = datetime.combine(target_date, time.min, tzinfo=VIETNAM_TIMEZONE)
-    start_utc = start_local.astimezone(timezone.utc).replace(tzinfo=None)
-    return start_utc, start_utc + timedelta(days=1)
+from app.services.time_service import VIETNAM_TIMEZONE, vietnam_day_utc_bounds
 
 
 def current_vietnam_day_utc_bounds() -> tuple[datetime, datetime]:

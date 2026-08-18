@@ -8,7 +8,7 @@ import { Modal } from "../components/Modal";
 import { StatusBadge } from "../components/StatusBadge";
 import { ToastNotification } from "../components/ToastNotification";
 import type { Invoice } from "../types";
-import { dateTime, money, numberText, todayInputValue } from "../utils/format";
+import { money, numberText, todayInputValue, utcDateTime } from "../utils/format";
 
 type DeliveryFilter = "pending" | "delivered" | "all" | "cancelled";
 
@@ -130,10 +130,10 @@ export function ShippingReceivedPage() {
           <td>{invoice.customer?.name ?? "Khách lẻ"}<span className="table-subtext">{invoice.customer?.phone}</span></td>
           <td>{invoice.customer?.address || "-"}</td>
           <td className="code-cell">{invoice.code}</td>
-          <td>{dateTime(invoice.audited_at)}</td>
+          <td>{utcDateTime(invoice.audited_at)}</td>
           <td><StatusBadge status={invoice.status}/></td>
           <td>{invoice.delivered_at
-            ? <span className="delivery-status delivered"><CheckCircle2 size={14}/>Đã giao<span className="table-subtext">{dateTime(invoice.delivered_at)}</span></span>
+            ? <span className="delivery-status delivered"><CheckCircle2 size={14}/>Đã giao<span className="table-subtext">{utcDateTime(invoice.delivered_at)}</span></span>
             : invoice.status === "cancelled"
               ? <button className="primary-button shipping-deliver-button" type="button" disabled><Ban size={15}/>Đơn đã hủy</button>
               : <div className="shipping-delivery-actions desktop-actions">
@@ -159,7 +159,7 @@ export function ShippingReceivedPage() {
             <span className="shipping-card-code">{invoice.code}</span>
           </header>
           <div className="shipping-received-meta">
-            <span>Nhận lúc {dateTime(invoice.audited_at)}</span>
+            <span>Nhận lúc {utcDateTime(invoice.audited_at)}</span>
             <StatusBadge status={invoice.status}/>
           </div>
           <div className="shipping-card-address"><span>Địa chỉ giao hàng</span><strong>{invoice.customer?.address || "Chưa có địa chỉ"}</strong></div>
@@ -173,7 +173,7 @@ export function ShippingReceivedPage() {
             </div>
             <div className={`shipping-delivery-state${invoice.delivered_at ? " delivered" : ""}`}>
               {invoice.delivered_at
-                ? <><CheckCircle2 size={19}/><span><strong>Đã giao</strong><small>{dateTime(invoice.delivered_at)}</small></span></>
+                ? <><CheckCircle2 size={19}/><span><strong>Đã giao</strong><small>{utcDateTime(invoice.delivered_at)}</small></span></>
                 : invoice.status === "cancelled"
                   ? <button className="primary-button" type="button" disabled><Ban size={17}/><span>Đơn đã hủy</span></button>
                   : <div className="shipping-delivery-actions">

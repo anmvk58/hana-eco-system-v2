@@ -7,7 +7,8 @@ from app.api.deps import require_permission
 from app.database import get_db
 from app.models.user import User
 from app.schemas.external_handover import ExternalHandoverBatchRead, ExternalHandoverBatchUpdate
-from app.schemas.invoice import InvoiceBulkAuditAssign, InvoiceRead
+from app.schemas.invoice import InternalShipperAssignmentRead, InternalShipperHandover, InternalShipperRecall, InvoiceBulkAuditAssign, InvoiceRead
+from app.schemas.shipper import ShipperRead
 from app.services import ship_management_service
 
 
@@ -40,6 +41,43 @@ def handover_invoices(
     db: Session = Depends(get_db),
 ):
     return ship_management_service.handover_invoices(db, payload, current_user)
+
+
+@router.get("/internal-shippers", response_model=list[ShipperRead])
+def list_internal_shippers(
+    _: User = Depends(require_permission("shipping.manage")),
+    db: Session = Depends(get_db),
+):
+    return ship_management_service.list_active_internal_shippers(db)
+
+
+@router.post("/internal-handover", response_model=list[InvoiceRead])
+def handover_to_internal_shipper(
+    payload: InternalShipperHandover,
+    current_user: User = Depends(require_permission("shipping.manage")),
+    db: Session = Depends(get_db),
+):
+    return ship_management_service.handover_to_internal_shipper(db, payload, current_user)
+
+
+@router.get("/internal-handover-invoices", response_model=list[InternalShipperAssignmentRead])
+def list_internal_shipper_assignments(
+    from_date: date | None = None,
+    to_date: date | None = None,
+    _: User = Depends(require_permission("shipping.manage")),
+    db: Session = Depends(get_db),
+):
+    return ship_management_service.list_internal_shipper_assignments(db, from_date, to_date)
+
+
+@router.post("/internal-handover-invoices/{invoice_id}/recall", response_model=InvoiceRead)
+def recall_internal_shipper_assignment(
+    invoice_id: int,
+    payload: InternalShipperRecall,
+    current_user: User = Depends(require_permission("shipping.manage")),
+    db: Session = Depends(get_db),
+):
+    return ship_management_service.recall_internal_shipper_assignment(db, invoice_id, payload, current_user)
 
 
 @router.get("/external-handover-batches", response_model=list[ExternalHandoverBatchRead])

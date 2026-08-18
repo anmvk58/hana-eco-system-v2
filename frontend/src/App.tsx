@@ -18,7 +18,11 @@ import { ShippersPage } from "./pages/ShippersPage";
 import { ShippingClaimPage } from "./pages/ShippingClaimPage";
 import { ShippingReceivedPage } from "./pages/ShippingReceivedPage";
 import { ShipManagementPage } from "./pages/ShipManagementPage";
+import { InternalShipperHandoverPage } from "./pages/InternalShipperHandoverPage";
+import { InternalCodCollectionsPage } from "./pages/InternalCodCollectionsPage";
+import { InternalCodCollectionHistoryPage } from "./pages/InternalCodCollectionHistoryPage";
 import { ExternalHandoverBatchesPage } from "./pages/ExternalHandoverBatchesPage";
+import { OrderReconciliationPage } from "./pages/OrderReconciliationPage";
 import { useAuth } from "./auth/AuthContext";
 
 export default function App() {
@@ -43,6 +47,11 @@ export default function App() {
         <Route path="/shipping/claim" element={protect("shipping.claim", <ShippingClaimPage />)} />
         <Route path="/shipping/received" element={protect("shipping.claim", <ShippingReceivedPage />)} />
         <Route path="/ship-management" element={protect("shipping.manage", <ShipManagementPage />)} />
+        <Route path="/ship-management/internal-handover" element={protect("shipping.manage", <InternalShipperHandoverPage />)} />
+        <Route path="/cod-management/internal-collections" element={protect("shipping.manage", <InternalCodCollectionsPage />)} />
+        <Route path="/cod-management/internal-collection-history" element={protect("shipping.manage", <InternalCodCollectionHistoryPage />)} />
+        <Route path="/cod-management/order-reconciliation" element={protect("shipping.manage", <OrderReconciliationPage />)} />
+        <Route path="/ship-management/internal-cod-collections" element={<Navigate to="/cod-management/internal-collections" replace />} />
         <Route path="/ship-management/external-batches" element={protect("shipping.manage", <ExternalHandoverBatchesPage />)} />
         <Route path="/forbidden" element={<ForbiddenPage />} />
       </Routes>

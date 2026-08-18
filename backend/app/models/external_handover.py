@@ -32,6 +32,11 @@ class ExternalHandoverBatch(Base, TimestampMixin):
     updated_by_user = relationship("User", foreign_keys=[updated_by_user_id])
     cancelled_by_user = relationship("User", foreign_keys=[cancelled_by_user_id])
     items = relationship("ExternalHandoverBatchItem", back_populates="batch", cascade="all, delete-orphan")
+    reconciliation = relationship(
+        "ExternalHandoverBatchReconciliation",
+        back_populates="batch",
+        uselist=False,
+    )
 
 
 class ExternalHandoverBatchItem(Base):
