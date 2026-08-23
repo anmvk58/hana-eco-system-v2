@@ -50,10 +50,10 @@ export function InvoiceReceipt({ invoice, className = "" }: { invoice: Invoice; 
       </div>
 
       <div className="k80-customer">
-        <div>Khách hàng: {customerName}</div>
-        <div>SĐT: {customerPhone}</div>
-        <div>Địa chỉ: {customerAddress}</div>
-        <div>Ghi chú: {invoice.note || ""}</div>
+        <div className="k80-customer-info">Khách hàng: {customerName}</div>
+        <div className="k80-customer-info">SĐT: {customerPhone}</div>
+        <div className="k80-customer-info">Địa chỉ: {customerAddress}</div>
+        <div className="k80-customer-note">Ghi chú: {invoice.note || ""}</div>
       </div>
 
       <div className="k80-items">
@@ -87,7 +87,6 @@ export function InvoiceReceipt({ invoice, className = "" }: { invoice: Invoice; 
       <div className="k80-notes">
         <p>- Bảo hành 100% nếu có vấn đề xảy ra khi nhận hàng.</p>
         <p>- Vui lòng kiểm tra sản phẩm và báo shop tình trạng gặp hỏng trong ngày.</p>
-        <p>- Không nhận bảo hành sản phẩm qua ngày, xin quý khách thông cảm.</p>
       </div>
 
       <div className="k80-thanks">Cảm ơn quý khách và hẹn gặp lại!</div>

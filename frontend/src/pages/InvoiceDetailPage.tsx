@@ -1,12 +1,14 @@
-import { ArrowLeft, BadgeCheck, Edit, Printer, RotateCcw, Store, Truck, XCircle } from "lucide-react";
-import { useEffect, useState } from "react";
+import { AlertTriangle, ArrowLeft, BadgeCheck, Edit, Printer, RotateCcw, Store, Truck, XCircle } from "lucide-react";
+import { FormEvent, useEffect, useState } from "react";
 import { Link, useLocation, useParams } from "react-router-dom";
 
 import { api } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
 import { EmptyState } from "../components/EmptyState";
 import { InvoiceReceipt } from "../components/InvoiceReceipt";
+import { Modal } from "../components/Modal";
 import { StatusBadge } from "../components/StatusBadge";
+import { ToastNotification } from "../components/ToastNotification";
 import { AuditBadge } from "../components/AuditBadge";
 import type { InvoiceAuditLabel } from "../types";
 import type { Invoice, InvoiceHistory } from "../types";
@@ -20,6 +22,11 @@ export function InvoiceDetailPage() {
   const [invoice, setInvoice] = useState<Invoice | null>(null);
   const [history, setHistory] = useState<InvoiceHistory[]>([]);
   const [error, setError] = useState("");
+  const [rollbackOpen, setRollbackOpen] = useState(false);
+  const [rollbackReason, setRollbackReason] = useState("");
+  const [rollbackError, setRollbackError] = useState("");
+  const [rollingBack, setRollingBack] = useState(false);
+  const [toast, setToast] = useState("");
   const navigationState = location.state as { invoiceListSearch?: string; returnTo?: string } | null;
   const invoiceListSearch = navigationState?.invoiceListSearch;
   const invoiceListPath = navigationState?.returnTo ?? (invoiceListSearch ? `/invoices?${invoiceListSearch}` : "/invoices");
@@ -55,6 +62,26 @@ export function InvoiceDetailPage() {
       setInvoice(await api.invoices.audit(invoice.id, label));
       if (hasPermission("invoices.history")) setHistory(await api.invoices.history(invoice.id));
     } catch (err) { setError(err instanceof Error ? err.message : "Không gán được nhãn audit"); }
+  }
+
+  async function rollbackAudit(event: FormEvent) {
+    event.preventDefault();
+    if (!invoice || !rollbackReason.trim()) return;
+    setRollbackError("");
+    setRollingBack(true);
+    try {
+      const updated = await api.invoices.rollbackAudit(invoice.id, rollbackReason.trim());
+      setInvoice(updated);
+      if (hasPermission("invoices.history")) setHistory(await api.invoices.history(invoice.id));
+      setRollbackOpen(false);
+      setRollbackReason("");
+      setRollbackError("");
+      setToast(`${updated.code} đã trở về trạng thái Chưa Audit.`);
+    } catch (err) {
+      setRollbackError(err instanceof Error ? err.message : "Không hoàn tác được nhãn Audit");
+    } finally {
+      setRollingBack(false);
+    }
   }
 
   if (!invoice) return error ? <div className="alert error">{error}</div> : <EmptyState title="Đang tải hóa đơn" />;
@@ -96,7 +123,10 @@ export function InvoiceDetailPage() {
         {!invoice.audit_label && invoice.status === "created" && hasPermission("invoices.audit") ? <div className="detail-actions">
           <button className="secondary-button" type="button" onClick={() => void assignAuditLabel("retail")}><Store size={16}/>Khách lẻ</button>
           <button className="secondary-button" type="button" onClick={() => void assignAuditLabel("external_shipper")}><Truck size={16}/>Ship Ngoài</button>
-        </div> : <span className="field-hint">{invoice.audit_label ? "Hóa đơn đã được audit." : "Đơn Ship Ruột sẽ được gán khi shipper nhận đơn."}</span>}
+        </div> : invoice.audit_label && invoice.audit_label !== "internal_shipper" && hasPermission("invoices.audit") ? <div className="audit-rollback-actions">
+          <span className="field-hint">Hóa đơn đã được Audit.</span>
+          <button className="secondary-button danger-button" type="button" onClick={() => { setRollbackError(""); setRollbackOpen(true); }}><RotateCcw size={16}/>Hoàn tác Audit</button>
+        </div> : <span className="field-hint">{invoice.audit_label ? "Đơn Ship nội bộ cần thu hồi tại màn hình bàn giao." : "Đơn Ship Ruột sẽ được gán khi shipper nhận đơn."}</span>}
       </section>
 
       <InvoiceReceipt invoice={invoice} />
@@ -125,6 +155,24 @@ export function InvoiceDetailPage() {
           ))}
         </div>
       </section> : null}
+
+      {rollbackOpen ? <Modal title={`Hoàn tác Audit ${invoice.code}`} className="invoice-audit-rollback-modal" onClose={() => { if (!rollingBack) { setRollbackOpen(false); setRollbackReason(""); setRollbackError(""); } }}>
+        <form className="invoice-audit-rollback-form" onSubmit={(event) => void rollbackAudit(event)}>
+          <div className="invoice-audit-rollback-summary">
+            <RotateCcw size={23}/>
+            <div><small>Nhãn hiện tại</small><strong><AuditBadge label={invoice.audit_label}/></strong><span>{invoice.customer?.name || "Khách lẻ"}</span></div>
+          </div>
+          <div className="invoice-audit-rollback-warning"><AlertTriangle size={19}/><span>Hóa đơn sẽ quay về <strong>Chưa Audit</strong> để có thể gán lại đúng nhãn. Không thể hoàn tác nếu đơn đã được kiểm kê, thu tiền hoặc đang thuộc một phiên bàn giao.</span></div>
+          {rollbackError ? <div className="alert error">{rollbackError}</div> : null}
+          <label>Lý do hoàn tác<textarea required autoFocus maxLength={500} rows={3} value={rollbackReason} onChange={(event) => setRollbackReason(event.target.value)} placeholder="Ví dụ: Bấm nhầm Khách lẻ, cần bàn giao cho shipper..."/></label>
+          <div className="form-actions">
+            <button className="secondary-button" type="button" disabled={rollingBack} onClick={() => { setRollbackOpen(false); setRollbackReason(""); setRollbackError(""); }}>Hủy</button>
+            <button className="primary-button danger-confirm-button" type="submit" disabled={rollingBack || !rollbackReason.trim()}><RotateCcw size={16}/>{rollingBack ? "Đang hoàn tác..." : "Xác nhận hoàn tác"}</button>
+          </div>
+        </form>
+      </Modal> : null}
+
+      {toast ? <ToastNotification title="Hoàn tác Audit thành công" message={toast} duration={3600} onClose={() => setToast("")}/> : null}
     </div>
   );
 }

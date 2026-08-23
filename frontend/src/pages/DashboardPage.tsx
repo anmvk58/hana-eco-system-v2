@@ -1,23 +1,36 @@
 import { CalendarDays, CircleDollarSign, ClipboardCheck, ReceiptText, Users } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
-import { Link } from "react-router-dom";
 
 import { api } from "../api/client";
-import { useAuth } from "../auth/AuthContext";
+import { DateRangePicker } from "../components/DateRangePicker";
 import { EmptyState } from "../components/EmptyState";
-import { StatusBadge } from "../components/StatusBadge";
-import type { DashboardSummary, DashboardTimePreset } from "../types";
-import { money, numberText } from "../utils/format";
+import type { DashboardCountSlice, DashboardSummary, DashboardTimePreset } from "../types";
+import { money, numberText, todayInputValue } from "../utils/format";
 
 type TimePreset = DashboardTimePreset;
 
 const timePresets: Array<{ value: TimePreset; label: string }> = [
   { value: "today", label: "Hôm nay" },
-  { value: "7days", label: "7 ngày qua" },
-  { value: "month", label: "1 tháng qua" },
-  { value: "year", label: "1 năm qua" },
+  { value: "yesterday", label: "Hôm qua" },
+  { value: "last7days", label: "7 ngày qua" },
+  { value: "thisMonth", label: "Tháng này" },
+  { value: "custom", label: "Khoảng ngày" },
 ];
+
+const pieColors = ["#15947f", "#e7832e", "#376fd0", "#8d63c7", "#d7556b", "#49a4b6", "#a58b26", "#61717c", "#53a85a", "#c5689e"];
+
+function previousDate(value: string) {
+  const [year, month, day] = value.split("-").map(Number);
+  const result = new Date(Date.UTC(year, month - 1, day - 1));
+  return result.toISOString().slice(0, 10);
+}
+
+function shiftDate(value: string, days: number) {
+  const [year, month, day] = value.split("-").map(Number);
+  const result = new Date(Date.UTC(year, month - 1, day + days));
+  return result.toISOString().slice(0, 10);
+}
 
 interface RevenueChartPoint {
   key: string;
@@ -40,31 +53,62 @@ function compactMoney(value: number) {
 }
 
 export function DashboardPage() {
-  const { hasPermission } = useAuth();
+  const today = todayInputValue();
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
   const [timePreset, setTimePreset] = useState<TimePreset>("today");
+  const [fromDate, setFromDate] = useState(today);
+  const [toDate, setToDate] = useState(today);
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (!fromDate || !toDate) return;
     let active = true;
     setError("");
-    void api.dashboard.summary(timePreset)
+    setLoading(true);
+    void api.dashboard.summary(fromDate, toDate)
       .then((data) => {
         if (active) setSummary(data);
       })
       .catch((err) => {
         if (active) setError(err instanceof Error ? err.message : "Không tải được tổng quan");
+      })
+      .finally(() => {
+        if (active) setLoading(false);
       });
     return () => {
       active = false;
     };
-  }, [timePreset]);
+  }, [fromDate, toDate]);
+
+  function selectPreset(preset: TimePreset) {
+    setTimePreset(preset);
+    if (preset === "today") {
+      setFromDate(today);
+      setToDate(today);
+    } else if (preset === "yesterday") {
+      const yesterday = previousDate(today);
+      setFromDate(yesterday);
+      setToDate(yesterday);
+    } else if (preset === "last7days") {
+      setFromDate(shiftDate(today, -6));
+      setToDate(today);
+    } else if (preset === "thisMonth") {
+      setFromDate(`${today.slice(0, 8)}01`);
+      setToDate(today);
+    }
+  }
+
+  function changeCustomRange(from: string, to: string) {
+    setTimePreset("custom");
+    setFromDate(from);
+    setToDate(to);
+  }
 
   const productRevenue = summary?.product_revenue ?? "0";
   const extraChargeRevenue = summary?.extra_charge_revenue ?? "0";
   const createdInvoiceCount = summary?.created_invoice_count ?? 0;
   const createdCustomerCount = summary?.created_customer_count ?? 0;
-  const invoices = summary?.recent_invoices ?? [];
   const topProductsByQuantity = summary?.top_products_by_quantity ?? [];
   const topProductsByRevenue = summary?.top_products_by_revenue ?? [];
   const revenueChartData: RevenueChartPoint[] = (summary?.revenue_chart ?? []).map((point) => ({
@@ -88,24 +132,28 @@ export function DashboardPage() {
               key={preset.value}
               type="button"
               aria-pressed={timePreset === preset.value}
-              onClick={() => setTimePreset(preset.value)}
+              onClick={() => selectPreset(preset.value)}
             >
               {preset.label}
             </button>
           ))}
         </div>
+        {timePreset === "custom" ? (
+          <DateRangePicker from={fromDate} to={toDate} onChange={changeCustomRange} />
+        ) : null}
       </section>
 
-      <section className="metric-grid dashboard-metrics dashboard-metrics-refresh" key={timePreset}>
+      <div className={loading ? "dashboard-content loading" : "dashboard-content"} aria-busy={loading}>
+      <section className="metric-grid dashboard-metrics dashboard-metrics-refresh" key={`${fromDate}-${toDate}`}>
         <MetricCard icon={<ReceiptText />} label="Doanh thu thuần sản phẩm" value={money(productRevenue)} />
         <MetricCard icon={<CircleDollarSign />} label="Tổng tiền thu khác" value={money(extraChargeRevenue)} />
         <MetricCard icon={<ClipboardCheck />} label="Hóa đơn đã tạo" value={String(createdInvoiceCount)} />
         <MetricCard icon={<Users />} label="Khách hàng đã tạo" value={String(createdCustomerCount)} />
       </section>
 
-      <RevenueChart data={revenueChartData} preset={timePreset} total={Number(productRevenue)} />
+      <RevenueChart data={revenueChartData} granularity={summary?.revenue_granularity ?? "hour"} fromDate={fromDate} toDate={toDate} total={Number(productRevenue)} />
 
-      <section className="dashboard-top-charts" key={`top-products-${timePreset}`}>
+      <section className="dashboard-top-charts" key={`top-products-${fromDate}-${toDate}`}>
         <HorizontalTopChart
           title="Top 10 sản phẩm theo số lượng"
           subtitle="Sản phẩm bán được nhiều nhất"
@@ -120,39 +168,16 @@ export function DashboardPage() {
         />
       </section>
 
-      <section className="dashboard-grid dashboard-single">
-        <div className="table-panel">
-          <div className="panel-header">
-            <div>
-              <h2>Hóa đơn gần đây</h2>
-              <span>Theo ngày bán mới nhất</span>
-            </div>
-            {hasPermission("invoices.view") ? <Link to="/invoices" className="link-button secondary-button">Xem tất cả</Link> : null}
-          </div>
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Mã</th>
-                <th>Khách</th>
-                <th>Trạng thái</th>
-                <th>Tổng</th>
-              </tr>
-            </thead>
-            <tbody>
-              {invoices.slice(0, 6).map((invoice) => (
-                <tr key={invoice.id}>
-                  <td className="code-cell">{invoice.code}</td>
-                  <td>{invoice.customer?.name ?? "Khách lẻ"}</td>
-                  <td><StatusBadge status={invoice.status} /></td>
-                  <td className="numeric strong">{numberText(invoice.total_amount)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          {invoices.length === 0 ? <EmptyState title="Chưa có hóa đơn" /> : null}
-        </div>
-
+      <section className="dashboard-pie-grid" key={`pie-${fromDate}-${toDate}`}>
+        <DonutChart title="Trạng thái Audit đơn" subtitle="Đơn đã gán nhãn và chưa gán nhãn" data={summary?.audit_chart ?? []} />
+        <DonutChart
+          title="Đơn theo shipper nội bộ"
+          subtitle="Top 10 shipper có số đơn nhiều nhất"
+          data={(summary?.internal_shipper_chart ?? []).map((shipper) => ({ key: String(shipper.shipper_id), label: shipper.name, value: shipper.order_count }))}
+        />
+        <DonutChart title="Trạng thái kiểm kê" subtitle="Đơn đã thu tiền và đang chờ kiểm kê" data={summary?.reconciliation_chart ?? []} />
       </section>
+      </div>
     </div>
   );
 }
@@ -206,18 +231,34 @@ function HorizontalTopChart({
   );
 }
 
-function RevenueChart({ data, preset, total }: { data: RevenueChartPoint[]; preset: TimePreset; total: number }) {
+function RevenueChart({
+  data,
+  granularity,
+  fromDate,
+  toDate,
+  total,
+}: {
+  data: RevenueChartPoint[];
+  granularity: "hour" | "day" | "month";
+  fromDate: string;
+  toDate: string;
+  total: number;
+}) {
   const maxValue = Math.max(...data.map((point) => point.value), 0);
   const axisMax = revenueAxisMax(maxValue);
   const axisTicks = Array.from({ length: 5 }, (_, index) => axisMax * (1 - index / 4));
-  const periodLabel = timePresets.find((item) => item.value === preset)?.label ?? "";
+  const formatDate = (value: string) => new Intl.DateTimeFormat("vi-VN").format(new Date(`${value}T00:00:00+07:00`));
+  const rangeLabel = !fromDate || !toDate ? "Đang chọn khoảng ngày" : fromDate === toDate
+    ? formatDate(fromDate)
+    : `${formatDate(fromDate)} – ${formatDate(toDate)}`;
+  const granularityLabel = granularity === "hour" ? "Theo giờ" : granularity === "month" ? "Theo tháng" : "Theo ngày";
 
   return (
-    <section className="revenue-chart-panel" key={preset}>
+    <section className="revenue-chart-panel" key={`${fromDate}-${toDate}`}>
       <div className="panel-header">
         <div>
           <h2>Doanh thu theo thời gian</h2>
-          <span>{periodLabel} · {preset === "today" ? "Theo giờ" : preset === "year" ? "Theo tháng" : "Theo ngày"}</span>
+          <span>{rangeLabel} · {granularityLabel}</span>
         </div>
         <strong className="revenue-chart-total">{money(total)}</strong>
       </div>
@@ -244,6 +285,60 @@ function RevenueChart({ data, preset, total }: { data: RevenueChartPoint[]; pres
         </div>
       </div>
     </section>
+  );
+}
+
+function DonutChart({ title, subtitle, data }: { title: string; subtitle: string; data: DashboardCountSlice[] }) {
+  const total = data.reduce((sum, item) => sum + item.value, 0);
+  let offset = 0;
+
+  return (
+    <article className="dashboard-pie-panel">
+      <div className="panel-header">
+        <div>
+          <h2>{title}</h2>
+          <span>{subtitle}</span>
+        </div>
+      </div>
+      <div className="dashboard-pie-body">
+        <div className="dashboard-donut" role="img" aria-label={`${title}: tổng ${numberText(total)} đơn`}>
+          <svg viewBox="0 0 42 42" aria-hidden="true">
+            <circle className="dashboard-donut-track" cx="21" cy="21" r="15.9155" pathLength="100" />
+            {total > 0 ? data.map((item, index) => {
+              const percentage = item.value / total * 100;
+              const currentOffset = offset;
+              offset += percentage;
+              return (
+                <circle
+                  className="dashboard-donut-segment"
+                  cx="21"
+                  cy="21"
+                  r="15.9155"
+                  key={item.key}
+                  pathLength="100"
+                  stroke={pieColors[index % pieColors.length]}
+                  strokeDasharray={`${percentage} ${100 - percentage}`}
+                  strokeDashoffset={-currentOffset}
+                />
+              );
+            }) : null}
+          </svg>
+          <div><strong>{numberText(total)}</strong><span>Tổng đơn</span></div>
+        </div>
+        {data.length ? (
+          <div className="dashboard-pie-legend">
+            {data.map((item, index) => (
+              <div key={item.key} title={`${item.label}: ${numberText(item.value)} đơn`}>
+                <i style={{ backgroundColor: pieColors[index % pieColors.length] }} />
+                <span>{item.label}</span>
+                <strong>{numberText(item.value)}</strong>
+                <small>{total > 0 ? `${Math.round(item.value / total * 100)}%` : "0%"}</small>
+              </div>
+            ))}
+          </div>
+        ) : <EmptyState title="Không có đơn trong khoảng thời gian này" />}
+      </div>
+    </article>
   );
 }
 

@@ -59,7 +59,6 @@ class UserPayload(ORMBase):
 class UserUpdate(ORMBase):
     username: str | None = Field(default=None, min_length=1, max_length=80, pattern=r"^[A-Za-z0-9._-]+$")
     display_name: str | None = Field(default=None, min_length=1, max_length=160)
-    password: str | None = Field(default=None, min_length=4, max_length=128)
     is_active: bool | None = None
     role_ids: list[int] | None = None
 
@@ -77,6 +76,15 @@ class CurrentUserRead(UserRead):
 class LoginPayload(ORMBase):
     username: str = Field(min_length=1, max_length=80)
     password: str = Field(min_length=1, max_length=128)
+
+
+class ChangePasswordPayload(ORMBase):
+    current_password: str = Field(min_length=1, max_length=128)
+    new_password: str = Field(min_length=4, max_length=128)
+
+
+class ResetPasswordPayload(ORMBase):
+    new_password: str = Field(min_length=4, max_length=128)
 
 
 class LoginRead(ORMBase):

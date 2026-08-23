@@ -20,6 +20,7 @@ import {
   History,
   Handshake,
   ClipboardCheck,
+  KeyRound,
 } from "lucide-react";
 import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
@@ -51,17 +52,15 @@ const shipManagementNavItems = [
 ];
 
 const codManagementNavItems = [
-  { to: "/cod-management/order-reconciliation", label: "Kiểm kê đơn", icon: ClipboardCheck, permissions: ["shipping.manage"] },
+  { to: "/cod-management/order-reconciliation", label: "Kiểm kê đơn", icon: ClipboardCheck, permissions: ["order_reconciliation.manage"] },
   { to: "/cod-management/internal-collections", label: "Thu tiền Ship Nội Bộ", icon: Banknote, permissions: ["shipping.manage"] },
   { to: "/cod-management/internal-collection-history", label: "Lịch sử thu tiền COD", icon: History, permissions: ["shipping.manage"] },
 ];
 
-const accessControlNavItem = {
-  to: "/access-control",
-  label: "Người dùng & role",
-  icon: ShieldCheck,
-  permissions: ["users.view", "roles.view"],
-};
+const accessControlNavItems = [
+  { to: "/access-control", label: "Quản lý người dùng & Role", icon: ShieldCheck, permissions: ["users.view", "roles.view"] },
+  { to: "/account/change-password", label: "Đổi mật khẩu", icon: KeyRound, permissions: [] },
+];
 
 const shipperManagementNavItem = {
   to: "/shippers",
@@ -79,6 +78,7 @@ const routeTitles: Record<string, string> = {
   "/reports": "Báo cáo bán hàng",
   "/reports/sold-products": "Báo cáo hàng hóa bán được",
   "/access-control": "Người dùng & phân quyền",
+  "/account/change-password": "Đổi mật khẩu",
   "/shippers": "Quản lý shipper nội bộ",
   "/shipping/claim": "Nhận đơn ship",
   "/shipping/received": "Đơn đã nhận",
@@ -101,6 +101,7 @@ export function Layout({ children }: { children: ReactNode }) {
   const [isReportsOpen, setIsReportsOpen] = useState(() => location.pathname.startsWith("/reports"));
   const [isShipManagementOpen, setIsShipManagementOpen] = useState(() => location.pathname.startsWith("/ship-management"));
   const [isCodManagementOpen, setIsCodManagementOpen] = useState(() => location.pathname.startsWith("/cod-management"));
+  const [isAccessControlOpen, setIsAccessControlOpen] = useState(() => location.pathname === "/access-control" || location.pathname.startsWith("/account/"));
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(
@@ -112,6 +113,7 @@ export function Layout({ children }: { children: ReactNode }) {
   const visibleReportItems = reportNavItems.filter((item) => item.permissions.every(hasPermission));
   const visibleShipManagementItems = shipManagementNavItems.filter((item) => item.permissions.every(hasPermission));
   const visibleCodManagementItems = codManagementNavItems.filter((item) => item.permissions.every(hasPermission));
+  const visibleAccessControlItems = accessControlNavItems.filter((item) => item.permissions.every(hasPermission));
   const userInitial = currentUser?.display_name.trim().charAt(0).toLocaleUpperCase("vi-VN") || "U";
 
   useEffect(() => {
@@ -282,11 +284,32 @@ export function Layout({ children }: { children: ReactNode }) {
               </div> : null}
             </div>
           ) : null}
-          {accessControlNavItem.permissions.every(hasPermission) ? (
-            <NavLink to={accessControlNavItem.to} title={accessControlNavItem.label}>
-              <ShieldCheck size={18} />
-              <span>{accessControlNavItem.label}</span>
-            </NavLink>
+          {visibleAccessControlItems.length > 0 ? (
+            <div className="nav-group">
+              <button
+                className={`nav-group-toggle${location.pathname === "/access-control" || location.pathname.startsWith("/account/") ? " active" : ""}`}
+                type="button"
+                aria-expanded={isAccessControlOpen}
+                aria-controls="access-control-navigation"
+                title="Người dùng & Role"
+                onClick={() => {
+                  if (isSidebarCollapsed) {
+                    setIsSidebarCollapsed(false);
+                    setIsAccessControlOpen(true);
+                    return;
+                  }
+                  setIsAccessControlOpen((open) => !open);
+                }}
+              >
+                <ShieldCheck size={18}/><span>Người dùng & Role</span><ChevronDown className={`nav-group-chevron${isAccessControlOpen ? " open" : ""}`} size={17}/>
+              </button>
+              {isAccessControlOpen ? <div className="nav-group-items" id="access-control-navigation">
+                {visibleAccessControlItems.map((item) => {
+                  const Icon = item.icon;
+                  return <NavLink key={item.to} to={item.to} title={item.label}><Icon size={17}/><span>{item.label}</span></NavLink>;
+                })}
+              </div> : null}
+            </div>
           ) : null}
           {shipperManagementNavItem.permissions.every(hasPermission) ? (
             <NavLink to={shipperManagementNavItem.to} title={shipperManagementNavItem.label}>

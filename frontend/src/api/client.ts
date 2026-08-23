@@ -2,7 +2,6 @@ import type {
   Customer,
   CustomerPayload,
   DashboardSummary,
-  DashboardTimePreset,
   ExtraChargeSetting,
   ExtraChargeSettingPayload,
   ExtraChargeType,
@@ -52,6 +51,7 @@ export class ApiError extends Error {
 
 type InvoiceListFilters = {
   status?: InvoiceStatus;
+  exclude_cancelled?: boolean;
   customer_id?: number;
   code?: string;
   customer_phone?: string;
@@ -128,11 +128,28 @@ async function listAllInvoices(filters?: Omit<InvoiceListFilters, "page" | "page
   return invoices;
 }
 
+async function listAllProducts(search?: string) {
+  const pageSize = 200;
+  const products: Product[] = [];
+  let skip = 0;
+
+  while (true) {
+    const page = await request<Product[]>("/products", {}, { search, skip, limit: pageSize });
+    products.push(...page);
+    if (page.length < pageSize) break;
+    skip += page.length;
+  }
+
+  return products;
+}
+
 export const api = {
   auth: {
     login: (username: string, password: string) => request<LoginResponse>("/auth/login", { method: "POST", body: JSON.stringify({ username, password }) }),
     me: () => request<User>("/auth/me"),
     logout: () => request<void>("/auth/logout", { method: "POST" }),
+    changePassword: (currentPassword: string, newPassword: string) =>
+      request<void>("/auth/change-password", { method: "POST", body: JSON.stringify({ current_password: currentPassword, new_password: newPassword }) }),
   },
   access: {
     permissions: () => request<Permission[]>("/permissions"),
@@ -143,6 +160,8 @@ export const api = {
     users: () => request<User[]>("/users"),
     createUser: (payload: UserPayload) => request<User>("/users", { method: "POST", body: JSON.stringify(payload) }),
     updateUser: (id: number, payload: Partial<UserPayload>) => request<User>(`/users/${id}`, { method: "PUT", body: JSON.stringify(payload) }),
+    resetUserPassword: (id: number, newPassword: string) =>
+      request<void>(`/users/${id}/reset-password`, { method: "POST", body: JSON.stringify({ new_password: newPassword }) }),
     removeUser: (id: number) => request<void>(`/users/${id}`, { method: "DELETE" }),
   },
   shippers: {
@@ -218,7 +237,8 @@ export const api = {
     remove: (id: number) => request<void>(`/customers/${id}`, { method: "DELETE" }),
   },
   products: {
-    list: (search?: string) => request<Product[]>("/products", {}, { search }),
+    list: (search?: string, skip = 0, limit = 50) => request<Product[]>("/products", {}, { search, skip, limit }),
+    listAll: listAllProducts,
     create: (payload: ProductPayload) => request<Product>("/products", { method: "POST", body: JSON.stringify(payload) }),
     update: (id: number, payload: Partial<ProductPayload>) =>
       request<Product>(`/products/${id}`, { method: "PUT", body: JSON.stringify(payload) }),
@@ -242,7 +262,8 @@ export const api = {
       request<SoldProductReportRow[]>("/reports/sold-products", {}, filters),
   },
   dashboard: {
-    summary: (period: DashboardTimePreset) => request<DashboardSummary>("/dashboard/summary", {}, { period }),
+    summary: (fromDate: string, toDate: string) =>
+      request<DashboardSummary>("/dashboard/summary", {}, { from_date: fromDate, to_date: toDate }),
   },
   invoices: {
     list: (filters?: InvoiceListFilters) => request<InvoicePage>("/invoices", {}, filters),
@@ -257,5 +278,7 @@ export const api = {
     print: (id: number) => request<Invoice>(`/invoices/${id}/print`),
     audit: (id: number, auditLabel: Exclude<InvoiceAuditLabel, "internal_shipper">) =>
       request<Invoice>(`/invoices/${id}/audit`, { method: "POST", body: JSON.stringify({ audit_label: auditLabel }) }),
+    rollbackAudit: (id: number, reason: string) =>
+      request<Invoice>(`/invoices/${id}/audit/rollback`, { method: "POST", body: JSON.stringify({ reason }) }),
   },
 };

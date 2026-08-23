@@ -68,10 +68,14 @@ pip install -r requirements.txt
 uvicorn app.main:app --reload
 ```
 
-API chạy tại `http://localhost:8000`. Backend sẽ đọc `backend/.env`:
+API chạy tại `http://localhost:8000`. Sao chép `backend/.env.example` thành `backend/.env`, sau đó đặt thông tin MySQL thật trong file này. `backend/.env` được Git bỏ qua:
 
 ```env
-DATABASE_URL=mysql+pymysql://hana:hana_password@localhost:3306/hana_pos?charset=utf8mb4
+MYSQL_HOST=localhost
+MYSQL_PORT=3306
+MYSQL_DATABASE=your_database
+MYSQL_USER=your_application_user
+MYSQL_PASSWORD=your_strong_password
 ```
 
 ## Chạy frontend local
@@ -87,8 +91,12 @@ Frontend chạy tại `http://localhost:5173` và mặc định gọi API `http:
 ## Chạy bằng Docker Compose
 
 ```powershell
+Copy-Item .env.example .env
+# Thay toàn bộ placeholder trong .env bằng thông tin thật trước khi chạy.
 docker compose up --build
 ```
+
+Compose chỉ đọc credential MySQL từ file `.env` cục bộ đã được Git bỏ qua. Không commit file này. Mật khẩu application user và root phải khác nhau; MySQL chỉ được publish lên `127.0.0.1` theo mặc định.
 
 Docker Compose sẽ chạy:
 

@@ -24,7 +24,7 @@ router = APIRouter(prefix="/order-reconciliation", tags=["order-reconciliation"]
 def list_unaudited_invoices(
     from_date: date | None = Query(default=None),
     to_date: date | None = Query(default=None),
-    _: User = Depends(require_permission("shipping.manage")),
+    _: User = Depends(require_permission("order_reconciliation.manage")),
     db: Session = Depends(get_db),
 ):
     return order_reconciliation_service.list_unaudited_invoices(db, from_date, to_date)
@@ -34,7 +34,7 @@ def list_unaudited_invoices(
 def list_retail_invoices(
     from_date: date | None = Query(default=None),
     to_date: date | None = Query(default=None),
-    _: User = Depends(require_permission("shipping.manage")),
+    _: User = Depends(require_permission("order_reconciliation.manage")),
     db: Session = Depends(get_db),
 ):
     return order_reconciliation_service.list_retail_invoices(db, from_date, to_date)
@@ -43,7 +43,7 @@ def list_retail_invoices(
 @router.post("/unaudited-invoices/{invoice_id}/mark-retail", response_model=InvoiceRead)
 def mark_invoice_as_retail(
     invoice_id: int,
-    current_user: User = Depends(require_permission("shipping.manage")),
+    current_user: User = Depends(require_permission("order_reconciliation.manage")),
     db: Session = Depends(get_db),
 ):
     return invoice_service.assign_audit_label(db, invoice_id, InvoiceAuditLabel.retail, current_user)
@@ -53,7 +53,7 @@ def mark_invoice_as_retail(
 def collect_retail_invoice(
     invoice_id: int,
     payload: RetailInvoiceCollectCreate,
-    current_user: User = Depends(require_permission("shipping.manage")),
+    current_user: User = Depends(require_permission("order_reconciliation.manage")),
     db: Session = Depends(get_db),
 ):
     return order_reconciliation_service.collect_retail_invoice(db, invoice_id, payload, current_user)
@@ -63,7 +63,7 @@ def collect_retail_invoice(
 def list_external_handover_reconciliations(
     from_date: date | None = Query(default=None),
     to_date: date | None = Query(default=None),
-    _: User = Depends(require_permission("shipping.manage")),
+    _: User = Depends(require_permission("order_reconciliation.manage")),
     db: Session = Depends(get_db),
 ):
     return order_reconciliation_service.list_external_handover_reconciliations(db, from_date, to_date)
@@ -76,7 +76,7 @@ def list_external_handover_reconciliations(
 def reconcile_external_handover_batch(
     batch_id: int,
     payload: ExternalHandoverReconcileCreate,
-    current_user: User = Depends(require_permission("shipping.manage")),
+    current_user: User = Depends(require_permission("order_reconciliation.manage")),
     db: Session = Depends(get_db),
 ):
     return order_reconciliation_service.reconcile_external_handover_batch(db, batch_id, payload, current_user)

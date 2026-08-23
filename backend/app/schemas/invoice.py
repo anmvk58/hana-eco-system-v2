@@ -2,7 +2,7 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Any
 
-from pydantic import Field, model_validator
+from pydantic import Field, field_validator, model_validator
 
 from app.models.enums import ExternalAdvanceMethod, ExtraChargeType, InvoiceAuditLabel, InvoiceHistoryAction, InvoiceStatus
 from app.schemas.common import ORMBase
@@ -85,6 +85,18 @@ class InvoiceAuditAssign(ORMBase):
         if self.audit_label == InvoiceAuditLabel.internal_shipper:
             raise ValueError("Nhãn Ship Ruột chỉ được gán khi shipper nhận đơn")
         return self
+
+
+class InvoiceAuditRollback(ORMBase):
+    reason: str = Field(min_length=1, max_length=500)
+
+    @field_validator("reason")
+    @classmethod
+    def validate_reason(cls, value: str) -> str:
+        normalized = value.strip()
+        if not normalized:
+            raise ValueError("Vui lòng nhập lý do hoàn tác")
+        return normalized
 
 
 class InvoiceClaim(ORMBase):

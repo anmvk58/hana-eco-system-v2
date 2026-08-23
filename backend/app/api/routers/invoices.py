@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from app.api.deps import require_any_permission, require_permission
 from app.database import get_db
 from app.models.enums import InvoiceAuditLabel, InvoiceStatus
-from app.schemas.invoice import InvoiceAuditAssign, InvoiceCancel, InvoiceCreate, InvoiceHistoryRead, InvoicePage, InvoiceRead, InvoiceUpdate
+from app.schemas.invoice import InvoiceAuditAssign, InvoiceAuditRollback, InvoiceCancel, InvoiceCreate, InvoiceHistoryRead, InvoicePage, InvoiceRead, InvoiceUpdate
 from app.services import invoice_service
 from app.models.user import User
 
@@ -17,6 +17,7 @@ router = APIRouter(prefix="/invoices", tags=["invoices"])
 @router.get("", response_model=InvoicePage, dependencies=[Depends(require_any_permission("invoices.view", "dashboard.view", "reports.view"))])
 def list_invoices(
     status_filter: InvoiceStatus | None = Query(default=None, alias="status"),
+    exclude_cancelled: bool = Query(default=False),
     customer_id: int | None = None,
     code_filter: str | None = Query(default=None, alias="code", max_length=60),
     customer_phone: str | None = Query(default=None, max_length=30),
@@ -32,6 +33,7 @@ def list_invoices(
     items, total, current_page, total_pages = invoice_service.list_invoices(
         db,
         status_filter,
+        exclude_cancelled,
         customer_id,
         code_filter,
         customer_phone,
@@ -94,6 +96,16 @@ def assign_audit_label(
     db: Session = Depends(get_db),
 ):
     return invoice_service.assign_audit_label(db, invoice_id, payload.audit_label, current_user)
+
+
+@router.post("/{invoice_id}/audit/rollback", response_model=InvoiceRead)
+def rollback_audit_label(
+    invoice_id: int,
+    payload: InvoiceAuditRollback,
+    current_user: User = Depends(require_permission("invoices.audit")),
+    db: Session = Depends(get_db),
+):
+    return invoice_service.rollback_audit_label(db, invoice_id, payload.reason, current_user)
 
 
 @router.delete("/{invoice_id}", status_code=status.HTTP_204_NO_CONTENT)

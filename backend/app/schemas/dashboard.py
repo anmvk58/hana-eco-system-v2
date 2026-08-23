@@ -1,11 +1,10 @@
-from datetime import datetime
+from datetime import date
 from decimal import Decimal
+from typing import Literal
 
 from pydantic import Field
 
-from app.models.enums import InvoiceStatus
 from app.schemas.common import ORMBase
-from app.schemas.customer import CustomerRead
 
 
 class DashboardProductSummary(ORMBase):
@@ -23,17 +22,22 @@ class DashboardRevenuePoint(ORMBase):
     show_label: bool
 
 
-class DashboardRecentInvoice(ORMBase):
-    id: int
-    code: str
-    customer: CustomerRead | None = None
-    status: InvoiceStatus
-    sold_at: datetime
-    total_amount: Decimal
+class DashboardCountSlice(ORMBase):
+    key: str
+    label: str
+    value: int
+
+
+class DashboardShipperOrderSummary(ORMBase):
+    shipper_id: int
+    name: str
+    order_count: int
 
 
 class DashboardSummary(ORMBase):
-    period: str
+    from_date: date
+    to_date: date
+    revenue_granularity: Literal["hour", "day", "month"]
     product_revenue: Decimal = Field(default=Decimal("0"))
     extra_charge_revenue: Decimal = Field(default=Decimal("0"))
     created_invoice_count: int
@@ -41,4 +45,6 @@ class DashboardSummary(ORMBase):
     revenue_chart: list[DashboardRevenuePoint]
     top_products_by_quantity: list[DashboardProductSummary]
     top_products_by_revenue: list[DashboardProductSummary]
-    recent_invoices: list[DashboardRecentInvoice]
+    audit_chart: list[DashboardCountSlice]
+    internal_shipper_chart: list[DashboardShipperOrderSummary]
+    reconciliation_chart: list[DashboardCountSlice]

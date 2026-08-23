@@ -37,7 +37,7 @@ export function ProductsPage() {
     setLoading(true);
     setError("");
     try {
-      setProducts(await api.products.list(keyword));
+      setProducts(await api.products.listAll(keyword));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Không tải được sản phẩm");
     } finally {

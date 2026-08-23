@@ -385,7 +385,7 @@ export interface ExternalHandoverReconcilePayload {
   note?: string;
 }
 
-export type DashboardTimePreset = "today" | "7days" | "month" | "year";
+export type DashboardTimePreset = "today" | "yesterday" | "last7days" | "thisMonth" | "custom";
 
 export interface DashboardProductSummary {
   key: string;
@@ -402,22 +402,22 @@ export interface DashboardRevenuePoint {
   show_label: boolean;
 }
 
-export interface DashboardRecentInvoice {
-  id: number;
-  code: string;
-  customer?: Customer | null;
-  status: InvoiceStatus;
-  sold_at: string;
-  audit_label?: InvoiceAuditLabel | null;
-  assigned_shipper_id?: number | null;
-  assigned_shipper?: Shipper | null;
-  audited_at?: string | null;
-  audited_by_user_id?: number | null;
-  total_amount: string;
+export interface DashboardCountSlice {
+  key: string;
+  label: string;
+  value: number;
+}
+
+export interface DashboardShipperOrderSummary {
+  shipper_id: number;
+  name: string;
+  order_count: number;
 }
 
 export interface DashboardSummary {
-  period: DashboardTimePreset;
+  from_date: string;
+  to_date: string;
+  revenue_granularity: "hour" | "day" | "month";
   product_revenue: string;
   extra_charge_revenue: string;
   created_invoice_count: number;
@@ -425,7 +425,9 @@ export interface DashboardSummary {
   revenue_chart: DashboardRevenuePoint[];
   top_products_by_quantity: DashboardProductSummary[];
   top_products_by_revenue: DashboardProductSummary[];
-  recent_invoices: DashboardRecentInvoice[];
+  audit_chart: DashboardCountSlice[];
+  internal_shipper_chart: DashboardShipperOrderSummary[];
+  reconciliation_chart: DashboardCountSlice[];
 }
 
 export interface InvoiceHistory {

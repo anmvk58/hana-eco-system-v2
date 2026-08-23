@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 from app.api.deps import bearer_scheme, get_current_user, require_permission
 from app.database import get_db
 from app.models.user import User
-from app.schemas.access_control import CurrentUserRead, LoginPayload, LoginRead, PermissionRead, RolePayload, RoleRead, UserPayload, UserRead, UserUpdate
+from app.schemas.access_control import ChangePasswordPayload, CurrentUserRead, LoginPayload, LoginRead, PermissionRead, ResetPasswordPayload, RolePayload, RoleRead, UserPayload, UserRead, UserUpdate
 from app.services import access_control_service, auth_service
 
 
@@ -30,6 +30,17 @@ def logout(
 @router.get("/auth/me", response_model=CurrentUserRead)
 def current_user(user: User = Depends(get_current_user)):
     return access_control_service.serialize_user(user)
+
+
+@router.post("/auth/change-password", status_code=status.HTTP_204_NO_CONTENT)
+def change_password(
+    payload: ChangePasswordPayload,
+    credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    auth_service.change_password(db, current_user.id, credentials.credentials, payload)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.get("/permissions", response_model=list[PermissionRead], dependencies=[Depends(require_permission("roles.view"))])
@@ -87,4 +98,15 @@ def delete_user(
     db: Session = Depends(get_db),
 ):
     access_control_service.deactivate_user(db, user_id, current_user)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.post("/users/{user_id}/reset-password", status_code=status.HTTP_204_NO_CONTENT)
+def reset_user_password(
+    user_id: int,
+    payload: ResetPasswordPayload,
+    current_user: User = Depends(require_permission("users.reset_password")),
+    db: Session = Depends(get_db),
+):
+    access_control_service.reset_user_password(db, user_id, payload, current_user)
     return Response(status_code=status.HTTP_204_NO_CONTENT)

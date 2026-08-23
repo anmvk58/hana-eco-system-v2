@@ -1,4 +1,4 @@
-from typing import Literal
+from datetime import date
 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
@@ -18,7 +18,8 @@ router = APIRouter(prefix="/dashboard", tags=["dashboard"])
     dependencies=[Depends(require_permission("dashboard.view"))],
 )
 def dashboard_summary(
-    period: Literal["today", "7days", "month", "year"] = Query(default="today"),
+    from_date: date | None = Query(default=None),
+    to_date: date | None = Query(default=None),
     db: Session = Depends(get_db),
 ):
-    return dashboard_service.get_dashboard_summary(db, period)
+    return dashboard_service.get_dashboard_summary(db, from_date, to_date)

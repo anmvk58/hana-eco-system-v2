@@ -1,5 +1,5 @@
 from fastapi import HTTPException, status
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
@@ -7,7 +7,7 @@ from app.api.deps import permission_codes
 from app.core.permissions import ALL_PERMISSION_CODES, PERMISSIONS
 from app.core.security import hash_password
 from app.models.user import AuthSession, Permission, Role, User
-from app.schemas.access_control import RolePayload, UserPayload, UserUpdate
+from app.schemas.access_control import ResetPasswordPayload, RolePayload, UserPayload, UserUpdate
 
 
 def user_query():
@@ -20,6 +20,8 @@ def role_query():
 
 def ensure_defaults(db: Session) -> None:
     existing = {item.code: item for item in db.scalars(select(Permission)).all()}
+    reconciliation_permission_was_missing = "order_reconciliation.manage" not in existing
+    reset_password_permission_was_missing = "users.reset_password" not in existing
     for definition in PERMISSIONS:
         item = existing.get(definition.code)
         if item:
@@ -30,6 +32,24 @@ def ensure_defaults(db: Session) -> None:
             db.add(item)
             existing[definition.code] = item
     db.flush()
+
+    if reconciliation_permission_was_missing:
+        legacy_shipping_roles = db.scalars(
+            role_query().where(Role.permissions.any(Permission.code == "shipping.manage"))
+        ).all()
+        reconciliation_permission = existing["order_reconciliation.manage"]
+        for role in legacy_shipping_roles:
+            if reconciliation_permission not in role.permissions:
+                role.permissions.append(reconciliation_permission)
+
+    if reset_password_permission_was_missing:
+        legacy_user_admin_roles = db.scalars(
+            role_query().where(Role.permissions.any(Permission.code == "users.update"))
+        ).all()
+        reset_password_permission = existing["users.reset_password"]
+        for role in legacy_user_admin_roles:
+            if reset_password_permission not in role.permissions:
+                role.permissions.append(reset_password_permission)
 
     admin_role = db.scalar(role_query().where(Role.name == "Quản trị hệ thống"))
     if not admin_role:
@@ -150,10 +170,9 @@ def save_user(db: Session, payload: UserPayload | UserUpdate, user: User | None 
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Phải giữ ít nhất một quản trị viên hoạt động")
     for key, value in changes.items():
         setattr(user, key, value.strip() if isinstance(value, str) else value)
-    if payload.password is not None:
-        user.password_hash = hash_password(payload.password)
-        if user.id:
-            db.query(AuthSession).filter(AuthSession.user_id == user.id).delete(synchronize_session=False)
+    password = getattr(payload, "password", None)
+    if password is not None:
+        user.password_hash = hash_password(password)
     if user.id and changes.get("is_active") is False:
         db.query(AuthSession).filter(AuthSession.user_id == user.id).delete(synchronize_session=False)
     if payload.role_ids is not None:
@@ -179,6 +198,20 @@ def deactivate_user(db: Session, user_id: int, current_user: User) -> None:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Phải giữ ít nhất một quản trị viên hoạt động")
     user.is_active = False
     db.query(AuthSession).filter(AuthSession.user_id == user.id).delete(synchronize_session=False)
+    db.commit()
+
+
+def reset_user_password(db: Session, user_id: int, payload: ResetPasswordPayload, current_user: User) -> None:
+    if user_id == current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Hãy dùng chức năng Đổi mật khẩu để thay đổi mật khẩu của chính bạn",
+        )
+    user = db.scalar(select(User).where(User.id == user_id).with_for_update())
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Người dùng không tồn tại")
+    user.password_hash = hash_password(payload.new_password)
+    db.execute(delete(AuthSession).where(AuthSession.user_id == user.id))
     db.commit()
 
 

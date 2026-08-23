@@ -1,4 +1,4 @@
-import { ChevronLeft, ChevronRight, Eye, LoaderCircle, Minus, Pencil, Search, XCircle } from "lucide-react";
+import { ChevronLeft, ChevronRight, Eye, FileText, LoaderCircle, Minus, Pencil, Search, XCircle } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 
@@ -12,6 +12,7 @@ import type { Invoice, InvoiceListItem, InvoiceStatus } from "../types";
 import { dateTime, normalizeInvoiceCodeSearch, numberText, todayInputValue } from "../utils/format";
 
 const PAGE_SIZE_OPTIONS = [10, 20, 50, 100];
+type InvoiceStatusFilter = InvoiceStatus | "active" | "all";
 
 function positiveInteger(value: string | null, fallback: number) {
   const parsed = Number(value);
@@ -23,8 +24,10 @@ export function InvoicesPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [invoices, setInvoices] = useState<InvoiceListItem[]>([]);
   const initialStatus = searchParams.get("status");
-  const [status, setStatus] = useState<InvoiceStatus | "">(
-    initialStatus === "created" || initialStatus === "completed" || initialStatus === "cancelled" ? initialStatus : "",
+  const [status, setStatus] = useState<InvoiceStatusFilter>(
+    initialStatus === "created" || initialStatus === "completed" || initialStatus === "cancelled" || initialStatus === "all"
+      ? initialStatus
+      : "active",
   );
   const [fromDate, setFromDate] = useState(searchParams.get("from_date") ?? todayInputValue());
   const [toDate, setToDate] = useState(searchParams.get("to_date") ?? todayInputValue());
@@ -59,7 +62,8 @@ export function InvoicesPage() {
     setError("");
     try {
       const data = await api.invoices.list({
-          status: selectedStatus || undefined,
+          status: selectedStatus === "created" || selectedStatus === "completed" || selectedStatus === "cancelled" ? selectedStatus : undefined,
+          exclude_cancelled: selectedStatus === "active" ? true : undefined,
           code: normalizedInvoiceCode || undefined,
           customer_phone: selectedCustomerPhone.trim() || undefined,
           from_date: selectedFromDate || undefined,
@@ -92,7 +96,7 @@ export function InvoicesPage() {
   }, []);
 
   function applyFilters(
-    selectedStatus: InvoiceStatus | "",
+    selectedStatus: InvoiceStatusFilter,
     selectedFromDate: string,
     selectedToDate: string,
     selectedInvoiceCode = invoiceCode,
@@ -100,7 +104,7 @@ export function InvoicesPage() {
   ) {
     const normalizedInvoiceCode = normalizeInvoiceCodeSearch(selectedInvoiceCode);
     const nextSearchParams = new URLSearchParams();
-    if (selectedStatus) nextSearchParams.set("status", selectedStatus);
+    nextSearchParams.set("status", selectedStatus);
     if (selectedFromDate) nextSearchParams.set("from_date", selectedFromDate);
     if (selectedToDate) nextSearchParams.set("to_date", selectedToDate);
     if (normalizedInvoiceCode) nextSearchParams.set("code", normalizedInvoiceCode);
@@ -217,9 +221,10 @@ export function InvoicesPage() {
         </button>
         <select
           value={status}
-          onChange={(event) => applyFilters(event.target.value as InvoiceStatus | "", fromDate, toDate)}
+          onChange={(event) => applyFilters(event.target.value as InvoiceStatusFilter, fromDate, toDate)}
         >
-          <option value="">Tất cả trạng thái</option>
+          <option value="active">Đang hiệu lực</option>
+          <option value="all">Tất cả trạng thái</option>
           <option value="created">Đã tạo</option>
           <option value="completed">Hoàn thành</option>
           <option value="cancelled">Đã hủy</option>
@@ -230,6 +235,11 @@ export function InvoicesPage() {
           Đang tải...
         </span> : null}
       </section>
+
+      <div className={`invoice-filter-result-count${loading ? " loading" : ""}`} role="status" aria-live="polite">
+        <FileText size={16} />
+        <span>{loading ? "Đang cập nhật số lượng hóa đơn..." : <>Tìm thấy <strong>{numberText(total)}</strong> hóa đơn phù hợp với bộ lọc</>}</span>
+      </div>
 
       {error ? <div className="alert error">{error}</div> : null}
 

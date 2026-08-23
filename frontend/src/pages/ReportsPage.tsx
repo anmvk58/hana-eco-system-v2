@@ -23,7 +23,7 @@ export function ReportsPage() {
   async function loadReports() {
     setError("");
     try {
-      setInvoices(await api.invoices.listAll({ status: "created", from_date: fromDate || undefined, to_date: toDate || undefined }));
+      setInvoices(await api.invoices.listAll({ exclude_cancelled: true, from_date: fromDate || undefined, to_date: toDate || undefined }));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Không tải được báo cáo");
     }
@@ -120,7 +120,7 @@ export function ReportsPage() {
           <div className="panel-header">
             <div>
               <h2>Doanh thu theo ngày</h2>
-              <span>Chỉ tính hóa đơn đã tạo</span>
+              <span>Tính hóa đơn đã tạo và hoàn thành</span>
             </div>
           </div>
           <table className="data-table">

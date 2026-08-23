@@ -10,8 +10,11 @@ from sqlalchemy.orm import Session, selectinload
 
 from app.models.customer import Customer
 from app.models.enums import ExtraChargeType, InvoiceAuditLabel, InvoiceHistoryAction, InvoiceStatus
+from app.models.external_handover import ExternalHandoverBatchItem
+from app.models.internal_cod_collection import InternalCodCollectionItem
 from app.models.invoice import Invoice, InvoiceCodeSequence, InvoiceExtraCharge, InvoiceHistory, InvoiceItem
 from app.models.product import Product
+from app.models.retail_invoice_collection import RetailInvoiceCollection
 from app.models.shipper import Shipper
 from app.models.user import User
 from app.schemas.invoice import InvoiceCreate, InvoiceExtraChargeCreate, InvoiceItemCreate, InvoiceUpdate
@@ -183,6 +186,7 @@ def get_invoice(db: Session, invoice_id: int, include_deleted: bool = False) -> 
 def list_invoices(
     db: Session,
     status_filter: InvoiceStatus | None = None,
+    exclude_cancelled: bool = False,
     customer_id: int | None = None,
     code_filter: str | None = None,
     customer_phone: str | None = None,
@@ -199,6 +203,8 @@ def list_invoices(
         conditions.append(Invoice.deleted_at.is_(None))
     if status_filter:
         conditions.append(Invoice.status == status_filter)
+    elif exclude_cancelled:
+        conditions.append(Invoice.status != InvoiceStatus.cancelled)
     if customer_id:
         conditions.append(Invoice.customer_id == customer_id)
     if code_filter and code_filter.strip():
@@ -520,6 +526,78 @@ def assign_audit_label(
             user_id=current_user.id,
             user_name=current_user.display_name,
             reason=f"Gán nhãn audit {label_name}",
+        )
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+    return get_invoice(db, invoice.id)
+
+
+def rollback_audit_label(
+    db: Session,
+    invoice_id: int,
+    reason: str,
+    current_user: User,
+) -> Invoice:
+    invoice = db.scalar(invoice_query(invoice_id).where(Invoice.deleted_at.is_(None)).with_for_update())
+    if not invoice:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Hóa đơn không tồn tại")
+    if invoice.status == InvoiceStatus.cancelled:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Không thể hoàn tác Audit cho hóa đơn đã hủy")
+    if invoice.audit_label is None:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Hóa đơn hiện chưa được Audit")
+    if invoice.audit_label == InvoiceAuditLabel.internal_shipper:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Đơn Ship nội bộ phải được thu hồi tại màn hình Bàn giao Ship Nội Bộ",
+        )
+    if db.scalar(select(RetailInvoiceCollection.id).where(RetailInvoiceCollection.invoice_id == invoice.id)):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Không thể hoàn tác vì hóa đơn đã được kiểm kê/thu tiền",
+        )
+    if db.scalar(select(InternalCodCollectionItem.id).where(InternalCodCollectionItem.invoice_id == invoice.id)):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Không thể hoàn tác vì hóa đơn đã thuộc phiên thu COD nội bộ",
+        )
+    if db.scalar(
+        select(ExternalHandoverBatchItem.id).where(
+            ExternalHandoverBatchItem.invoice_id == invoice.id,
+            ExternalHandoverBatchItem.is_active.is_(True),
+        )
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Đơn đang thuộc bảng giao Ship ngoài; hãy chỉnh sửa hoặc hủy bảng giao tương ứng",
+        )
+
+    before_data = snapshot_invoice(invoice)
+    previous_label = invoice.audit_label
+    try:
+        invoice.audit_label = None
+        invoice.assigned_shipper_id = None
+        invoice.audited_at = None
+        invoice.audited_by_user_id = None
+        invoice.external_shipper_name = None
+        invoice.external_shipper_phone = None
+        invoice.external_advance_method = None
+        invoice.external_transfer_amount = Decimal("0")
+        invoice.external_cash_amount = Decimal("0")
+        invoice.external_shipping_fee = Decimal("0")
+        invoice.external_advance_amount = Decimal("0")
+        db.flush()
+        label_name = "Khách lẻ" if previous_label == InvoiceAuditLabel.retail else "Ship Ngoài"
+        add_history(
+            db,
+            invoice,
+            InvoiceHistoryAction.updated,
+            before_data=before_data,
+            after_data=snapshot_invoice(invoice),
+            user_id=current_user.id,
+            user_name=current_user.display_name,
+            reason=f"Hoàn tác nhãn Audit {label_name}: {reason.strip()}",
         )
         db.commit()
     except Exception:

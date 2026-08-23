@@ -4,9 +4,9 @@ from fastapi import HTTPException, status
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
-from app.core.security import hash_token, new_session_token, verify_password
+from app.core.security import hash_password, hash_token, new_session_token, verify_password
 from app.models.user import AuthSession, User
-from app.schemas.access_control import LoginPayload
+from app.schemas.access_control import ChangePasswordPayload, LoginPayload
 from app.services.access_control_service import serialize_user, user_query
 
 
@@ -33,4 +33,24 @@ def login(db: Session, payload: LoginPayload) -> dict:
 
 def logout(db: Session, token: str) -> None:
     db.execute(delete(AuthSession).where(AuthSession.token_hash == hash_token(token)))
+    db.commit()
+
+
+def change_password(db: Session, user_id: int, current_token: str, payload: ChangePasswordPayload) -> None:
+    user = db.scalar(select(User).where(User.id == user_id).with_for_update())
+    if not user or not user.is_active:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Người dùng không tồn tại hoặc đã bị khóa")
+    if not verify_password(payload.current_password, user.password_hash):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Mật khẩu hiện tại không đúng")
+    if verify_password(payload.new_password, user.password_hash):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Mật khẩu mới phải khác mật khẩu hiện tại")
+
+    user.password_hash = hash_password(payload.new_password)
+    current_token_hash = hash_token(current_token)
+    db.execute(
+        delete(AuthSession).where(
+            AuthSession.user_id == user.id,
+            AuthSession.token_hash != current_token_hash,
+        )
+    )
     db.commit()

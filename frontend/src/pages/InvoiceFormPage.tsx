@@ -1,4 +1,4 @@
-import { BadgeCheck, ChevronDown, ChevronUp, Minus, Plus, Save, Search, Settings } from "lucide-react";
+import { BadgeCheck, ChevronDown, ChevronUp, Edit2, LoaderCircle, Minus, Plus, RefreshCw, Save, Search, Settings } from "lucide-react";
 import { FormEvent, KeyboardEvent, useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
@@ -30,6 +30,13 @@ const defaultCharges: DraftCharge[] = [
 ];
 const blankCustomerForm = {
   code: "",
+  name: "",
+  phone: "",
+  address: "",
+  note: "",
+};
+
+const blankCustomerQuickEditForm = {
   name: "",
   phone: "",
   address: "",
@@ -77,9 +84,14 @@ export function InvoiceFormPage() {
   const [invoice, setInvoice] = useState<Invoice | null>(null);
   const [customerId, setCustomerId] = useState("");
   const [customerSearch, setCustomerSearch] = useState("");
+  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [customerFocused, setCustomerFocused] = useState(false);
   const [customerModalOpen, setCustomerModalOpen] = useState(false);
   const [customerForm, setCustomerForm] = useState(blankCustomerForm);
+  const [customerQuickEditOpen, setCustomerQuickEditOpen] = useState(false);
+  const [customerQuickEditForm, setCustomerQuickEditForm] = useState(blankCustomerQuickEditForm);
+  const [customerQuickEditError, setCustomerQuickEditError] = useState("");
+  const [customerQuickEditSaving, setCustomerQuickEditSaving] = useState(false);
   const [note, setNote] = useState("");
   const [reason, setReason] = useState("");
   const [lines, setLines] = useState<DraftLine[]>([{ ...blankLine }]);
@@ -93,6 +105,9 @@ export function InvoiceFormPage() {
   const [searchFocused, setSearchFocused] = useState(false);
   const [highlightedProductIndex, setHighlightedProductIndex] = useState(0);
   const [error, setError] = useState("");
+  const [baseDataLoading, setBaseDataLoading] = useState(true);
+  const [baseDataReady, setBaseDataReady] = useState(false);
+  const [baseDataRetryVersion, setBaseDataRetryVersion] = useState(0);
   const [toastMessage, setToastMessage] = useState("");
   const [invoiceToPrint, setInvoiceToPrint] = useState<Invoice | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -131,20 +146,34 @@ export function InvoiceFormPage() {
   }, [invoiceToPrint]);
 
   useEffect(() => {
+    let cancelled = false;
+
     async function loadBaseData() {
+      setBaseDataLoading(true);
+      setBaseDataReady(false);
+      setError("");
       const [productData, chargeSettingData] = await Promise.all([
-        api.products.list(),
+        api.products.listAll(),
         api.extraChargeSettings.list(),
       ]);
+      if (cancelled) return;
       setProducts(productData);
       const shipping = chargeSettingData.find((setting) => setting.charge_type === "shipping");
       setShippingDefaultAmount(shipping?.default_amount ?? "0");
       if (!editingId) {
         setCharges(buildChargesFromSettings(chargeSettingData));
       }
+      setBaseDataReady(true);
     }
-    void loadBaseData().catch((err) => setError(err instanceof Error ? err.message : "Không tải được dữ liệu nền"));
-  }, [editingId]);
+    void loadBaseData()
+      .catch((err) => {
+        if (!cancelled) setError(err instanceof Error ? err.message : "Không tải được dữ liệu nền");
+      })
+      .finally(() => {
+        if (!cancelled) setBaseDataLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, [editingId, baseDataRetryVersion]);
 
   useEffect(() => {
     if (isEditing || !customerFocused || customerId) return;
@@ -172,6 +201,7 @@ export function InvoiceFormPage() {
       setInvoice(data);
       setCustomerId(data.customer_id ? String(data.customer_id) : "");
       setCustomerSearch(data.customer ? `${data.customer.phone ?? data.customer.code} - ${data.customer.name}` : "");
+      setSelectedCustomer(data.customer ?? null);
       setIsPaidByTransfer(data.is_paid_by_transfer);
       setNote(data.note ?? "");
       setLines(
@@ -285,7 +315,54 @@ export function InvoiceFormPage() {
   function selectCustomer(customer: Customer) {
     setCustomerId(String(customer.id));
     setCustomerSearch(`${customer.phone ?? customer.code} - ${customer.name}`);
+    setSelectedCustomer(customer);
     setCustomerFocused(false);
+  }
+
+  function openCustomerQuickEdit() {
+    if (!selectedCustomer) return;
+    setCustomerQuickEditForm({
+      name: selectedCustomer.name,
+      phone: selectedCustomer.phone ?? "",
+      address: selectedCustomer.address ?? "",
+      note: selectedCustomer.note ?? "",
+    });
+    setCustomerQuickEditError("");
+    setCustomerQuickEditOpen(true);
+  }
+
+  function closeCustomerQuickEdit() {
+    if (customerQuickEditSaving) return;
+    setCustomerQuickEditOpen(false);
+    setCustomerQuickEditError("");
+    setCustomerQuickEditForm(blankCustomerQuickEditForm);
+  }
+
+  async function updateSelectedCustomer(event: FormEvent) {
+    event.preventDefault();
+    if (!selectedCustomer) return;
+    setCustomerQuickEditError("");
+    setCustomerQuickEditSaving(true);
+    try {
+      const updated = await api.customers.update(selectedCustomer.id, {
+        name: customerQuickEditForm.name.trim(),
+        address: customerQuickEditForm.address.trim(),
+        note: customerQuickEditForm.note.trim(),
+      });
+      setSelectedCustomer(updated);
+      setCustomerSearch(`${updated.phone ?? updated.code} - ${updated.name}`);
+      setCustomers((current) => current.some((customer) => customer.id === updated.id)
+        ? current.map((customer) => customer.id === updated.id ? updated : customer)
+        : [updated, ...current]);
+      setInvoice((current) => current && current.customer_id === updated.id ? { ...current, customer: updated } : current);
+      setCustomerQuickEditOpen(false);
+      setCustomerQuickEditForm(blankCustomerQuickEditForm);
+      setToastMessage(`Đã cập nhật thông tin khách hàng ${updated.name}.`);
+    } catch (err) {
+      setCustomerQuickEditError(err instanceof Error ? err.message : "Không cập nhật được khách hàng");
+    } finally {
+      setCustomerQuickEditSaving(false);
+    }
   }
 
   function openCreateCustomer() {
@@ -431,6 +508,28 @@ export function InvoiceFormPage() {
     }
   }
 
+  if (!baseDataReady) {
+    return (
+      <section className="sales-loading-gate" aria-busy={baseDataLoading} aria-live="polite">
+        <div className="sales-loading-gate-icon">
+          {baseDataLoading ? <LoaderCircle className="loading-spinner" size={34} /> : <RefreshCw size={32} />}
+        </div>
+        <h2>{baseDataLoading ? "Đang tải dữ liệu bán hàng" : "Chưa tải được dữ liệu bán hàng"}</h2>
+        <p>
+          {baseDataLoading
+            ? "Vui lòng chờ hệ thống tải đầy đủ danh mục sản phẩm trước khi thao tác."
+            : error || "Không tải được danh mục sản phẩm và cấu hình bán hàng."}
+        </p>
+        {!baseDataLoading ? (
+          <button className="primary-button" type="button" onClick={() => setBaseDataRetryVersion((version) => version + 1)}>
+            <RefreshCw size={17} />
+            Thử tải lại
+          </button>
+        ) : null}
+      </section>
+    );
+  }
+
   return (
     <>
       <form className="invoice-workspace" onSubmit={(event) => void submit(event)}>
@@ -467,6 +566,7 @@ export function InvoiceFormPage() {
                       if (isEditing) return;
                       setCustomerSearch(event.target.value);
                       setCustomerId("");
+                      setSelectedCustomer(null);
                       setCustomerFocused(true);
                     }}
                     onFocus={(event) => {
@@ -480,6 +580,17 @@ export function InvoiceFormPage() {
                     onKeyDown={handleCustomerSearchKeyDown}
                     placeholder={isEditing ? "Không cho phép sửa khách hàng" : "Nhập ít nhất 5 chữ số điện thoại; Để trống nếu là khách lẻ"}
                   />
+                  {selectedCustomer && hasPermission("customers.update") ? (
+                    <button
+                      className="customer-quick-edit-button"
+                      type="button"
+                      onClick={openCustomerQuickEdit}
+                      title="Chỉnh sửa nhanh thông tin khách hàng"
+                    >
+                      <Edit2 size={15} />
+                      <span>Sửa nhanh</span>
+                    </button>
+                  ) : null}
                 </div>
                 {!isEditing && customerFocused && customerSearch.replace(/\s+/g, "").length >= 5 ? (
                   <div className="product-suggestions customer-suggestions">
@@ -731,6 +842,58 @@ export function InvoiceFormPage() {
               </button>
               <button className="primary-button" type="submit">
                 Lưu khách hàng
+              </button>
+            </div>
+          </form>
+        </Modal>
+      ) : null}
+
+      {customerQuickEditOpen && selectedCustomer ? (
+        <Modal title="Chỉnh sửa nhanh khách hàng" onClose={closeCustomerQuickEdit} className="customer-quick-edit-modal">
+          <form className="form-grid customer-quick-edit-form" onSubmit={(event) => void updateSelectedCustomer(event)}>
+            <div className="customer-quick-edit-intro span-2">
+              <BadgeCheck size={22} />
+              <div>
+                <strong>{selectedCustomer.code}</strong>
+                <span>Chỉ cập nhật thông tin liên hệ; số điện thoại không được phép thay đổi tại đây.</span>
+              </div>
+            </div>
+            {customerQuickEditError ? <div className="alert error span-2">{customerQuickEditError}</div> : null}
+            <label>
+              Số điện thoại
+              <input disabled value={customerQuickEditForm.phone} aria-describedby="customer-phone-lock-note" />
+              <small id="customer-phone-lock-note" className="customer-quick-edit-lock-note">Số điện thoại đã được khóa</small>
+            </label>
+            <label>
+              Tên khách hàng
+              <input
+                required
+                autoFocus
+                value={customerQuickEditForm.name}
+                onChange={(event) => setCustomerQuickEditForm({ ...customerQuickEditForm, name: event.target.value })}
+              />
+            </label>
+            <label className="span-2">
+              Địa chỉ
+              <textarea
+                rows={3}
+                value={customerQuickEditForm.address}
+                onChange={(event) => setCustomerQuickEditForm({ ...customerQuickEditForm, address: event.target.value })}
+              />
+            </label>
+            <label className="span-2">
+              Ghi chú khách hàng
+              <textarea
+                rows={3}
+                value={customerQuickEditForm.note}
+                onChange={(event) => setCustomerQuickEditForm({ ...customerQuickEditForm, note: event.target.value })}
+              />
+            </label>
+            <div className="form-actions span-2">
+              <button className="secondary-button" type="button" disabled={customerQuickEditSaving} onClick={closeCustomerQuickEdit}>Hủy</button>
+              <button className="primary-button" type="submit" disabled={customerQuickEditSaving}>
+                <Save size={16} />
+                {customerQuickEditSaving ? "Đang lưu..." : "Lưu thay đổi"}
               </button>
             </div>
           </form>
