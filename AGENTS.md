@@ -7,7 +7,7 @@ Hana POS is a Vietnamese-language point-of-sale web application. The repository 
 - `frontend/`: React 19, TypeScript, React Router, and Vite.
 - `backend/`: FastAPI, SQLAlchemy 2, Pydantic, and PyMySQL.
 - `docs/`: architecture and database notes.
-- `docker-compose.yml`: local frontend, API, and MySQL 8.4 stack.
+- `docker-compose.yml`: single-host production stack with Cloudflare Tunnel, an Nginx-served frontend, API, and MySQL 8.4.
 
 Read `docs/CODEX_HANDOFF.md` before starting substantial work. Update it when a change affects architecture, delivered scope, important technical decisions, known risks, or the next-work list.
 
@@ -27,18 +27,15 @@ Read `docs/CODEX_HANDOFF.md` before starting substantial work. Update it when a 
 
 ## Setup and run
 
-Preferred full-stack development command from the repository root:
+Production Compose deployment from the repository root requires a populated root `.env` and a Cloudflare Tunnel Published Application targeting `http://frontend:80`:
 
 ```powershell
-docker compose up --build
+docker compose up -d --build
 ```
 
-Services:
+The Compose stack does not publish frontend, API, or MySQL ports on the host. Public traffic reaches Nginx through the outbound-only Cloudflare Tunnel and the configured `DOMAIN`.
 
-- Frontend: `http://localhost:5173`
-- API: `http://localhost:8000`
-- Swagger: `http://localhost:8000/docs`
-- MySQL: `localhost:3306`
+For development, run the backend and frontend locally with the commands below and use a separately reachable MySQL instance. FastAPI Swagger is then available at `http://localhost:8000/docs` and Vite at `http://localhost:5173`.
 
 Local backend (requires a reachable MySQL compatible with `backend/.env`):
 

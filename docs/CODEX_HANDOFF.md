@@ -1,6 +1,6 @@
 # Codex Project Handoff
 
-Last reviewed: 2026-08-23
+Last reviewed: 2026-08-25
 Baseline commit when reviewed: `1b0e36f` (`master`)  
 Project: Hana POS MVP
 
@@ -8,23 +8,28 @@ Project: Hana POS MVP
 
 Hana POS is a browser-based POS and lightweight management system inspired by a reduced KiotViet-style workflow. The implemented scope covers authentication and authorization, customers, product categories, products and inventory, sales invoices, configurable extra charges, invoice printing, dashboards, and sold-product reporting.
 
-The application is currently oriented toward local/development deployment with Docker Compose. It is not yet production-hardened.
+The tracked Docker Compose stack is oriented toward a single-host production deployment through Cloudflare Tunnel. Operational hardening such as secure bootstrap credentials, backups, migrations, and log retention is still required before relying on it for critical production data.
 
 ## 2. Architecture
 
 ### Runtime topology
 
 ```text
-Browser (React/Vite :5173)
-        |
-        | JSON REST + Bearer token
-        v
-FastAPI (:8000, /api)
-        |
-        | SQLAlchemy + PyMySQL
-        v
-MySQL 8.4 (:3306, database hana_pos)
+Browser
+   |
+   | HTTPS on the public hostname
+   v
+Cloudflare edge -> outbound-only cloudflared connector
+   |
+   v
+Nginx (:80, static React bundle)
+   |
+   | /api and /health
+   v
+FastAPI (:8000) -> MySQL 8.4 (:3306)
 ```
+
+Only the Cloudflare Tunnel connector is public-facing. Frontend, API, and database ports are available only on the Compose network; the host does not publish them.
 
 ### Backend
 
@@ -80,7 +85,7 @@ MySQL 8.4 (:3306, database hana_pos)
 
 ### Platform and access control
 
-- FastAPI API, React/Vite SPA, MySQL database, and Docker Compose development stack.
+- FastAPI API, React/Vite SPA, MySQL database, and a production-oriented Docker Compose stack. The frontend image uses a Node build stage and serves the resulting static bundle through Nginx; Nginx handles SPA fallback and proxies same-origin `/api` calls. A remotely managed Cloudflare Tunnel publishes the frontend without inbound host ports or a public origin IP.
 - Login, logout, current-user lookup, token expiry handling, and inactive-user rejection.
 - Permission catalog; role CRUD; user CRUD/deactivation; multi-role assignment.
 - Protection against editing the system role, removing the last active administrator, and self-deactivation.
@@ -140,7 +145,7 @@ Priority is an engineering recommendation inferred from the current repository, 
 - Replace the default `admin/admin` bootstrap credential with a secure first-run or environment-secret flow; rotate any existing persistent deployment immediately.
 - Introduce Alembic (or an equivalent controlled migration system). Move startup `ALTER TABLE` and data conversions into versioned, repeatable migrations with backup/rollback instructions.
 - Add automated tests for authentication/RBAC and invoice transaction invariants, especially concurrent invoice-code allocation, insufficient/negative stock policy, edit reconciliation, cancellation, deletion, totals, and audit history.
-- Define production secrets, allowed CORS origins, HTTPS/reverse proxy, database backup/restore, log retention, and a non-development frontend/API deployment strategy.
+- Define secret storage beyond the host `.env` file, database backup/restore, centralized log retention, monitoring, and a documented Cloudflare Tunnel token-rotation procedure. Compose limits each service's local `json-file` logs to five 10 MB files, but this is not a durable audit-log solution.
 
 ### P1 — correctness and maintainability
 
@@ -162,8 +167,10 @@ Priority is an engineering recommendation inferred from the current repository, 
 
 ### Full stack with Docker
 
+Copy `.env.example` to `.env`, set the production hostname, remotely managed Cloudflare Tunnel token, and unique database credentials. In the Cloudflare Tunnel dashboard, configure the Published Application service URL as `http://frontend:80`, then run:
+
 ```powershell
-docker compose up --build
+docker compose up -d --build
 ```
 
 Useful checks:
@@ -173,6 +180,7 @@ docker compose config --quiet
 docker compose ps
 docker compose logs api
 docker compose logs frontend
+docker compose logs cloudflared
 ```
 
 Stop containers without deleting the MySQL volume:
@@ -200,10 +208,12 @@ Syntax/import compilation check from the repository root:
 python -m compileall -q backend/app
 ```
 
-Health and API documentation:
+When running the backend directly, health and API documentation remain available at:
 
 - `GET http://localhost:8000/health`
 - `http://localhost:8000/docs`
+
+The Compose deployment exposes `/health` through the public application hostname but deliberately does not route FastAPI Swagger paths through Nginx.
 
 ### Frontend locally
 
@@ -225,8 +235,8 @@ There are currently no `test` or `lint` scripts in `frontend/package.json`, and 
 ## 7. Environment and operational notes
 
 - Backend settings: `APP_NAME`, `API_PREFIX`, `DATABASE_URL`, and `CORS_ORIGINS`; see `backend/.env.example`.
-- Frontend API setting: `VITE_API_BASE_URL`. When it is not set, the browser calls same-origin `/api`; Vite proxies that path to the Compose API service. This supports local/LAN access and temporary HTTPS tunnels through one frontend URL without exposing a separate API port or adding dynamic CORS origins.
-- Compose database credentials are required through the root `.env` file and are no longer present in tracked Compose/backend source. `.env.example` contains placeholders only; application and root passwords must be different strong secrets. MySQL's host port is bound to `127.0.0.1` by default instead of all network interfaces. Because previously committed credentials must be treated as exposed, rotate them for any existing persistent database rather than only moving their old values into `.env`.
+- Frontend API setting: `VITE_API_BASE_URL`. When it is not set, the browser calls same-origin `/api`; Vite proxies it during local development, while production Nginx proxies it to the Compose API service.
+- The root `.env` must define `DOMAIN`, `CLOUDFLARE_TUNNEL_TOKEN`, and database credentials. `.env.example` contains placeholders only; the tunnel token and real credentials must never be committed. The Cloudflare Published Application must target `http://frontend:80`. Application and root database passwords must be different strong secrets. MySQL has no published host port in the production Compose stack. Because previously committed credentials must be treated as exposed, rotate them for any existing persistent database rather than only moving their old values into `.env`.
 - The MySQL data volume is named `mysql_data` by Compose and persists across ordinary `docker compose down/up` cycles.
 - The browser token key is `hana-access-token`.
 - Default development login after first initialization is `admin` / `admin`; change it immediately.
