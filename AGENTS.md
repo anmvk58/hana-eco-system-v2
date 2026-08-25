@@ -33,7 +33,7 @@ Production Compose deployment from the repository root requires a populated root
 docker compose up -d --build
 ```
 
-The Compose stack does not publish frontend, API, or MySQL ports on the host. Public traffic reaches Nginx through the outbound-only Cloudflare Tunnel and the configured `DOMAIN`.
+The Compose stack does not publish frontend or API ports on the host. Public traffic reaches Nginx through the outbound-only Cloudflare Tunnel and the configured `DOMAIN`. MySQL is bound only to `127.0.0.1:${MYSQL_EXPOSED_PORT:-3306}` so host-side administration tools can connect without exposing the database to LAN or Internet clients.
 
 For development, run the backend and frontend locally with the commands below and use a separately reachable MySQL instance. FastAPI Swagger is then available at `http://localhost:8000/docs` and Vite at `http://localhost:5173`.
 

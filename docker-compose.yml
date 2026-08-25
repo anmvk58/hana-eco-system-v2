@@ -77,6 +77,8 @@ services:
       MYSQL_USER: ${MYSQL_USER:?Set MYSQL_USER in the root .env file}
       MYSQL_PASSWORD: ${MYSQL_PASSWORD:?Set MYSQL_PASSWORD in the root .env file}
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Set MYSQL_ROOT_PASSWORD in the root .env file}
+    ports:
+      - "127.0.0.1:${MYSQL_EXPOSED_PORT:-3306}:3306"
     healthcheck:
       test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u \"$${MYSQL_USER}\" --password=\"$${MYSQL_PASSWORD}\" --silent"]
       interval: 10s

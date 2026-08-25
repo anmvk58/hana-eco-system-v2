@@ -29,7 +29,7 @@ Nginx (:80, static React bundle)
 FastAPI (:8000) -> MySQL 8.4 (:3306)
 ```
 
-Only the Cloudflare Tunnel connector is public-facing. Frontend, API, and database ports are available only on the Compose network; the host does not publish them.
+Only the Cloudflare Tunnel connector is public-facing. Frontend and API ports are available only on the Compose network. MySQL is additionally bound to the configurable host loopback port `127.0.0.1:${MYSQL_EXPOSED_PORT:-3306}` for host-side administration; it is not reachable through LAN or public interfaces.
 
 ### Backend
 
@@ -236,7 +236,7 @@ There are currently no `test` or `lint` scripts in `frontend/package.json`, and 
 
 - Backend settings: `APP_NAME`, `API_PREFIX`, `DATABASE_URL`, and `CORS_ORIGINS`; see `backend/.env.example`.
 - Frontend API setting: `VITE_API_BASE_URL`. When it is not set, the browser calls same-origin `/api`; Vite proxies it during local development, while production Nginx proxies it to the Compose API service.
-- The root `.env` must define `DOMAIN`, `CLOUDFLARE_TUNNEL_TOKEN`, and database credentials. `.env.example` contains placeholders only; the tunnel token and real credentials must never be committed. The Cloudflare Published Application must target `http://frontend:80`. Application and root database passwords must be different strong secrets. MySQL has no published host port in the production Compose stack. Because previously committed credentials must be treated as exposed, rotate them for any existing persistent database rather than only moving their old values into `.env`.
+- The root `.env` must define `DOMAIN`, `CLOUDFLARE_TUNNEL_TOKEN`, database credentials, and optionally `MYSQL_EXPOSED_PORT` (default `3306`). `.env.example` contains placeholders only; the tunnel token and real credentials must never be committed. The Cloudflare Published Application must target `http://frontend:80`. Application and root database passwords must be different strong secrets. MySQL is published only on host loopback for local administration, never on all interfaces. Because previously committed credentials must be treated as exposed, rotate them for any existing persistent database rather than only moving their old values into `.env`.
 - The MySQL data volume is named `mysql_data` by Compose and persists across ordinary `docker compose down/up` cycles.
 - The browser token key is `hana-access-token`.
 - Default development login after first initialization is `admin` / `admin`; change it immediately.
