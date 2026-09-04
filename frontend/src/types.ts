@@ -386,11 +386,18 @@ export interface ExternalHandoverReconcilePayload {
 }
 
 export type DashboardTimePreset = "today" | "yesterday" | "last7days" | "thisMonth" | "custom";
+export type DashboardProductMetric = "revenue" | "quantity";
 
 export interface DashboardProductSummary {
   key: string;
   name: string;
   quantity: string;
+  revenue: string;
+}
+
+export interface DashboardCustomerSummary {
+  customer_id: number;
+  name: string;
   revenue: string;
 }
 
@@ -414,6 +421,14 @@ export interface DashboardShipperOrderSummary {
   order_count: number;
 }
 
+export interface DashboardOrderStatusCharts {
+  from_date: string;
+  to_date: string;
+  audit_chart: DashboardCountSlice[];
+  internal_shipper_chart: DashboardShipperOrderSummary[];
+  reconciliation_chart: DashboardCountSlice[];
+}
+
 export interface DashboardSummary {
   from_date: string;
   to_date: string;
@@ -421,13 +436,7 @@ export interface DashboardSummary {
   product_revenue: string;
   extra_charge_revenue: string;
   created_invoice_count: number;
-  created_customer_count: number;
   revenue_chart: DashboardRevenuePoint[];
-  top_products_by_quantity: DashboardProductSummary[];
-  top_products_by_revenue: DashboardProductSummary[];
-  audit_chart: DashboardCountSlice[];
-  internal_shipper_chart: DashboardShipperOrderSummary[];
-  reconciliation_chart: DashboardCountSlice[];
 }
 
 export interface InvoiceHistory {

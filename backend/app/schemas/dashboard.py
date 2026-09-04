@@ -14,6 +14,12 @@ class DashboardProductSummary(ORMBase):
     revenue: Decimal
 
 
+class DashboardCustomerSummary(ORMBase):
+    customer_id: int
+    name: str
+    revenue: Decimal
+
+
 class DashboardRevenuePoint(ORMBase):
     key: str
     label: str
@@ -34,6 +40,14 @@ class DashboardShipperOrderSummary(ORMBase):
     order_count: int
 
 
+class DashboardOrderStatusCharts(ORMBase):
+    from_date: date
+    to_date: date
+    audit_chart: list[DashboardCountSlice]
+    internal_shipper_chart: list[DashboardShipperOrderSummary]
+    reconciliation_chart: list[DashboardCountSlice]
+
+
 class DashboardSummary(ORMBase):
     from_date: date
     to_date: date
@@ -41,10 +55,4 @@ class DashboardSummary(ORMBase):
     product_revenue: Decimal = Field(default=Decimal("0"))
     extra_charge_revenue: Decimal = Field(default=Decimal("0"))
     created_invoice_count: int
-    created_customer_count: int
     revenue_chart: list[DashboardRevenuePoint]
-    top_products_by_quantity: list[DashboardProductSummary]
-    top_products_by_revenue: list[DashboardProductSummary]
-    audit_chart: list[DashboardCountSlice]
-    internal_shipper_chart: list[DashboardShipperOrderSummary]
-    reconciliation_chart: list[DashboardCountSlice]

@@ -86,10 +86,12 @@ Only the Cloudflare Tunnel connector is public-facing. Frontend and API ports ar
 ### Platform and access control
 
 - FastAPI API, React/Vite SPA, MySQL database, and a production-oriented Docker Compose stack. The frontend image uses a Node build stage and serves the resulting static bundle through Nginx; Nginx handles SPA fallback and proxies same-origin `/api` calls. A remotely managed Cloudflare Tunnel publishes the frontend without inbound host ports or a public origin IP.
+- `docker-compose.local.yml` provides a development stack without Cloudflare or Nginx: Vite is published at `127.0.0.1:5173`, FastAPI at `127.0.0.1:8000`, and MySQL at `127.0.0.1:3306`. Frontend/backend sources are bind-mounted for hot reload. It deliberately reuses the production Compose MySQL volume `hanaecosystemv2_mysql_data` and the root `.env` database credentials, so the production and local MySQL containers must never run concurrently.
 - Login, logout, current-user lookup, token expiry handling, and inactive-user rejection.
 - Permission catalog; role CRUD; user CRUD/deactivation; multi-role assignment.
 - Protection against editing the system role, removing the last active administrator, and self-deactivation.
 - Frontend route/menu permission handling and a forbidden page.
+- Browser tab titles follow the navigation labels using `Tên mục | Hana POS`, with dedicated titles for login, invoice detail/edit, and forbidden screens. `Layout` derives titles from the existing navigation items and a shared `usePageTitle` hook updates the document title on navigation and resets it on unmount.
 - “Người dùng & Role” is a collapsible menu group. Every authenticated user can open “Đổi mật khẩu”, which requires the current password, rejects reuse of the existing password, keeps the active session, and revokes that user's other sessions. Administrators can reset another user's forgotten password from the user table through the dedicated `users.reset_password` permission; reset revokes every session belonging to the target user. General `users.update` no longer changes passwords, keeping profile/role editing separate from credential administration. Existing roles with `users.update` receive the new reset permission once during the upgrade because they previously had equivalent password-reset capability through the general edit form; it can be removed independently afterward.
 
 ### Catalog and customers
@@ -132,7 +134,7 @@ Only the Cloudflare Tunnel connector is public-facing. Frontend and API ports ar
 
 ### Dashboard and reports
 
-- Dashboard summary API accepts an inclusive sale-date range (defaulting to the current Vietnam date) and performs database-side counts, sums, product rankings, adaptive revenue buckets, audit totals, top-10 internal-shipper order counts, and invoice reconciliation totals. The response deliberately omits recent invoice records and customer relationships. Audit and reconciliation charts exclude cancelled/deleted invoices; an invoice is reconciled when it belongs to an immutable retail/transfer collection, internal COD collection, or active reconciled external-handover batch. The Dashboard UI offers `Hôm nay`, `Hôm qua`, `7 ngày qua`, `Tháng này`, and a custom date-range picker shared by every dashboard report, replaces the recent-invoice table with three equal-width donut charts on desktop, and stacks charts/cards without horizontal overflow on mobile.
+- Dashboard summary API accepts an inclusive sale-date range (defaulting to the current Vietnam date) and now returns only invoice counts, revenue sums, and adaptive revenue buckets. Product rankings are isolated in `/dashboard/top-products`, which accepts an independent date range and a `quantity` or `revenue` metric; customer rankings are provided by `/dashboard/top-customers` and sum active invoice totals for identified customers. Audit totals, top-10 internal-shipper order counts, and invoice reconciliation totals are isolated in `/dashboard/order-status-charts`; the three donut charts share one independent preset filter inside a single status card. The summary response deliberately omits customer-creation counting, recent invoice records, customer relationships, product rankings, and order-status charts. Audit and reconciliation charts exclude cancelled/deleted invoices; an invoice is reconciled when it belongs to an immutable retail/transfer collection, internal COD collection, or active reconciled external-handover batch. The Dashboard UI offers `Hôm nay`, `Hôm qua`, `7 ngày qua`, `Tháng này`, and a custom date-range picker for the general reports. The Top 10 product, customer, and order-status cards have independent preset selectors; the product card can switch between net revenue and quantity, and each selection refreshes only its own card. Its summary area uses two balanced cards: product revenue includes the created-invoice count, while other receipts remain separate. The status card uses three equal-width donut regions on desktop and stacks them without horizontal overflow on smaller screens.
 - General reports page includes both created and completed invoices while excluding cancelled invoices, matching the Dashboard's active-invoice scope.
 - Sold-products report with optional date range, excluding cancelled/deleted invoices.
 
@@ -212,6 +214,23 @@ When running the backend directly, health and API documentation remain available
 
 - `GET http://localhost:8000/health`
 - `http://localhost:8000/docs`
+
+### Full local stack with Docker
+
+First stop the production stack so its MySQL container releases the shared data volume, then run the development stack. A populated root `.env` is required for the shared database credentials, but no Cloudflare Tunnel container is started:
+
+```powershell
+docker compose down
+docker compose -f docker-compose.local.yml up --build
+```
+
+Open `http://localhost:5173`; FastAPI Swagger is available at `http://localhost:8000/docs`. Stop it without deleting local database data using:
+
+```powershell
+docker compose -f docker-compose.local.yml down
+```
+
+The optional `LOCAL_FRONTEND_PORT`, `LOCAL_API_PORT`, and `LOCAL_MYSQL_PORT` variables override the local host ports. `MYSQL_VOLUME_NAME` can override the shared volume name when the production stack was created with a non-default Compose project name. Do not run two MySQL containers against the same data volume concurrently.
 
 The Compose deployment exposes `/health` through the public application hostname but deliberately does not route FastAPI Swagger paths through Nginx.
 

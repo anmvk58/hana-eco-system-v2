@@ -3,8 +3,10 @@ import { FormEvent, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { useAuth } from "../auth/AuthContext";
+import { usePageTitle } from "../hooks/usePageTitle";
 
 export function LoginPage() {
+  usePageTitle("Đăng nhập");
   const { login, error } = useAuth();
   const navigate = useNavigate();
   const [username, setUsername] = useState("");

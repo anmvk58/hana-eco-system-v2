@@ -1,5 +1,6 @@
 from datetime import date, datetime, time, timedelta
 from decimal import Decimal
+from typing import Literal
 
 from fastapi import HTTPException
 from sqlalchemy import case, func, or_, select
@@ -16,6 +17,8 @@ from app.models.shipper import Shipper
 from app.models.user import User
 from app.schemas.dashboard import (
     DashboardCountSlice,
+    DashboardCustomerSummary,
+    DashboardOrderStatusCharts,
     DashboardProductSummary,
     DashboardRevenuePoint,
     DashboardShipperOrderSummary,
@@ -106,34 +109,75 @@ def revenue_points(
     return granularity, points
 
 
-def get_dashboard_summary(db: Session, from_date: date | None, to_date: date | None) -> DashboardSummary:
+def get_top_products(
+    db: Session,
+    metric: Literal["revenue", "quantity"],
+    from_date: date | None,
+    to_date: date | None,
+) -> list[DashboardProductSummary]:
+    _, _, start, end_exclusive = date_range(from_date, to_date)
+    total_quantity = func.coalesce(func.sum(InvoiceItem.quantity), 0)
+    total_revenue = func.coalesce(func.sum(InvoiceItem.line_total), 0)
+    primary_order = total_revenue.desc() if metric == "revenue" else total_quantity.desc()
+    secondary_order = total_quantity.desc() if metric == "revenue" else total_revenue.desc()
+    rows = db.execute(
+        select(
+            InvoiceItem.product_code.label("key"),
+            func.max(InvoiceItem.product_name).label("name"),
+            total_quantity.label("quantity"),
+            total_revenue.label("revenue"),
+        )
+        .join(Invoice, Invoice.id == InvoiceItem.invoice_id)
+        .where(
+            Invoice.status.in_((InvoiceStatus.created, InvoiceStatus.completed)),
+            Invoice.deleted_at.is_(None),
+            Invoice.sold_at >= start,
+            Invoice.sold_at < end_exclusive,
+        )
+        .group_by(InvoiceItem.product_code)
+        .order_by(primary_order, secondary_order, InvoiceItem.product_code.asc())
+        .limit(10)
+    ).mappings()
+    return [DashboardProductSummary(**row) for row in rows]
+
+
+def get_top_customers(
+    db: Session,
+    from_date: date | None,
+    to_date: date | None,
+) -> list[DashboardCustomerSummary]:
+    _, _, start, end_exclusive = date_range(from_date, to_date)
+    total_revenue = func.coalesce(func.sum(Invoice.total_amount), 0)
+    rows = db.execute(
+        select(
+            Customer.id.label("customer_id"),
+            Customer.name.label("name"),
+            total_revenue.label("revenue"),
+        )
+        .join(Invoice, Invoice.customer_id == Customer.id)
+        .where(
+            Invoice.status.in_((InvoiceStatus.created, InvoiceStatus.completed)),
+            Invoice.deleted_at.is_(None),
+            Invoice.sold_at >= start,
+            Invoice.sold_at < end_exclusive,
+        )
+        .group_by(Customer.id, Customer.name)
+        .order_by(total_revenue.desc(), Customer.name.asc(), Customer.id.asc())
+        .limit(10)
+    ).mappings()
+    return [DashboardCustomerSummary(**row) for row in rows]
+
+
+def get_dashboard_order_status_charts(
+    db: Session,
+    from_date: date | None,
+    to_date: date | None,
+) -> DashboardOrderStatusCharts:
     selected_from, selected_to, start, end_exclusive = date_range(from_date, to_date)
-    system_start = vietnam_day_utc_bounds(selected_from)[0]
-    system_end = vietnam_day_utc_bounds(selected_to)[1]
     active_invoice_conditions = (
         Invoice.status.in_((InvoiceStatus.created, InvoiceStatus.completed)), Invoice.deleted_at.is_(None),
         Invoice.sold_at >= start, Invoice.sold_at < end_exclusive,
     )
-
-    revenue = db.execute(select(
-        func.coalesce(func.sum(Invoice.subtotal), 0).label("product_revenue"),
-        func.coalesce(func.sum(Invoice.total_extra_charges), 0).label("extra_charge_revenue"),
-    ).where(*active_invoice_conditions)).mappings().one()
-
-    created_invoice_count = db.scalar(select(func.count(Invoice.id)).where(
-        Invoice.status.in_((InvoiceStatus.created, InvoiceStatus.completed)), Invoice.deleted_at.is_(None),
-        Invoice.created_at >= system_start, Invoice.created_at < system_end,
-    )) or 0
-    created_customer_count = db.scalar(select(func.count(Customer.id)).where(
-        Customer.deleted_at.is_(None), Customer.created_at >= system_start, Customer.created_at < system_end,
-    )) or 0
-
-    product_rows = list(db.execute(select(
-        InvoiceItem.product_code.label("key"), func.max(InvoiceItem.product_name).label("name"),
-        func.sum(InvoiceItem.quantity).label("quantity"), func.sum(InvoiceItem.line_total).label("revenue"),
-    ).join(Invoice, Invoice.id == InvoiceItem.invoice_id).where(*active_invoice_conditions)
-      .group_by(InvoiceItem.product_code)).mappings())
-    products = [DashboardProductSummary(**row) for row in product_rows]
 
     audit_totals = db.execute(select(
         func.coalesce(func.sum(case((Invoice.audit_label.is_not(None), 1), else_=0)), 0).label("audited"),
@@ -166,14 +210,9 @@ def get_dashboard_summary(db: Session, from_date: date | None, to_date: date | N
         func.coalesce(func.sum(case((is_reconciled, 0), else_=1)), 0).label("unreconciled"),
     ).where(*active_invoice_conditions)).mappings().one()
 
-    granularity, chart = revenue_points(db, selected_from, selected_to, start, end_exclusive)
-    return DashboardSummary(
-        from_date=selected_from, to_date=selected_to, revenue_granularity=granularity,
-        product_revenue=revenue["product_revenue"], extra_charge_revenue=revenue["extra_charge_revenue"],
-        created_invoice_count=created_invoice_count, created_customer_count=created_customer_count,
-        revenue_chart=chart,
-        top_products_by_quantity=sorted(products, key=lambda item: (-item.quantity, -item.revenue, item.key))[:10],
-        top_products_by_revenue=sorted(products, key=lambda item: (-item.revenue, -item.quantity, item.key))[:10],
+    return DashboardOrderStatusCharts(
+        from_date=selected_from,
+        to_date=selected_to,
         audit_chart=[
             DashboardCountSlice(key="audited", label="Đã Audit", value=audit_totals["audited"]),
             DashboardCountSlice(key="unaudited", label="Chưa Audit", value=audit_totals["unaudited"]),
@@ -183,4 +222,32 @@ def get_dashboard_summary(db: Session, from_date: date | None, to_date: date | N
             DashboardCountSlice(key="reconciled", label="Đã kiểm kê", value=reconciliation_totals["reconciled"]),
             DashboardCountSlice(key="unreconciled", label="Chưa kiểm kê", value=reconciliation_totals["unreconciled"]),
         ],
+    )
+
+
+def get_dashboard_summary(db: Session, from_date: date | None, to_date: date | None) -> DashboardSummary:
+    selected_from, selected_to, start, end_exclusive = date_range(from_date, to_date)
+    system_start = vietnam_day_utc_bounds(selected_from)[0]
+    system_end = vietnam_day_utc_bounds(selected_to)[1]
+    active_invoice_conditions = (
+        Invoice.status.in_((InvoiceStatus.created, InvoiceStatus.completed)), Invoice.deleted_at.is_(None),
+        Invoice.sold_at >= start, Invoice.sold_at < end_exclusive,
+    )
+
+    revenue = db.execute(select(
+        func.coalesce(func.sum(Invoice.subtotal), 0).label("product_revenue"),
+        func.coalesce(func.sum(Invoice.total_extra_charges), 0).label("extra_charge_revenue"),
+    ).where(*active_invoice_conditions)).mappings().one()
+
+    created_invoice_count = db.scalar(select(func.count(Invoice.id)).where(
+        Invoice.status.in_((InvoiceStatus.created, InvoiceStatus.completed)), Invoice.deleted_at.is_(None),
+        Invoice.created_at >= system_start, Invoice.created_at < system_end,
+    )) or 0
+
+    granularity, chart = revenue_points(db, selected_from, selected_to, start, end_exclusive)
+    return DashboardSummary(
+        from_date=selected_from, to_date=selected_to, revenue_granularity=granularity,
+        product_revenue=revenue["product_revenue"], extra_charge_revenue=revenue["extra_charge_revenue"],
+        created_invoice_count=created_invoice_count,
+        revenue_chart=chart,
     )

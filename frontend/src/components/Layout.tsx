@@ -24,8 +24,9 @@ import {
 } from "lucide-react";
 import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
-import { NavLink, useLocation, useNavigate } from "react-router-dom";
+import { matchPath, NavLink, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
+import { usePageTitle } from "../hooks/usePageTitle";
 
 const navItems = [
   { to: "/", label: "Tổng quan", icon: Gauge, permissions: ["dashboard.view"] },
@@ -69,6 +70,19 @@ const shipperManagementNavItem = {
   permissions: ["shippers.view"],
 };
 
+const pageTitleItems = [
+  ...navItems,
+  ...catalogNavItems,
+  ...reportNavItems,
+  ...shipManagementNavItems,
+  ...codManagementNavItems,
+  ...accessControlNavItems,
+  shipperManagementNavItem,
+  { to: "/invoices/:invoiceId/edit", label: "Sửa hóa đơn" },
+  { to: "/invoices/:invoiceId", label: "Chi tiết hóa đơn" },
+  { to: "/forbidden", label: "Không có quyền truy cập" },
+];
+
 const routeTitles: Record<string, string> = {
   "/": "Tổng quan bán hàng",
   "/customers": "Quản lý khách hàng",
@@ -95,6 +109,8 @@ export function Layout({ children }: { children: ReactNode }) {
   const location = useLocation();
   const navigate = useNavigate();
   const { currentUser, hasPermission, logout } = useAuth();
+  const pageTitle = pageTitleItems.find((item) => matchPath(item.to, location.pathname))?.label ?? "Hana POS";
+  usePageTitle(pageTitle);
   const [isCatalogOpen, setIsCatalogOpen] = useState(
     () => location.pathname === "/customers" || location.pathname === "/products",
   );

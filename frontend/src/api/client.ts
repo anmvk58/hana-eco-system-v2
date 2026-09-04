@@ -1,6 +1,10 @@
 import type {
   Customer,
   CustomerPayload,
+  DashboardCustomerSummary,
+  DashboardOrderStatusCharts,
+  DashboardProductMetric,
+  DashboardProductSummary,
   DashboardSummary,
   ExtraChargeSetting,
   ExtraChargeSettingPayload,
@@ -264,6 +268,12 @@ export const api = {
   dashboard: {
     summary: (fromDate: string, toDate: string) =>
       request<DashboardSummary>("/dashboard/summary", {}, { from_date: fromDate, to_date: toDate }),
+    topProducts: (metric: DashboardProductMetric, fromDate: string, toDate: string) =>
+      request<DashboardProductSummary[]>("/dashboard/top-products", {}, { metric, from_date: fromDate, to_date: toDate }),
+    topCustomers: (fromDate: string, toDate: string) =>
+      request<DashboardCustomerSummary[]>("/dashboard/top-customers", {}, { from_date: fromDate, to_date: toDate }),
+    orderStatusCharts: (fromDate: string, toDate: string) =>
+      request<DashboardOrderStatusCharts>("/dashboard/order-status-charts", {}, { from_date: fromDate, to_date: toDate }),
   },
   invoices: {
     list: (filters?: InvoiceListFilters) => request<InvoicePage>("/invoices", {}, filters),
