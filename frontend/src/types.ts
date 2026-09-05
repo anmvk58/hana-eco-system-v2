@@ -88,6 +88,8 @@ export interface Product {
   cost_price: string;
   stock_quantity: string;
   status: ProductStatus;
+  is_quick_select: boolean;
+  quick_select_order: number;
   created_at: string;
   updated_at: string;
   deleted_at?: string | null;
@@ -102,6 +104,8 @@ export interface ProductPayload {
   cost_price: string;
   stock_quantity: string;
   status: ProductStatus;
+  is_quick_select: boolean;
+  quick_select_order: number;
 }
 
 export interface ProductCategory {

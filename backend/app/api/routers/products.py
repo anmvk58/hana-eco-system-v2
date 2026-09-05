@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.api.deps import require_any_permission, require_permission
-from app.schemas.product import ProductCreate, ProductRead, ProductUpdate
+from app.schemas.product import ProductCreate, ProductRead, ProductUpdate, QuickProductSelectionUpdate
 from app.services import product_service
 
 
@@ -24,6 +24,11 @@ def list_products(
 @router.post("", response_model=ProductRead, status_code=status.HTTP_201_CREATED, dependencies=[Depends(require_permission("products.create"))])
 def create_product(payload: ProductCreate, db: Session = Depends(get_db)):
     return product_service.create_product(db, payload)
+
+
+@router.put("/quick-selection", response_model=list[ProductRead], dependencies=[Depends(require_permission("products.update"))])
+def update_quick_product_selection(payload: QuickProductSelectionUpdate, db: Session = Depends(get_db)):
+    return product_service.update_quick_product_selection(db, payload)
 
 
 @router.get("/{product_id}", response_model=ProductRead, dependencies=[Depends(require_permission("products.view"))])

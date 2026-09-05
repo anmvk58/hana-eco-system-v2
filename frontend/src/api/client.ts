@@ -244,6 +244,7 @@ export const api = {
     list: (search?: string, skip = 0, limit = 50) => request<Product[]>("/products", {}, { search, skip, limit }),
     listAll: listAllProducts,
     create: (payload: ProductPayload) => request<Product>("/products", { method: "POST", body: JSON.stringify(payload) }),
+    updateQuickSelection: (productIds: Array<number | null>) => request<Product[]>("/products/quick-selection", { method: "PUT", body: JSON.stringify({ product_ids: productIds }) }),
     update: (id: number, payload: Partial<ProductPayload>) =>
       request<Product>(`/products/${id}`, { method: "PUT", body: JSON.stringify(payload) }),
     remove: (id: number) => request<void>(`/products/${id}`, { method: "DELETE" }),

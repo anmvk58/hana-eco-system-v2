@@ -27,6 +27,8 @@
 | cost_price | numeric(14,2) | Required |
 | stock_quantity | numeric(14,3) | Required |
 | status | enum(active, inactive) | Required |
+| is_quick_select | boolean | Show in the sales quick-selection list |
+| quick_select_order | integer | Ascending position in the quick-selection list |
 | created_at | datetime | Required |
 | updated_at | datetime | Required |
 | deleted_at | datetime | Nullable, soft delete |

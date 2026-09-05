@@ -18,6 +18,8 @@ const blankProduct: ProductPayload = {
   cost_price: "0",
   stock_quantity: "0",
   status: "active",
+  is_quick_select: false,
+  quick_select_order: 0,
 };
 
 export function ProductsPage() {
@@ -74,6 +76,8 @@ export function ProductsPage() {
       cost_price: product.cost_price,
       stock_quantity: product.stock_quantity,
       status: product.status,
+      is_quick_select: product.is_quick_select,
+      quick_select_order: product.quick_select_order,
     });
     setNewCategoryName("");
     setNewCategoryNote("");
@@ -267,7 +271,6 @@ export function ProductsPage() {
                 onChange={(event) => setForm({ ...form, stock_quantity: event.target.value })}
               />
             </label>
-
             {hasPermission("product_categories.create") ? <section className="inline-create span-2">
               <div>
                 <strong>Tạo nhanh ngành hàng</strong>

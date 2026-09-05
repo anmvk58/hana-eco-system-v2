@@ -44,6 +44,7 @@ def create_app() -> FastAPI:
     def on_startup() -> None:
         Base.metadata.create_all(bind=engine)
         ensure_product_category_column()
+        ensure_product_quick_select_columns()
         ensure_user_password_column()
         ensure_unique_customer_phone()
         ensure_invoice_status_values()
@@ -72,6 +73,21 @@ def ensure_product_category_column() -> None:
         return
     with engine.begin() as connection:
         connection.execute(text("ALTER TABLE products ADD COLUMN category_id INT NULL"))
+
+
+def ensure_product_quick_select_columns() -> None:
+    inspector = inspect(engine)
+    if not inspector.has_table("products"):
+        return
+    product_columns = {column["name"] for column in inspector.get_columns("products")}
+    statements: list[str] = []
+    if "is_quick_select" not in product_columns:
+        statements.append("ALTER TABLE products ADD COLUMN is_quick_select BOOLEAN NOT NULL DEFAULT FALSE")
+    if "quick_select_order" not in product_columns:
+        statements.append("ALTER TABLE products ADD COLUMN quick_select_order INT NOT NULL DEFAULT 0")
+    with engine.begin() as connection:
+        for statement in statements:
+            connection.execute(text(statement))
 
 
 def ensure_user_password_column() -> None:

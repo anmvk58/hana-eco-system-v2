@@ -1,5 +1,6 @@
-import { BadgeCheck, ChevronDown, ChevronUp, Edit2, LoaderCircle, Minus, Plus, RefreshCw, Save, Search, Settings } from "lucide-react";
-import { FormEvent, KeyboardEvent, useEffect, useMemo, useState } from "react";
+import { BadgeCheck, Edit2, LoaderCircle, Minus, Plus, RefreshCw, Save, Search, Settings, Trash2, X } from "lucide-react";
+import { FormEvent, KeyboardEvent, memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useNavigate, useParams } from "react-router-dom";
 
 import { api } from "../api/client";
@@ -8,7 +9,7 @@ import { InvoiceReceipt } from "../components/InvoiceReceipt";
 import { Modal } from "../components/Modal";
 import { ToastNotification } from "../components/ToastNotification";
 import type { Customer, ExtraChargeSetting, ExtraChargeType, Invoice, InvoiceStatus, Product } from "../types";
-import { formatNumberInput, localTimeValue, money, normalizeNumberInput, todayInputValue } from "../utils/format";
+import { formatNumberInput, localTimeValue, money, normalizeNumberInput, numberText, todayInputValue } from "../utils/format";
 
 interface DraftLine {
   product_id: string;
@@ -22,12 +23,12 @@ interface DraftCharge {
   amount: string;
 }
 
-const blankLine: DraftLine = { product_id: "", quantity: "1", unit_price: "0" };
 const defaultCharges: DraftCharge[] = [
   { charge_type: "shipping", name: "Phí ship", amount: "0" },
   { charge_type: "packing", name: "Phí đóng hàng", amount: "0" },
   { charge_type: "other", name: "Phụ thu khác", amount: "0" },
 ];
+const quickProductSlotCount = 20;
 const blankCustomerForm = {
   code: "",
   name: "",
@@ -73,7 +74,61 @@ function buildChargesFromSettings(settings: ExtraChargeSetting[]) {
   });
 }
 
+const QuickProductList = memo(function QuickProductList({
+  slots,
+  onSelect,
+  canConfigure,
+  onConfigure,
+  onRemove,
+}: {
+  slots: Array<Product | null>;
+  onSelect: (product: Product) => void;
+  canConfigure: boolean;
+  onConfigure: (slotIndex: number) => void;
+  onRemove: (slotIndex: number) => void;
+}) {
+  return (
+    <section className="pos-quick-products">
+      <div className="pos-quick-header">
+        <h2>Chọn nhanh sản phẩm</h2>
+        <span>Bấm để thêm vào hóa đơn</span>
+      </div>
+      <div className="pos-product-grid">
+        {slots.map((product, slotIndex) => product ? (
+          <div className="pos-product-slot" key={product.id}>
+            <button className="pos-product-tile" type="button" onClick={() => onSelect(product)}>
+              <span className="pos-product-name">{product.name}</span>
+              <strong className="pos-product-price">{numberText(product.sale_price)}</strong>
+            </button>
+            {canConfigure ? (
+              <button className="pos-product-slot-remove" type="button" onClick={() => onRemove(slotIndex)} aria-label={`Bỏ ${product.name} khỏi chọn nhanh`} title="Bỏ khỏi chọn nhanh">
+                <X size={14} />
+              </button>
+            ) : null}
+          </div>
+        ) : canConfigure ? (
+          <button className="pos-product-tile pos-product-tile-empty" type="button" key={`empty-${slotIndex}`} onClick={() => onConfigure(slotIndex)}>
+            <Plus size={19} />
+            <span>Thêm sản phẩm</span>
+          </button>
+        ) : null)}
+      </div>
+      {!canConfigure && slots.every((product) => product === null) ? <p>Chưa cấu hình sản phẩm chọn nhanh</p> : null}
+    </section>
+  );
+});
+
 export function InvoiceFormPage() {
+  const [checkoutOpen, setCheckoutOpen] = useState(false);
+  const checkoutRef = useRef<HTMLElement>(null);
+  const productSearchRef = useRef<HTMLInputElement>(null);
+  const [productSelectionVersion, setProductSelectionVersion] = useState(0);
+  useLayoutEffect(() => {
+    if (productSelectionVersion === 0) return;
+    productSearchRef.current?.focus({ preventScroll: true });
+    productSearchRef.current?.select();
+    setSearchFocused(false);
+  }, [productSelectionVersion]);
   const { hasPermission } = useAuth();
   const { invoiceId } = useParams();
   const navigate = useNavigate();
@@ -94,12 +149,22 @@ export function InvoiceFormPage() {
   const [customerQuickEditSaving, setCustomerQuickEditSaving] = useState(false);
   const [note, setNote] = useState("");
   const [reason, setReason] = useState("");
-  const [lines, setLines] = useState<DraftLine[]>([{ ...blankLine }]);
+  const [lines, setLines] = useState<DraftLine[]>([]);
   const [charges, setCharges] = useState<DraftCharge[]>(defaultCharges);
   const [applyShippingFee, setApplyShippingFee] = useState(true);
   const [isPaidByTransfer, setIsPaidByTransfer] = useState(false);
   const [printTwoCopies, setPrintTwoCopies] = useState(true);
   const [shippingSettingsOpen, setShippingSettingsOpen] = useState(false);
+  useEffect(() => {
+    if (!checkoutOpen) return;
+    const previousFocus = document.activeElement as HTMLElement | null;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      previousFocus?.focus();
+    };
+  }, [checkoutOpen]);
   const [shippingDefaultAmount, setShippingDefaultAmount] = useState("0");
   const [productSearch, setProductSearch] = useState("");
   const [searchFocused, setSearchFocused] = useState(false);
@@ -109,6 +174,9 @@ export function InvoiceFormPage() {
   const [baseDataReady, setBaseDataReady] = useState(false);
   const [baseDataRetryVersion, setBaseDataRetryVersion] = useState(0);
   const [toastMessage, setToastMessage] = useState("");
+  const [quickConfigSlot, setQuickConfigSlot] = useState<number | null>(null);
+  const [quickConfigSearch, setQuickConfigSearch] = useState("");
+  const [quickConfigSaving, setQuickConfigSaving] = useState(false);
   const [invoiceToPrint, setInvoiceToPrint] = useState<Invoice | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -239,13 +307,45 @@ export function InvoiceFormPage() {
 
   const suggestedProducts = useMemo(() => filteredProducts.slice(0, 8), [filteredProducts]);
 
+  const quickProductSlots = useMemo(() => {
+    const slots: Array<Product | null> = Array.from({ length: quickProductSlotCount }, () => null);
+    const overflow: Product[] = [];
+    products
+      .filter((product) => product.is_quick_select && product.status === "active")
+      .sort((left, right) => left.quick_select_order - right.quick_select_order || left.id - right.id)
+      .forEach((product) => {
+        const configuredIndex = product.quick_select_order - 1;
+        if (configuredIndex >= 0 && configuredIndex < slots.length && slots[configuredIndex] === null) {
+          slots[configuredIndex] = product;
+        } else {
+          overflow.push(product);
+        }
+      });
+    overflow.forEach((product) => {
+      const emptyIndex = slots.indexOf(null);
+      if (emptyIndex >= 0) slots[emptyIndex] = product;
+    });
+    return slots;
+  }, [products]);
+
+  const quickConfigCandidates = useMemo(() => {
+    const selectedIds = new Set(quickProductSlots.flatMap((product) => product ? [product.id] : []));
+    const keyword = quickConfigSearch.trim().toLocaleLowerCase("vi");
+    return products.filter((product) =>
+      product.status === "active"
+      && !selectedIds.has(product.id)
+      && (!keyword || `${product.code} ${product.name}`.toLocaleLowerCase("vi").includes(keyword)),
+    );
+  }, [products, quickConfigSearch, quickProductSlots]);
+
   const totals = useMemo(() => {
     const subtotal = lines.reduce((sum, line) => sum + Number(line.quantity || 0) * Number(line.unit_price || 0), 0);
+    const productTypeCount = new Set(lines.map((line) => line.product_id).filter(Boolean)).size;
     const extra = charges.reduce((sum, charge) => {
       if (charge.charge_type === "shipping" && !applyShippingFee) return sum;
       return sum + Number(charge.amount || 0);
     }, 0);
-    return { subtotal, extra, total: subtotal + extra };
+    return { subtotal, extra, productTypeCount, total: subtotal + extra };
   }, [lines, charges, applyShippingFee]);
 
   function updateLine(index: number, patch: Partial<DraftLine>) {
@@ -262,24 +362,68 @@ export function InvoiceFormPage() {
     );
   }
 
-  function addProductToInvoice(product: Product) {
+  const addProductToInvoice = useCallback((product: Product) => {
     const productId = String(product.id);
-    const existingIndex = lines.findIndex((line) => line.product_id === productId);
-    if (existingIndex >= 0) {
-      setLines(
-        lines.map((line, index) =>
+    setLines((currentLines) => {
+      const existingIndex = currentLines.findIndex((line) => line.product_id === productId);
+      if (existingIndex >= 0) {
+        return currentLines.map((line, index) =>
           index === existingIndex
             ? { ...line, quantity: String(Number(line.quantity || 0) + 1), unit_price: line.unit_price || product.sale_price }
             : line,
-        ),
-      );
-    } else {
+        );
+      }
       const nextLine = { product_id: productId, quantity: "1", unit_price: product.sale_price };
-      const emptyIndex = lines.findIndex((line) => !line.product_id);
-      setLines(emptyIndex >= 0 ? lines.map((line, index) => (index === emptyIndex ? nextLine : line)) : [...lines, nextLine]);
-    }
-    setProductSearch("");
+      const emptyIndex = currentLines.findIndex((line) => !line.product_id);
+      return emptyIndex >= 0
+        ? currentLines.map((line, index) => (index === emptyIndex ? nextLine : line))
+        : [...currentLines, nextLine];
+    });
+    setProductSearch(product.code);
+    setHighlightedProductIndex(0);
     setSearchFocused(false);
+    setProductSelectionVersion((version) => version + 1);
+  }, []);
+
+  const saveQuickProductSlots = useCallback(async (slots: Array<Product | null>) => {
+    setQuickConfigSaving(true);
+    setError("");
+    try {
+      const configuredProducts = await api.products.updateQuickSelection(slots.map((product) => product?.id ?? null));
+      const configuredById = new Map(configuredProducts.map((product) => [product.id, product]));
+      setProducts((currentProducts) => currentProducts.map((product) =>
+        configuredById.get(product.id) ?? { ...product, is_quick_select: false, quick_select_order: 0 },
+      ));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Không lưu được danh sách chọn nhanh");
+      throw err;
+    } finally {
+      setQuickConfigSaving(false);
+    }
+  }, []);
+
+  const openQuickProductSlot = useCallback((slotIndex: number) => {
+    setQuickConfigSearch("");
+    setQuickConfigSlot(slotIndex);
+  }, []);
+
+  const removeQuickProductSlot = useCallback((slotIndex: number) => {
+    const nextSlots = [...quickProductSlots];
+    nextSlots[slotIndex] = null;
+    void saveQuickProductSlots(nextSlots);
+  }, [quickProductSlots, saveQuickProductSlots]);
+
+  async function assignQuickProduct(product: Product) {
+    if (quickConfigSlot === null) return;
+    const nextSlots = [...quickProductSlots];
+    nextSlots[quickConfigSlot] = product;
+    try {
+      await saveQuickProductSlots(nextSlots);
+      setQuickConfigSlot(null);
+      setQuickConfigSearch("");
+    } catch {
+      // Error is shown in the sales form; keep the picker open for retry.
+    }
   }
 
   function handleProductSearchKeyDown(event: KeyboardEvent<HTMLInputElement>) {
@@ -402,7 +546,7 @@ export function InvoiceFormPage() {
   }
 
   function removeLine(index: number) {
-    setLines(lines.length === 1 ? [{ ...blankLine }] : lines.filter((_, lineIndex) => lineIndex !== index));
+    setLines(lines.filter((_, lineIndex) => lineIndex !== index));
   }
 
   function adjustQuantity(index: number, delta: 1 | -1) {
@@ -414,6 +558,10 @@ export function InvoiceFormPage() {
 
   async function submit(event: FormEvent) {
     event.preventDefault();
+    if (!checkoutOpen) {
+      setCheckoutOpen(true);
+      return;
+    }
     setError("");
     setToastMessage("");
     const cleanLines = lines.filter((line) => line.product_id);
@@ -448,6 +596,7 @@ export function InvoiceFormPage() {
     setSubmitting(true);
     try {
       const saved = isEditing ? await api.invoices.update(editingId!, payload) : await api.invoices.create(payload);
+      setCheckoutOpen(false);
       if (isEditing) {
         navigate(`/invoices/${saved.id}`);
         return;
@@ -458,7 +607,7 @@ export function InvoiceFormPage() {
       setIsPaidByTransfer(false);
       setNote("");
       setReason("");
-      setLines([{ ...blankLine }]);
+      setLines([]);
       setProductSearch("");
       setApplyShippingFee(true);
       setCharges((current) => current.map((charge) => ({
@@ -532,26 +681,120 @@ export function InvoiceFormPage() {
 
   return (
     <>
-      <form className="invoice-workspace" onSubmit={(event) => void submit(event)}>
-        <section className="sell-panel">
-          <div className="panel-header">
-            <div>
-              <h2>{isEditing ? `Sửa hóa đơn ${invoice?.code ?? ""}` : "Tạo hóa đơn mới"}</h2>
-              <span>{isEditing ? "Chỉ được sửa hàng hóa, số lượng, đơn giá và các khoản phí" : "Chọn sản phẩm, số lượng và các khoản phí phát sinh"}</span>
+      <form id="pos-invoice-form" className="invoice-workspace pos-workspace" onSubmit={(event) => void submit(event)}>
+        <div className="pos-entry-column">
+          {isEditing ? (
+            <div className="panel-header">
+              <div>
+                <h2>{`Sửa hóa đơn ${invoice?.code ?? ""}`}</h2>
+                <span>Chỉ được sửa hàng hóa, số lượng, đơn giá và các khoản phí</span>
+              </div>
             </div>
-            <button className="primary-button" type="submit" disabled={submitting}>
-              <Save size={17} />
-              {submitting ? "Đang lưu..." : "Lưu hóa đơn"}
-            </button>
-          </div>
+          ) : null}
 
           {error ? <div className="alert error">{error}</div> : null}
 
+
+          <section className="sell-panel pos-products-panel" aria-label="Sản phẩm trong hóa đơn">
           <div className="sales-search-section">
             <div className="sales-search-field">
-              <label htmlFor="customer-search">Khách hàng</label>
-              <div className="customer-search-wrapper">
+              <label htmlFor="product-search">Sản phẩm</label>
+              <div className="line-search-wrapper">
                 <div className="line-search">
+                  <Search size={17} />
+                  <input
+                    id="product-search"
+                    ref={productSearchRef}
+                    value={productSearch}
+                    onBlur={() => window.setTimeout(() => setSearchFocused(false), 120)}
+                    onChange={(event) => {
+                      setProductSearch(event.target.value);
+                      setSearchFocused(true);
+                      setHighlightedProductIndex(0);
+                    }}
+                    onFocus={() => {
+                      setSearchFocused(true);
+                      setHighlightedProductIndex(0);
+                    }}
+                    onKeyDown={handleProductSearchKeyDown}
+                    placeholder="Nhập mã hoặc tên sản phẩm, bấm Enter để thêm"
+                  />
+                </div>
+                {searchFocused && productSearch.trim() ? (
+                  <div className="product-suggestions">
+                    {suggestedProducts.map((product, index) => (
+                      <button
+                        aria-selected={index === highlightedProductIndex}
+                        className={index === highlightedProductIndex ? "is-highlighted" : undefined}
+                        key={product.id}
+                        onMouseDown={(event) => { event.preventDefault(); addProductToInvoice(product); }}
+                        onMouseEnter={() => setHighlightedProductIndex(index)}
+                        type="button"
+                      >
+                        <span className="product-suggestion-identity">
+                          <span className="product-suggestion-code" title={product.code}>{product.code}</span>
+                          <span className="product-suggestion-name">{product.name}</span>
+                        </span>
+                        <span className="product-suggestion-price">{numberText(product.sale_price)}</span>
+                      </button>
+                    ))}
+                    {suggestedProducts.length === 0 ? <div className="suggestion-empty">Không tìm thấy sản phẩm phù hợp</div> : null}
+                  </div>
+                ) : null}
+              </div>
+            </div>
+          </div>
+
+          <div className="pos-selected-products">
+            {lines.map((line, index) => ({ line, index })).reverse().map(({ line, index }) => {
+              const product = productMap.get(Number(line.product_id));
+              return (
+                <article className="pos-selected-card" key={`${index}-${line.product_id}`}>
+                  <div className="pos-selected-heading">
+                    <span className="pos-selected-number">{index + 1}</span>
+                    <button className="pos-line-action" type="button" onClick={() => removeLine(index)} aria-label={`Xóa ${product?.name || "dòng sản phẩm"}`}><Trash2 size={20} /></button>
+                    {product ? (
+                      <div className="pos-selected-identity"><span>{product.code}</span><strong>{product.name}</strong></div>
+                    ) : (
+                      <select className="pos-selected-picker" aria-label="Chọn sản phẩm" value={line.product_id} onChange={(event) => updateLine(index, { product_id: event.target.value })}>
+                        <option value="">Chọn sản phẩm</option>
+                        {products.map((item) => <option key={item.id} value={item.id}>{item.code} - {item.name}</option>)}
+                      </select>
+                    )}
+                  </div>
+                  <div className="pos-selected-values">
+                    <div className="pos-selected-stepper">
+                      <button className="pos-line-action" type="button" disabled={!product || Number(line.quantity || 0) <= 1} onClick={() => adjustQuantity(index, -1)} aria-label={`Giảm số lượng ${product?.name || "sản phẩm"}`}><Minus size={18} /></button>
+                      <label className="pos-selected-quantity"><span>Số lượng</span><input aria-label={`Số lượng ${product?.name || "sản phẩm"}`} inputMode="decimal" value={formatNumberInput(line.quantity)} onFocus={(event) => event.currentTarget.select()} onChange={(event) => updateLine(index, { quantity: normalizeNumberInput(event.target.value) })} /></label>
+                      <button className="pos-line-action" type="button" disabled={!product} onClick={() => adjustQuantity(index, 1)} aria-label={`Tăng số lượng ${product?.name || "sản phẩm"}`}><Plus size={18} /></button>
+                    </div>
+                    <label className="pos-selected-price"><span>Đơn giá</span><input aria-label={`Đơn giá ${product?.name || "sản phẩm"}`} inputMode="numeric" value={formatNumberInput(line.unit_price, false)} onFocus={(event) => event.currentTarget.select()} onChange={(event) => updateLine(index, { unit_price: normalizeNumberInput(event.target.value, false) })} /></label>
+                    <div className="pos-selected-total"><span>Thành tiền</span><strong>{money(Number(line.quantity || 0) * Number(line.unit_price || 0))}</strong></div>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+          <div className="pos-order-info">
+            <label className="pos-order-note">
+              <span>Ghi chú đơn hàng</span>
+              <textarea value={note} onChange={(event) => setNote(event.target.value)} placeholder="Nhập ghi chú cho đơn hàng" />
+            </label>
+            <div className="pos-product-revenue">
+              <span>Tổng tiền sản phẩm ({totals.productTypeCount})</span>
+              <strong>{money(totals.subtotal)}</strong>
+            </div>
+          </div>
+          </section>
+        </div>
+
+        <div className="pos-right-pane">
+          <section className="pos-customer-panel" aria-label="Thông tin khách hàng">
+          <div className="sales-search-section">
+            <div className="sales-search-field">
+              <div className="pos-customer-heading"><label htmlFor="customer-search">Khách hàng</label><span>{customerId ? "Đã chọn khách hàng" : "Khách lẻ nếu để trống"}</span></div>
+              <div className="customer-search-wrapper">
+                <div className={`line-search${customerId ? " pos-customer-selected" : ""}`}>
                   <Search size={17} />
                   <input
                     id="customer-search"
@@ -578,7 +821,7 @@ export function InvoiceFormPage() {
                       if (!isEditing && customerSearch) event.preventDefault();
                     }}
                     onKeyDown={handleCustomerSearchKeyDown}
-                    placeholder={isEditing ? "Không cho phép sửa khách hàng" : "Nhập ít nhất 5 chữ số điện thoại; Để trống nếu là khách lẻ"}
+                    placeholder={isEditing ? "Không cho phép sửa khách hàng" : "Tìm khách bằng số điện thoại (ít nhất 5 số)"}
                   />
                   {selectedCustomer && hasPermission("customers.update") ? (
                     <button
@@ -621,117 +864,32 @@ export function InvoiceFormPage() {
               </div>
             </div>
 
-            <div className="sales-search-field">
-              <label htmlFor="product-search">Sản phẩm</label>
-              <div className="line-search-wrapper">
-                <div className="line-search">
-                  <Search size={17} />
-                  <input
-                    id="product-search"
-                    value={productSearch}
-                    onBlur={() => window.setTimeout(() => setSearchFocused(false), 120)}
-                    onChange={(event) => {
-                      setProductSearch(event.target.value);
-                      setSearchFocused(true);
-                      setHighlightedProductIndex(0);
-                    }}
-                    onFocus={() => {
-                      setSearchFocused(true);
-                      setHighlightedProductIndex(0);
-                    }}
-                    onKeyDown={handleProductSearchKeyDown}
-                    placeholder="Nhập mã hoặc tên sản phẩm, bấm Enter để thêm"
-                  />
-                </div>
-                {searchFocused && productSearch.trim() ? (
-                  <div className="product-suggestions">
-                    {suggestedProducts.map((product, index) => (
-                      <button
-                        aria-selected={index === highlightedProductIndex}
-                        className={index === highlightedProductIndex ? "is-highlighted" : undefined}
-                        key={product.id}
-                        onMouseDown={() => addProductToInvoice(product)}
-                        onMouseEnter={() => setHighlightedProductIndex(index)}
-                        type="button"
-                      >
-                        <span>
-                          <strong>{product.code}</strong>
-                          {product.name}
-                        </span>
-                        <span>{money(product.sale_price)}</span>
-                      </button>
-                    ))}
-                    {suggestedProducts.length === 0 ? <div className="suggestion-empty">Không tìm thấy sản phẩm phù hợp</div> : null}
-                  </div>
-                ) : null}
-              </div>
-            </div>
           </div>
-
-          <div className="line-table">
-            <div className="line-head">
-              <span>Sản phẩm</span>
-              <span>Số lượng</span>
-              <span>Đơn giá</span>
-              <span>Thành tiền</span>
-              <span></span>
-            </div>
-            {lines.map((line, index) => {
-              const selectedProduct = products.find((product) => String(product.id) === line.product_id);
-              return (
-              <div className="line-row" key={`${index}-${line.product_id}`}>
-                <div className="product-select">
-                  <select
-                    className="product-select-native"
-                    value={line.product_id}
-                    onChange={(event) => updateLine(index, { product_id: event.target.value })}
-                  >
-                    <option value="">Chọn sản phẩm</option>
-                    {products.map((product) => (
-                      <option key={product.id} value={product.id}>
-                        {product.code} - {product.name} ({money(product.sale_price)})
-                      </option>
-                    ))}
-                  </select>
-                  <span className={selectedProduct ? "product-select-value" : "product-select-value placeholder"}>
-                    {selectedProduct ? `${selectedProduct.code} - ${selectedProduct.name}` : "Chọn sản phẩm"}
-                  </span>
-                </div>
-                <div className="quantity-stepper">
-                  <input
-                    inputMode="decimal"
-                    value={formatNumberInput(line.quantity)}
-                    onChange={(event) => updateLine(index, { quantity: normalizeNumberInput(event.target.value) })}
-                  />
-                  <div className="quantity-stepper-controls">
-                    <button type="button" onClick={() => adjustQuantity(index, 1)} aria-label="Tăng số lượng thêm 1">
-                      <ChevronUp size={14} />
-                    </button>
-                    <button type="button" disabled={Number(line.quantity || 0) <= 1} onClick={() => adjustQuantity(index, -1)} aria-label="Giảm số lượng đi 1">
-                      <ChevronDown size={14} />
-                    </button>
-                  </div>
-                </div>
-                <input
-                  inputMode="numeric"
-                  value={formatNumberInput(line.unit_price, false)}
-                  onChange={(event) => updateLine(index, { unit_price: normalizeNumberInput(event.target.value, false) })}
-                />
-                <strong>{money(Number(line.quantity || 0) * Number(line.unit_price || 0))}</strong>
-                <button className="icon-button danger" type="button" onClick={() => removeLine(index)} aria-label="Xóa dòng">
-                  <Minus size={16} />
-                </button>
-              </div>
-              );
-            })}
-            <button className="add-line-button" type="button" onClick={() => setLines([...lines, { ...blankLine }])}>
-              <Plus size={16} />
-              Thêm dòng sản phẩm
-            </button>
+          </section>
+          <QuickProductList
+            slots={quickProductSlots}
+            onSelect={addProductToInvoice}
+            canConfigure={hasPermission("products.update")}
+            onConfigure={openQuickProductSlot}
+            onRemove={removeQuickProductSlot}
+          />
+          <div className="pos-payment-action">
+            <button className="primary-button" type="button" onClick={() => setCheckoutOpen(true)} disabled={!lines.some((line) => line.product_id)}>Thanh toán</button>
           </div>
-        </section>
-
-        <aside className="checkout-panel">
+        {checkoutOpen ? createPortal(<div className="pos-checkout-backdrop" onClick={(event) => { if (event.target === event.currentTarget && !submitting) setCheckoutOpen(false); }}>
+        <aside ref={checkoutRef} className="checkout-panel pos-checkout-overlay" role="dialog" aria-modal="true" aria-label="Thanh toán hóa đơn" onKeyDown={(event) => {
+          if (shippingSettingsOpen) return;
+          if (event.key === "Escape" && !submitting) { event.stopPropagation(); setCheckoutOpen(false); }
+          if (event.key === "Tab") {
+            const controls = checkoutRef.current?.querySelectorAll<HTMLElement>('button:not(:disabled), input:not(:disabled), textarea:not(:disabled), select:not(:disabled), [tabindex="0"]');
+            if (!controls?.length) return;
+            const first = controls[0]; const last = controls[controls.length - 1];
+            if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+            else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+          }
+        }}>
+          <div className="pos-checkout-header"><h2>Thanh toán hóa đơn</h2><button autoFocus className="icon-button" type="button" aria-label="Đóng thanh toán" disabled={submitting} onClick={() => setCheckoutOpen(false)}><X size={20} /></button></div>
+          <div className="pos-checkout-scroll">
           {!isEditing && hasPermission("invoices.print") ? (
             <section className="print-settings-section">
               <label className="print-copy-option">
@@ -758,7 +916,7 @@ export function InvoiceFormPage() {
             </span>
           </label>
           <div className="charge-list">
-            {charges.map((charge, index) => (
+            {charges.map((charge, index) => charge.charge_type === "shipping" ? (
               <label className={charge.charge_type === "shipping" ? "charge-field shipping-charge" : "charge-field"} key={charge.charge_type}>
                 <span className="charge-label-row">
                   <span>{charge.name}</span>
@@ -780,15 +938,11 @@ export function InvoiceFormPage() {
                   onChange={(event) => updateCharge(index, normalizeNumberInput(event.target.value, false))}
                 />
               </label>
-            ))}
+            ) : null)}
           </div>
           <label>
             Lý do sửa / ghi chú lịch sử
             <textarea value={reason} onChange={(event) => setReason(event.target.value)} placeholder="Ví dụ: Khách đổi số lượng" />
-          </label>
-          <label>
-            Ghi chú hóa đơn
-            <textarea value={note} onChange={(event) => setNote(event.target.value)} />
           </label>
           <div className="summary-lines">
             <div>
@@ -804,8 +958,41 @@ export function InvoiceFormPage() {
               <strong>{money(totals.total)}</strong>
             </div>
           </div>
-        </aside>
+          </div>
+          <div className="pos-checkout-footer">
+          <button className="primary-button pos-checkout-submit" type="submit" form="pos-invoice-form" disabled={submitting}>
+            <Save size={24} />
+            {submitting ? "Đang xử lý..." : "Thanh toán"}
+          </button>
+          </div>
+        </aside></div>, document.body) : null}
+        </div>
       </form>
+
+      {quickConfigSlot !== null ? (
+        <Modal title={`Chọn sản phẩm cho ô ${quickConfigSlot + 1}`} onClose={() => { if (!quickConfigSaving) setQuickConfigSlot(null); }}>
+          <div className="quick-product-picker">
+            <div className="line-search">
+              <Search size={17} />
+              <input
+                autoFocus
+                value={quickConfigSearch}
+                onChange={(event) => setQuickConfigSearch(event.target.value)}
+                placeholder="Tìm theo mã hoặc tên sản phẩm"
+              />
+            </div>
+            <div className="quick-product-picker-list">
+              {quickConfigCandidates.map((product) => (
+                <button type="button" key={product.id} disabled={quickConfigSaving} onClick={() => void assignQuickProduct(product)}>
+                  <span><strong>{product.code}</strong>{product.name}</span>
+                  <span>{money(product.sale_price)}</span>
+                </button>
+              ))}
+              {quickConfigCandidates.length === 0 ? <p>Không còn sản phẩm phù hợp để thêm</p> : null}
+            </div>
+          </div>
+        </Modal>
+      ) : null}
 
       {customerModalOpen ? (
         <Modal
