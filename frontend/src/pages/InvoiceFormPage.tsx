@@ -90,8 +90,7 @@ const QuickProductList = memo(function QuickProductList({
   return (
     <section className="pos-quick-products">
       <div className="pos-quick-header">
-        <h2>Chọn nhanh sản phẩm</h2>
-        <span>Bấm để thêm vào hóa đơn</span>
+        <label>Chọn nhanh sản phẩm</label>
       </div>
       <div className="pos-product-grid">
         {slots.map((product, slotIndex) => product ? (
@@ -122,6 +121,7 @@ export function InvoiceFormPage() {
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const checkoutRef = useRef<HTMLElement>(null);
   const productSearchRef = useRef<HTMLInputElement>(null);
+  const productSearchWrapperRef = useRef<HTMLDivElement>(null);
   const [productSelectionVersion, setProductSelectionVersion] = useState(0);
   useLayoutEffect(() => {
     if (productSelectionVersion === 0) return;
@@ -173,10 +173,15 @@ export function InvoiceFormPage() {
   const [baseDataLoading, setBaseDataLoading] = useState(true);
   const [baseDataReady, setBaseDataReady] = useState(false);
   const [baseDataRetryVersion, setBaseDataRetryVersion] = useState(0);
+  const [toastTitle, setToastTitle] = useState("Tạo hóa đơn thành công");
   const [toastMessage, setToastMessage] = useState("");
   const [quickConfigSlot, setQuickConfigSlot] = useState<number | null>(null);
   const [quickConfigSearch, setQuickConfigSearch] = useState("");
   const [quickConfigSaving, setQuickConfigSaving] = useState(false);
+  const [quickPriceProduct, setQuickPriceProduct] = useState<Product | null>(null);
+  const [quickPrice, setQuickPrice] = useState("");
+  const [quickPriceError, setQuickPriceError] = useState("");
+  const [quickPriceSaving, setQuickPriceSaving] = useState(false);
   const [invoiceToPrint, setInvoiceToPrint] = useState<Invoice | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -184,6 +189,7 @@ export function InvoiceFormPage() {
     if (!invoiceToPrint) return;
     let cancelled = false;
     const clearPrintedInvoice = () => {
+      setToastTitle(isEditing ? "Cập nhật hóa đơn thành công" : "Tạo hóa đơn thành công");
       setToastMessage(`Hóa đơn ${invoiceToPrint.code} đã được lưu.`);
       setInvoiceToPrint(null);
     };
@@ -385,6 +391,42 @@ export function InvoiceFormPage() {
     setProductSelectionVersion((version) => version + 1);
   }, []);
 
+  function openQuickPriceEdit(product: Product) {
+    setQuickPriceProduct(product);
+    setQuickPrice(product.sale_price);
+    setQuickPriceError("");
+    setSearchFocused(true);
+  }
+
+  function closeQuickPriceEdit() {
+    if (quickPriceSaving) return;
+    setQuickPriceProduct(null);
+    setQuickPriceError("");
+  }
+
+  async function saveQuickPrice() {
+    if (!quickPriceProduct) return;
+    const value = Number(quickPrice);
+    if (!quickPrice.trim() || !Number.isFinite(value) || value < 0) {
+      setQuickPriceError("Vui lòng nhập giá bán hợp lệ");
+      return;
+    }
+    setQuickPriceSaving(true);
+    setQuickPriceError("");
+    try {
+      const updated = await api.products.update(quickPriceProduct.id, { sale_price: quickPrice });
+      setProducts((currentProducts) => currentProducts.map((product) => product.id === updated.id ? updated : product));
+      setQuickPriceProduct(null);
+      setToastTitle("Cập nhật giá Sản phẩm thành công");
+      setToastMessage(`Giá bán mới của ${updated.name} là ${numberText(updated.sale_price)}.`);
+      window.requestAnimationFrame(() => productSearchRef.current?.focus({ preventScroll: true }));
+    } catch (err) {
+      setQuickPriceError(err instanceof Error ? err.message : "Không cập nhật được giá sản phẩm");
+    } finally {
+      setQuickPriceSaving(false);
+    }
+  }
+
   const saveQuickProductSlots = useCallback(async (slots: Array<Product | null>) => {
     setQuickConfigSaving(true);
     setError("");
@@ -501,6 +543,7 @@ export function InvoiceFormPage() {
       setInvoice((current) => current && current.customer_id === updated.id ? { ...current, customer: updated } : current);
       setCustomerQuickEditOpen(false);
       setCustomerQuickEditForm(blankCustomerQuickEditForm);
+      setToastTitle("Cập nhật khách hàng thành công");
       setToastMessage(`Đã cập nhật thông tin khách hàng ${updated.name}.`);
     } catch (err) {
       setCustomerQuickEditError(err instanceof Error ? err.message : "Không cập nhật được khách hàng");
@@ -623,6 +666,7 @@ export function InvoiceFormPage() {
       if (hasPermission("invoices.print")) {
         setInvoiceToPrint(saved);
       } else {
+        setToastTitle(isEditing ? "Cập nhật hóa đơn thành công" : "Tạo hóa đơn thành công");
         setToastMessage(`Hóa đơn ${saved.code} đã được lưu.`);
       }
     } catch (err) {
@@ -699,14 +743,18 @@ export function InvoiceFormPage() {
           <div className="sales-search-section">
             <div className="sales-search-field">
               <label htmlFor="product-search">Sản phẩm</label>
-              <div className="line-search-wrapper">
+              <div className="line-search-wrapper" ref={productSearchWrapperRef}>
                 <div className="line-search">
                   <Search size={17} />
                   <input
                     id="product-search"
                     ref={productSearchRef}
                     value={productSearch}
-                    onBlur={() => window.setTimeout(() => setSearchFocused(false), 120)}
+                    onBlur={(event) => {
+                      const nextFocus = event.relatedTarget;
+                      if (nextFocus instanceof Node && productSearchWrapperRef.current?.contains(nextFocus)) return;
+                      window.setTimeout(() => setSearchFocused(false), 120);
+                    }}
                     onChange={(event) => {
                       setProductSearch(event.target.value);
                       setSearchFocused(true);
@@ -723,20 +771,49 @@ export function InvoiceFormPage() {
                 {searchFocused && productSearch.trim() ? (
                   <div className="product-suggestions">
                     {suggestedProducts.map((product, index) => (
-                      <button
+                      <div
                         aria-selected={index === highlightedProductIndex}
-                        className={index === highlightedProductIndex ? "is-highlighted" : undefined}
+                        className={`product-suggestion-row${index === highlightedProductIndex ? " is-highlighted" : ""}`}
                         key={product.id}
-                        onMouseDown={(event) => { event.preventDefault(); addProductToInvoice(product); }}
                         onMouseEnter={() => setHighlightedProductIndex(index)}
-                        type="button"
                       >
-                        <span className="product-suggestion-identity">
-                          <span className="product-suggestion-code" title={product.code}>{product.code}</span>
-                          <span className="product-suggestion-name">{product.name}</span>
-                        </span>
-                        <span className="product-suggestion-price">{numberText(product.sale_price)}</span>
-                      </button>
+                        <button className="product-suggestion-select" disabled={quickPriceProduct?.id === product.id} onMouseDown={(event) => { event.preventDefault(); addProductToInvoice(product); }} type="button">
+                          <span className="product-suggestion-identity">
+                            <span className="product-suggestion-name">{product.name}</span>
+                          </span>
+                          {quickPriceProduct?.id !== product.id ? <span className="product-suggestion-price">{numberText(product.sale_price)}</span> : null}
+                        </button>
+                        {quickPriceProduct?.id === product.id ? (
+                          <span className="product-suggestion-price-editor">
+                            <input
+                              autoFocus
+                              aria-label={`Giá bán mới của ${product.name}`}
+                              disabled={quickPriceSaving}
+                              inputMode="numeric"
+                              value={formatNumberInput(quickPrice, false)}
+                              onFocus={(event) => event.currentTarget.select()}
+                              onChange={(event) => { setQuickPrice(normalizeNumberInput(event.target.value, false)); setQuickPriceError(""); }}
+                              onKeyDown={(event) => {
+                                if (event.key === "Enter") { event.preventDefault(); event.stopPropagation(); void saveQuickPrice(); }
+                                if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); closeQuickPriceEdit(); }
+                              }}
+                            />
+                            {quickPriceError ? <small>{quickPriceError}</small> : null}
+                          </span>
+                        ) : null}
+                        {hasPermission("products.update") && quickPriceProduct?.id !== product.id ? (
+                          <button
+                            className="product-suggestion-edit"
+                            type="button"
+                            aria-label={`Sửa giá ${product.name}`}
+                            title="Sửa nhanh giá bán"
+                            onMouseDown={(event) => event.preventDefault()}
+                            onClick={(event) => { event.stopPropagation(); openQuickPriceEdit(product); }}
+                          >
+                            <Edit2 size={16} />
+                          </button>
+                        ) : null}
+                      </div>
                     ))}
                     {suggestedProducts.length === 0 ? <div className="suggestion-empty">Không tìm thấy sản phẩm phù hợp</div> : null}
                   </div>
@@ -1116,7 +1193,7 @@ export function InvoiceFormPage() {
           {printTwoCopies ? <InvoiceReceipt invoice={invoiceToPrint} className="auto-print-receipt receipt-copy-next-page" /> : null}
         </div>
       ) : null}
-      {toastMessage ? <ToastNotification message={toastMessage} onClose={() => setToastMessage("")} /> : null}
+      {toastMessage ? <ToastNotification title={toastTitle} message={toastMessage} onClose={() => setToastMessage("")} /> : null}
     </>
   );
 }

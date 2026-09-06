@@ -885,6 +885,12 @@ textarea {
   justify-content: flex-end;
 }
 
+.invoice-list-action-button { align-items: center; border: 1px solid transparent; border-radius: 6px; display: inline-flex; font-size: 13px; font-weight: 700; height: 40px; justify-content: center; min-width: 58px; padding: 0 12px; text-decoration: none; }
+.invoice-list-view-button { background: #e8f1ff; border-color: #bfd4f2; color: #245b9e; }
+.invoice-list-view-button:hover { background: #d9e9ff; border-color: #9ebfe8; }
+.invoice-list-edit-button { background: #e4f5f1; border-color: #addbd3; color: var(--teal-dark); }
+.invoice-list-edit-button:hover { background: #d5eee8; border-color: #84c8bc; }
+
 .status-badge {
   align-items: center;
   border-radius: 999px;
@@ -1666,8 +1672,7 @@ label {
 .pos-quick-products { background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 14px; }
 .pos-quick-products[hidden] { display: none; }
 .pos-quick-header { margin-bottom: 14px; }
-.pos-quick-header h2, .pos-checkout-header h2 { margin: 0; font-size: 18px; }
-.pos-quick-header > span { color: var(--muted); font-size: 13px; }
+.pos-checkout-header h2 { margin: 0; font-size: 18px; }
 .pos-product-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 9px; margin-top: 14px; max-height: calc(100dvh - 260px); overflow-y: auto; padding: 2px; }
 .pos-product-tile { display: flex; flex-direction: column; gap: 8px; justify-content: space-between; min-width: 0; min-height: 82px; padding: 10px; text-align: left; background: #f7fbfa; border: 1px solid #dce9e5; border-radius: 9px; cursor: pointer; overflow-wrap: anywhere; }
 .pos-product-tile:hover { border-color: var(--teal); background: #eaf7f3; }
@@ -1689,7 +1694,9 @@ label {
 .quick-product-picker-list > button > span:first-child { display: grid; gap: 3px; }
 .quick-product-picker-list > button > span:last-child { color: var(--teal-dark); font-weight: 700; white-space: nowrap; }
 .quick-product-picker-list p { color: var(--muted); margin: 12px 0; text-align: center; }
-.pos-order-info { border-top: 1px solid var(--line); display: grid; gap: 12px; grid-template-columns: minmax(0, 1fr) minmax(220px, .65fr); margin-top: 12px; padding-top: 10px; }
+.pos-workspace .pos-products-panel .sales-search-section,
+.pos-order-info { grid-template-columns: minmax(0, 1fr) minmax(220px, .65fr); }
+.pos-order-info { border-top: 1px solid var(--line); display: grid; gap: 12px; margin-top: 12px; padding-top: 10px; }
 .pos-order-note { display: grid; gap: 4px; }
 .pos-order-note > span { color: var(--muted); font-size: 13px; }
 .pos-order-note textarea { height: 48px; min-height: 48px; resize: none; width: 100%; }
@@ -1726,6 +1733,7 @@ label {
   .pos-selected-identity { grid-template-columns: minmax(60px, .35fr) minmax(0, 1fr); font-size: 14px; }
   .pos-selected-values { grid-template-columns: 108px minmax(0, 1fr) minmax(0, 1fr); gap: 10px; }
   .pos-selected-price { margin-left: 0; }
+  .pos-workspace .pos-products-panel .sales-search-section,
   .pos-order-info { grid-template-columns: 1fr; }
   .pos-product-revenue { justify-items: start; text-align: left; }
 }
@@ -1796,7 +1804,8 @@ label {
   min-width: 0;
 }
 
-.sales-search-field > label {
+.sales-search-field > label,
+.pos-quick-header > label {
   color: #41505c;
   font-size: 13px;
   font-weight: 700;
@@ -1903,7 +1912,8 @@ label {
   z-index: 8;
 }
 
-.product-suggestions button {
+.product-suggestions > button,
+.product-suggestion-select {
   align-items: center;
   background: #fff;
   border: 0;
@@ -1918,40 +1928,35 @@ label {
   text-align: left;
 }
 
-.product-suggestions button:hover {
+.product-suggestions > button:hover,
+.product-suggestion-select:hover {
   background: #f5faf9;
 }
 
-.product-suggestions button.is-highlighted {
+.product-suggestions > button.is-highlighted,
+.product-suggestion-row.is-highlighted {
   background: #e9f7f4;
 }
 
-.product-suggestions button span:first-child {
+.product-suggestions > button span:first-child,
+.product-suggestion-select span:first-child {
   display: flex;
   gap: 8px;
   min-width: 0;
 }
 
-.product-suggestions button strong {
+.product-suggestions > button strong,
+.product-suggestion-select strong {
   color: var(--teal);
 }
 
-.product-suggestions button > span.product-suggestion-identity {
+.product-suggestions > button > span.product-suggestion-identity,
+.product-suggestion-select > span.product-suggestion-identity {
   align-items: baseline;
   display: grid;
   flex: 1 1 auto;
-  grid-template-columns: 240px minmax(0, 1fr);
-  column-gap: 32px;
+  grid-template-columns: minmax(0, 1fr);
   min-width: 0;
-}
-
-.product-suggestion-code {
-  color: #38434c;
-  font-weight: 400;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .product-suggestion-name {
@@ -1961,12 +1966,27 @@ label {
   overflow-wrap: anywhere;
 }
 
-.product-suggestions button > .product-suggestion-price {
+.product-suggestions > button > .product-suggestion-price,
+.product-suggestion-select > .product-suggestion-price {
   color: var(--secondary);
   flex: 0 0 auto;
   font-weight: 400;
   white-space: nowrap;
 }
+
+.product-suggestion-row { align-items: stretch; border-bottom: 1px solid #edf2f4; display: flex; min-width: 0; }
+.product-suggestion-row .product-suggestion-select { background: transparent; border-bottom: 0; flex: 1 1 auto; justify-content: flex-start; min-width: 0; }
+.product-suggestion-row .product-suggestion-select > .product-suggestion-identity {
+  flex: 0 0 min(45%, 320px);
+  max-width: min(45%, 320px);
+}
+.product-suggestion-row .product-suggestion-select:disabled { color: inherit; cursor: default; opacity: 1; }
+.product-suggestion-edit { align-items: center; align-self: center; background: transparent; border: 0; border-left: 1px solid #e4ecee; color: var(--teal); cursor: pointer; display: inline-flex; flex: 0 0 42px; height: 30px; justify-content: center; margin-left: auto; padding: 0; }
+.product-suggestion-edit:hover, .product-suggestion-edit:focus-visible { background: #dff2ee; color: var(--teal-dark); outline: 0; }
+.product-suggestion-price-editor { display: grid; flex: 0 0 min(170px, 42%); gap: 3px; }
+.product-suggestion-price-editor input { border: 1px solid var(--teal); border-radius: 6px; font-size: 16px; font-weight: 700; min-height: 34px; min-width: 0; padding: 5px 8px; text-align: right; width: 100%; }
+.product-suggestion-price-editor input:focus { box-shadow: 0 0 0 3px rgba(0, 127, 114, .12); outline: 0; }
+.product-suggestion-price-editor small { color: #b42318; font-size: 11px; text-align: right; }
 
 .customer-suggestions {
   max-width: 100%;

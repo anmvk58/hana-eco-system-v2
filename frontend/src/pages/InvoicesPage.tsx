@@ -1,4 +1,4 @@
-import { ChevronLeft, ChevronRight, Eye, FileText, LoaderCircle, Minus, Pencil, Search, XCircle } from "lucide-react";
+import { ChevronLeft, ChevronRight, FileText, LoaderCircle, Minus, Pencil, Search, XCircle } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 
@@ -295,13 +295,25 @@ export function InvoicesPage() {
                 <td className="numeric strong">{numberText(invoice.total_amount)}</td>
                 <td className="row-actions">
                   <Link
-                    className="icon-button"
+                    className="invoice-list-action-button invoice-list-view-button"
                     to={`/invoices/${invoice.id}`}
                     state={{ invoiceListSearch: searchParams.toString() }}
                     aria-label="Xem"
+                    title="Xem hóa đơn"
                   >
-                    <Eye size={16} />
+                    Xem
                   </Link>
+                  {hasPermission("invoices.update") && invoice.status === "created" ? (
+                    <Link
+                      className="invoice-list-action-button invoice-list-edit-button"
+                      to={`/invoices/${invoice.id}/edit`}
+                      state={{ invoiceListSearch: searchParams.toString() }}
+                      aria-label="Sửa hóa đơn"
+                      title="Sửa hóa đơn"
+                    >
+                      Sửa
+                    </Link>
+                  ) : null}
                   {hasPermission("invoices.cancel") && invoice.status === "created" ? <button className="icon-button danger" type="button" onClick={() => void cancel(invoice)} aria-label="Hủy hóa đơn">
                     <XCircle size={16} />
                   </button> : null}
