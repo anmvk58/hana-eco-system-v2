@@ -8,6 +8,15 @@ import { useAuth } from "../auth/AuthContext";
 import { InvoiceReceipt } from "../components/InvoiceReceipt";
 import { Modal } from "../components/Modal";
 import { ToastNotification } from "../components/ToastNotification";
+import {
+  createSaleDraft,
+  createSaleDraftCollection,
+  readSaleDraftCollection,
+  saleDraftStorageKey,
+  writeSaleDraftCollection,
+  type SaleDraft,
+  type SaleDraftCollection,
+} from "../features/salesDraftStorage";
 import type { Customer, ExtraChargeSetting, ExtraChargeType, Invoice, InvoiceStatus, Product } from "../types";
 import { formatNumberInput, localTimeValue, money, normalizeNumberInput, numberText, todayInputValue } from "../utils/format";
 
@@ -129,17 +138,29 @@ export function InvoiceFormPage() {
     productSearchRef.current?.select();
     setSearchFocused(false);
   }, [productSelectionVersion]);
-  const { hasPermission } = useAuth();
+  const { currentUser, hasPermission } = useAuth();
   const { invoiceId } = useParams();
   const navigate = useNavigate();
   const editingId = invoiceId ? Number(invoiceId) : null;
   const isEditing = Boolean(editingId);
+  const storedDraftCollectionRef = useRef<SaleDraftCollection | null>(
+    !isEditing && currentUser ? readSaleDraftCollection(currentUser.id) : null,
+  );
+  const initialDraftCollectionRef = useRef<SaleDraftCollection>(
+    storedDraftCollectionRef.current ?? createSaleDraftCollection(defaultCharges),
+  );
+  const initialDraft = initialDraftCollectionRef.current.drafts.find(
+    (draft) => draft.id === initialDraftCollectionRef.current.activeDraftId,
+  ) ?? initialDraftCollectionRef.current.drafts[0];
+  const [drafts, setDrafts] = useState<SaleDraft[]>(initialDraftCollectionRef.current.drafts);
+  const [activeDraftId, setActiveDraftId] = useState(initialDraftCollectionRef.current.activeDraftId);
+  const [nextDraftSequence, setNextDraftSequence] = useState(initialDraftCollectionRef.current.nextSequence);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [invoice, setInvoice] = useState<Invoice | null>(null);
-  const [customerId, setCustomerId] = useState("");
-  const [customerSearch, setCustomerSearch] = useState("");
-  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
+  const [customerId, setCustomerId] = useState(isEditing ? "" : initialDraft.customerId);
+  const [customerSearch, setCustomerSearch] = useState(isEditing ? "" : initialDraft.customerSearch);
+  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(isEditing ? null : initialDraft.selectedCustomer);
   const [customerFocused, setCustomerFocused] = useState(false);
   const [customerModalOpen, setCustomerModalOpen] = useState(false);
   const [customerForm, setCustomerForm] = useState(blankCustomerForm);
@@ -147,13 +168,13 @@ export function InvoiceFormPage() {
   const [customerQuickEditForm, setCustomerQuickEditForm] = useState(blankCustomerQuickEditForm);
   const [customerQuickEditError, setCustomerQuickEditError] = useState("");
   const [customerQuickEditSaving, setCustomerQuickEditSaving] = useState(false);
-  const [note, setNote] = useState("");
-  const [reason, setReason] = useState("");
-  const [lines, setLines] = useState<DraftLine[]>([]);
-  const [charges, setCharges] = useState<DraftCharge[]>(defaultCharges);
-  const [applyShippingFee, setApplyShippingFee] = useState(true);
-  const [isPaidByTransfer, setIsPaidByTransfer] = useState(false);
-  const [printTwoCopies, setPrintTwoCopies] = useState(true);
+  const [note, setNote] = useState(isEditing ? "" : initialDraft.note);
+  const [reason, setReason] = useState(isEditing ? "" : initialDraft.reason);
+  const [lines, setLines] = useState<DraftLine[]>(isEditing ? [] : initialDraft.lines);
+  const [charges, setCharges] = useState<DraftCharge[]>(isEditing ? defaultCharges : initialDraft.charges);
+  const [applyShippingFee, setApplyShippingFee] = useState(isEditing ? true : initialDraft.applyShippingFee);
+  const [isPaidByTransfer, setIsPaidByTransfer] = useState(isEditing ? false : initialDraft.isPaidByTransfer);
+  const [printTwoCopies, setPrintTwoCopies] = useState(isEditing ? true : initialDraft.printTwoCopies);
   const [shippingSettingsOpen, setShippingSettingsOpen] = useState(false);
   useEffect(() => {
     if (!checkoutOpen) return;
@@ -184,6 +205,88 @@ export function InvoiceFormPage() {
   const [quickPriceSaving, setQuickPriceSaving] = useState(false);
   const [invoiceToPrint, setInvoiceToPrint] = useState<Invoice | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  const applyDraft = useCallback((draft: SaleDraft) => {
+    setCustomerId(draft.customerId);
+    setCustomerSearch(draft.customerSearch);
+    setSelectedCustomer(draft.selectedCustomer);
+    setNote(draft.note);
+    setReason(draft.reason);
+    setLines(draft.lines.map((line) => ({ ...line })));
+    setCharges(draft.charges.map((charge) => ({ ...charge })));
+    setApplyShippingFee(draft.applyShippingFee);
+    setIsPaidByTransfer(draft.isPaidByTransfer);
+    setPrintTwoCopies(draft.printTwoCopies);
+    setCheckoutOpen(false);
+    setProductSearch("");
+    setError("");
+  }, []);
+
+  useEffect(() => {
+    if (isEditing) return;
+    setDrafts((currentDrafts) => currentDrafts.map((draft) => {
+      if (draft.id !== activeDraftId) return draft;
+      const nextContent = {
+        customerId,
+        customerSearch,
+        selectedCustomer,
+        note,
+        reason,
+        lines,
+        charges,
+        applyShippingFee,
+        isPaidByTransfer,
+        printTwoCopies,
+      };
+      const currentContent = {
+        customerId: draft.customerId,
+        customerSearch: draft.customerSearch,
+        selectedCustomer: draft.selectedCustomer,
+        note: draft.note,
+        reason: draft.reason,
+        lines: draft.lines,
+        charges: draft.charges,
+        applyShippingFee: draft.applyShippingFee,
+        isPaidByTransfer: draft.isPaidByTransfer,
+        printTwoCopies: draft.printTwoCopies,
+      };
+      return JSON.stringify(nextContent) === JSON.stringify(currentContent)
+        ? draft
+        : { ...draft, ...nextContent, updatedAt: new Date().toISOString() };
+    }));
+  }, [activeDraftId, applyShippingFee, charges, customerId, customerSearch, isEditing, isPaidByTransfer, lines, note, printTwoCopies, reason, selectedCustomer]);
+
+  useEffect(() => {
+    if (isEditing || !currentUser) return;
+    const timer = window.setTimeout(() => {
+      writeSaleDraftCollection(currentUser.id, {
+        version: 1,
+        activeDraftId,
+        nextSequence: nextDraftSequence,
+        drafts,
+      });
+    }, 350);
+    return () => window.clearTimeout(timer);
+  }, [activeDraftId, currentUser, drafts, isEditing, nextDraftSequence]);
+
+  useEffect(() => {
+    if (isEditing || !currentUser) return;
+    const storageKey = saleDraftStorageKey(currentUser.id);
+    const handleStorage = (event: StorageEvent) => {
+      if (event.key !== storageKey || !event.newValue) return;
+      const collection = readSaleDraftCollection(currentUser.id);
+      if (!collection) return;
+      setDrafts(collection.drafts);
+      setNextDraftSequence(collection.nextSequence);
+      const draft = collection.drafts.find((item) => item.id === activeDraftId)
+        ?? collection.drafts.find((item) => item.id === collection.activeDraftId)
+        ?? collection.drafts[0];
+      setActiveDraftId(draft.id);
+      applyDraft(draft);
+    };
+    window.addEventListener("storage", handleStorage);
+    return () => window.removeEventListener("storage", handleStorage);
+  }, [activeDraftId, applyDraft, currentUser, isEditing]);
 
   useEffect(() => {
     if (!invoiceToPrint) return;
@@ -234,7 +337,7 @@ export function InvoiceFormPage() {
       setProducts(productData);
       const shipping = chargeSettingData.find((setting) => setting.charge_type === "shipping");
       setShippingDefaultAmount(shipping?.default_amount ?? "0");
-      if (!editingId) {
+      if (!editingId && !storedDraftCollectionRef.current) {
         setCharges(buildChargesFromSettings(chargeSettingData));
       }
       setBaseDataReady(true);
@@ -599,6 +702,103 @@ export function InvoiceFormPage() {
     updateLine(index, { quantity: String(next) });
   }
 
+  function isMeaningfulDraft(draft: SaleDraft) {
+    return Boolean(
+      draft.customerId
+      || draft.customerSearch.trim()
+      || draft.lines.some((line) => line.product_id)
+      || draft.note.trim()
+      || draft.reason.trim()
+      || draft.isPaidByTransfer,
+    );
+  }
+
+  function draftLabel(draft: SaleDraft) {
+    const customer = draft.selectedCustomer;
+    if (!customer) return "Hóa đơn";
+    return customer.phone ? `${customer.name} - ${customer.phone}` : customer.name;
+  }
+
+  function selectDraft(draftId: string) {
+    if (submitting || draftId === activeDraftId) return;
+    const draft = drafts.find((item) => item.id === draftId);
+    if (!draft) return;
+    setActiveDraftId(draft.id);
+    applyDraft(draft);
+  }
+
+  function addDraft() {
+    if (submitting) return;
+    if (drafts.length >= 20) {
+      setError("Chỉ được mở tối đa 20 đơn đang nhập. Vui lòng thanh toán hoặc đóng bớt đơn.");
+      return;
+    }
+    const draft = createSaleDraft(nextDraftSequence, [
+      { charge_type: "shipping", name: "Phí ship", amount: shippingDefaultAmount },
+      { charge_type: "packing", name: "Phí đóng hàng", amount: "0" },
+      { charge_type: "other", name: "Phụ thu khác", amount: "0" },
+    ]);
+    setDrafts((current) => [...current, draft]);
+    setNextDraftSequence((current) => current + 1);
+    setActiveDraftId(draft.id);
+    applyDraft(draft);
+  }
+
+  function closeDraft(draftId: string) {
+    if (submitting) return;
+    const index = drafts.findIndex((draft) => draft.id === draftId);
+    const closingDraft = drafts[index];
+    if (!closingDraft) return;
+    if (isMeaningfulDraft(closingDraft) && !window.confirm("Xóa đơn đang nhập này? Dữ liệu chưa thanh toán sẽ bị mất.")) return;
+
+    let remaining = drafts.filter((draft) => draft.id !== draftId);
+    let nextSequence = nextDraftSequence;
+    if (remaining.length === 0) {
+      const replacement = createSaleDraft(nextSequence, [
+        { charge_type: "shipping", name: "Phí ship", amount: shippingDefaultAmount },
+        { charge_type: "packing", name: "Phí đóng hàng", amount: "0" },
+        { charge_type: "other", name: "Phụ thu khác", amount: "0" },
+      ]);
+      nextSequence += 1;
+      remaining = [replacement];
+    }
+    setDrafts(remaining);
+    setNextDraftSequence(nextSequence);
+    if (draftId === activeDraftId) {
+      const nextDraft = remaining[Math.min(index, remaining.length - 1)];
+      setActiveDraftId(nextDraft.id);
+      applyDraft(nextDraft);
+    }
+  }
+
+  function finishActiveDraft() {
+    if (!currentUser) return;
+    const currentIndex = drafts.findIndex((draft) => draft.id === activeDraftId);
+    let remaining = drafts.filter((draft) => draft.id !== activeDraftId);
+    let nextSequence = nextDraftSequence;
+    if (remaining.length === 0) {
+      const replacement = createSaleDraft(nextSequence, [
+        { charge_type: "shipping", name: "Phí ship", amount: shippingDefaultAmount },
+        { charge_type: "packing", name: "Phí đóng hàng", amount: "0" },
+        { charge_type: "other", name: "Phụ thu khác", amount: "0" },
+      ]);
+      nextSequence += 1;
+      remaining = [replacement];
+    }
+    const nextDraft = remaining[Math.min(Math.max(currentIndex, 0), remaining.length - 1)];
+    const collection: SaleDraftCollection = {
+      version: 1,
+      activeDraftId: nextDraft.id,
+      nextSequence,
+      drafts: remaining,
+    };
+    writeSaleDraftCollection(currentUser.id, collection);
+    setDrafts(remaining);
+    setNextDraftSequence(nextSequence);
+    setActiveDraftId(nextDraft.id);
+    applyDraft(nextDraft);
+  }
+
   async function submit(event: FormEvent) {
     event.preventDefault();
     if (!checkoutOpen) {
@@ -645,18 +845,7 @@ export function InvoiceFormPage() {
         return;
       }
 
-      setCustomerId("");
-      setCustomerSearch("");
-      setIsPaidByTransfer(false);
-      setNote("");
-      setReason("");
-      setLines([]);
-      setProductSearch("");
-      setApplyShippingFee(true);
-      setCharges((current) => current.map((charge) => ({
-        ...charge,
-        amount: charge.charge_type === "shipping" ? shippingDefaultAmount : "0",
-      })));
+      finishActiveDraft();
       setProducts((current) => current.map((product) => {
         const soldItem = saved.items.find((item) => item.product_id === product.id);
         return soldItem
@@ -725,6 +914,37 @@ export function InvoiceFormPage() {
 
   return (
     <>
+      {!isEditing ? (
+        <nav className="sale-draft-tabs" aria-label="Các đơn đang nhập">
+          <div className="sale-draft-tab-list" role="tablist">
+            {drafts.map((draft) => (
+              <div className={`sale-draft-tab${draft.id === activeDraftId ? " active" : ""}`} key={draft.id}>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={draft.id === activeDraftId}
+                  title={draftLabel(draft)}
+                  onClick={() => selectDraft(draft.id)}
+                >
+                  {draftLabel(draft)}
+                </button>
+                <button
+                  className="sale-draft-close"
+                  type="button"
+                  aria-label={`Đóng ${draftLabel(draft)}`}
+                  title="Đóng đơn đang nhập"
+                  onClick={() => closeDraft(draft.id)}
+                >
+                  <X size={15} />
+                </button>
+              </div>
+            ))}
+            <button className="sale-draft-add" type="button" onClick={addDraft} disabled={drafts.length >= 20 || submitting} aria-label="Thêm hóa đơn mới" title="Thêm hóa đơn mới">
+              <Plus size={18} />
+            </button>
+          </div>
+        </nav>
+      ) : null}
       <form id="pos-invoice-form" className="invoice-workspace pos-workspace" onSubmit={(event) => void submit(event)}>
         <div className="pos-entry-column">
           {isEditing ? (
