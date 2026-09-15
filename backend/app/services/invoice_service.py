@@ -148,7 +148,10 @@ def recalculate_invoice(invoice: Invoice) -> None:
     total_extra_charges = sum((charge.amount for charge in invoice.extra_charges), Decimal("0"))
     invoice.subtotal = to_money(subtotal)
     invoice.total_extra_charges = to_money(total_extra_charges)
-    invoice.total_amount = to_money(invoice.subtotal + invoice.total_extra_charges)
+    total_before_discount = invoice.subtotal + invoice.total_extra_charges
+    if invoice.discount_amount > total_before_discount:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Giảm giá không được vượt quá tổng tiền hóa đơn")
+    invoice.total_amount = to_money(total_before_discount - invoice.discount_amount)
 
 
 def apply_stock_change(db: Session, items: list[InvoiceItem], direction: int) -> None:
@@ -300,6 +303,7 @@ def snapshot_invoice(invoice: Invoice) -> dict[str, Any]:
         "note": invoice.note,
         "subtotal": invoice.subtotal,
         "total_extra_charges": invoice.total_extra_charges,
+        "discount_amount": invoice.discount_amount,
         "total_amount": invoice.total_amount,
         "deleted_at": invoice.deleted_at,
         "items": [
@@ -364,6 +368,7 @@ def create_invoice(db: Session, payload: InvoiceCreate, user_id: int | None, use
             sold_at=sold_at,
             is_paid_by_transfer=payload.is_paid_by_transfer,
             note=payload.note,
+            discount_amount=to_money(payload.discount_amount),
         )
         invoice.items = build_invoice_items(db, payload.items)
         invoice.extra_charges = build_extra_charges(payload.extra_charges)
@@ -410,6 +415,8 @@ def update_invoice(db: Session, invoice_id: int, payload: InvoiceUpdate, user_id
         if payload.is_paid_by_transfer is not None:
             invoice.is_paid_by_transfer = payload.is_paid_by_transfer
         invoice.note = payload.note
+        if payload.discount_amount is not None:
+            invoice.discount_amount = to_money(payload.discount_amount)
         invoice.items.clear()
         invoice.extra_charges.clear()
         db.flush()

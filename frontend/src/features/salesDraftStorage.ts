@@ -22,6 +22,7 @@ export interface SaleDraft {
   reason: string;
   lines: SaleDraftLine[];
   charges: SaleDraftCharge[];
+  discount: string;
   applyShippingFee: boolean;
   isPaidByTransfer: boolean;
   printTwoCopies: boolean;
@@ -54,6 +55,7 @@ export function createSaleDraft(sequence: number, charges: SaleDraftCharge[]): S
     reason: "",
     lines: [],
     charges: charges.map((charge) => ({ ...charge })),
+    discount: "0",
     applyShippingFee: true,
     isPaidByTransfer: false,
     printTwoCopies: true,
@@ -75,7 +77,7 @@ export function readSaleDraftCollection(userId: number): SaleDraftCollection | n
     if (parsed.version !== 1 || !Array.isArray(parsed.drafts) || parsed.drafts.length === 0) return null;
     const drafts = parsed.drafts.filter((draft): draft is SaleDraft => Boolean(
       draft && typeof draft.id === "string" && typeof draft.sequence === "number" && Array.isArray(draft.lines) && Array.isArray(draft.charges),
-    ));
+    )).map((draft) => ({ ...draft, discount: typeof draft.discount === "string" ? draft.discount : "0" }));
     if (drafts.length === 0) return null;
     const activeDraftId = drafts.some((draft) => draft.id === parsed.activeDraftId) ? parsed.activeDraftId! : drafts[0].id;
     const highestSequence = Math.max(...drafts.map((draft) => draft.sequence));
@@ -93,4 +95,3 @@ export function readSaleDraftCollection(userId: number): SaleDraftCollection | n
 export function writeSaleDraftCollection(userId: number, collection: SaleDraftCollection) {
   window.localStorage.setItem(saleDraftStorageKey(userId), JSON.stringify(collection));
 }
-

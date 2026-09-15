@@ -47,7 +47,7 @@ class ProductRead(ProductBase):
 
 
 class QuickProductSelectionUpdate(ORMBase):
-    product_ids: list[int | None] = Field(min_length=1, max_length=20)
+    product_ids: list[int | None] = Field(min_length=1, max_length=15)
 
     @field_validator("product_ids")
     @classmethod

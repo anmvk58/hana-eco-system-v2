@@ -1,5 +1,5 @@
 import { BadgeCheck, Edit2, LoaderCircle, Minus, Plus, RefreshCw, Save, Search, Settings, Trash2, X } from "lucide-react";
-import { FormEvent, KeyboardEvent, memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { CSSProperties, FormEvent, KeyboardEvent, memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useNavigate, useParams } from "react-router-dom";
 
@@ -37,7 +37,7 @@ const defaultCharges: DraftCharge[] = [
   { charge_type: "packing", name: "Phí đóng hàng", amount: "0" },
   { charge_type: "other", name: "Phụ thu khác", amount: "0" },
 ];
-const quickProductSlotCount = 20;
+const quickProductSlotCount = 15;
 const blankCustomerForm = {
   code: "",
   name: "",
@@ -129,6 +129,8 @@ const QuickProductList = memo(function QuickProductList({
 export function InvoiceFormPage() {
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const checkoutRef = useRef<HTMLElement>(null);
+  const customerPanelRef = useRef<HTMLElement>(null);
+  const [customerPanelWidth, setCustomerPanelWidth] = useState(0);
   const productSearchRef = useRef<HTMLInputElement>(null);
   const productSearchWrapperRef = useRef<HTMLDivElement>(null);
   const [productSelectionVersion, setProductSelectionVersion] = useState(0);
@@ -172,6 +174,7 @@ export function InvoiceFormPage() {
   const [reason, setReason] = useState(isEditing ? "" : initialDraft.reason);
   const [lines, setLines] = useState<DraftLine[]>(isEditing ? [] : initialDraft.lines);
   const [charges, setCharges] = useState<DraftCharge[]>(isEditing ? defaultCharges : initialDraft.charges);
+  const [discount, setDiscount] = useState(isEditing ? "0" : initialDraft.discount);
   const [applyShippingFee, setApplyShippingFee] = useState(isEditing ? true : initialDraft.applyShippingFee);
   const [isPaidByTransfer, setIsPaidByTransfer] = useState(isEditing ? false : initialDraft.isPaidByTransfer);
   const [printTwoCopies, setPrintTwoCopies] = useState(isEditing ? true : initialDraft.printTwoCopies);
@@ -193,6 +196,15 @@ export function InvoiceFormPage() {
   const [error, setError] = useState("");
   const [baseDataLoading, setBaseDataLoading] = useState(true);
   const [baseDataReady, setBaseDataReady] = useState(false);
+  useLayoutEffect(() => {
+    const panel = customerPanelRef.current;
+    if (!baseDataReady || !panel) return;
+    const updateWidth = () => setCustomerPanelWidth(panel.getBoundingClientRect().width);
+    updateWidth();
+    const observer = new ResizeObserver(updateWidth);
+    observer.observe(panel);
+    return () => observer.disconnect();
+  }, [baseDataReady]);
   const [baseDataRetryVersion, setBaseDataRetryVersion] = useState(0);
   const [toastTitle, setToastTitle] = useState("Tạo hóa đơn thành công");
   const [toastMessage, setToastMessage] = useState("");
@@ -214,6 +226,7 @@ export function InvoiceFormPage() {
     setReason(draft.reason);
     setLines(draft.lines.map((line) => ({ ...line })));
     setCharges(draft.charges.map((charge) => ({ ...charge })));
+    setDiscount(draft.discount);
     setApplyShippingFee(draft.applyShippingFee);
     setIsPaidByTransfer(draft.isPaidByTransfer);
     setPrintTwoCopies(draft.printTwoCopies);
@@ -234,6 +247,7 @@ export function InvoiceFormPage() {
         reason,
         lines,
         charges,
+        discount,
         applyShippingFee,
         isPaidByTransfer,
         printTwoCopies,
@@ -246,6 +260,7 @@ export function InvoiceFormPage() {
         reason: draft.reason,
         lines: draft.lines,
         charges: draft.charges,
+        discount: draft.discount,
         applyShippingFee: draft.applyShippingFee,
         isPaidByTransfer: draft.isPaidByTransfer,
         printTwoCopies: draft.printTwoCopies,
@@ -254,7 +269,7 @@ export function InvoiceFormPage() {
         ? draft
         : { ...draft, ...nextContent, updatedAt: new Date().toISOString() };
     }));
-  }, [activeDraftId, applyShippingFee, charges, customerId, customerSearch, isEditing, isPaidByTransfer, lines, note, printTwoCopies, reason, selectedCustomer]);
+  }, [activeDraftId, applyShippingFee, charges, customerId, customerSearch, discount, isEditing, isPaidByTransfer, lines, note, printTwoCopies, reason, selectedCustomer]);
 
   useEffect(() => {
     if (isEditing || !currentUser) return;
@@ -381,6 +396,7 @@ export function InvoiceFormPage() {
       setSelectedCustomer(data.customer ?? null);
       setIsPaidByTransfer(data.is_paid_by_transfer);
       setNote(data.note ?? "");
+      setDiscount(data.discount_amount);
       setLines(
         data.items.map((item) => ({
           product_id: item.product_id ? String(item.product_id) : "",
@@ -454,8 +470,9 @@ export function InvoiceFormPage() {
       if (charge.charge_type === "shipping" && !applyShippingFee) return sum;
       return sum + Number(charge.amount || 0);
     }, 0);
-    return { subtotal, extra, productTypeCount, total: subtotal + extra };
-  }, [lines, charges, applyShippingFee]);
+    const discountAmount = Number(discount || 0);
+    return { subtotal, extra, discountAmount, productTypeCount, total: Math.max(0, subtotal + extra - discountAmount) };
+  }, [lines, charges, applyShippingFee, discount]);
 
   function updateLine(index: number, patch: Partial<DraftLine>) {
     setLines(
@@ -709,6 +726,7 @@ export function InvoiceFormPage() {
       || draft.lines.some((line) => line.product_id)
       || draft.note.trim()
       || draft.reason.trim()
+      || Number(draft.discount || 0) > 0
       || draft.isPaidByTransfer,
     );
   }
@@ -812,6 +830,10 @@ export function InvoiceFormPage() {
       setError("Hóa đơn cần ít nhất một sản phẩm");
       return;
     }
+    if (totals.discountAmount > totals.subtotal + totals.extra) {
+      setError("Giảm giá không được vượt quá tổng tiền hóa đơn");
+      return;
+    }
 
     const soldAt = isEditing && invoice ? invoice.sold_at : `${todayInputValue()}T${localTimeValue()}`;
     const effectiveCharges = charges.filter((charge) => charge.charge_type !== "shipping" || applyShippingFee);
@@ -821,6 +843,7 @@ export function InvoiceFormPage() {
       sold_at: soldAt,
       is_paid_by_transfer: isPaidByTransfer,
       note,
+      discount_amount: discount || "0",
       items: cleanLines.map((line) => ({
         product_id: Number(line.product_id),
         quantity: line.quantity,
@@ -980,10 +1003,13 @@ export function InvoiceFormPage() {
                       setSearchFocused(true);
                       setHighlightedProductIndex(0);
                     }}
-                    onFocus={() => {
+                    onFocus={(event) => {
+                      event.currentTarget.select();
                       setSearchFocused(true);
                       setHighlightedProductIndex(0);
                     }}
+                    onMouseUp={(event) => event.preventDefault()}
+                    onClick={(event) => event.currentTarget.select()}
                     onKeyDown={handleProductSearchKeyDown}
                     placeholder="Nhập mã hoặc tên sản phẩm, bấm Enter để thêm"
                   />
@@ -1086,7 +1112,7 @@ export function InvoiceFormPage() {
         </div>
 
         <div className="pos-right-pane">
-          <section className="pos-customer-panel" aria-label="Thông tin khách hàng">
+          <section ref={customerPanelRef} className="pos-customer-panel" aria-label="Thông tin khách hàng">
           <div className="sales-search-section">
             <div className="sales-search-field">
               <div className="pos-customer-heading"><label htmlFor="customer-search">Khách hàng</label><span>{customerId ? "Đã chọn khách hàng" : "Khách lẻ nếu để trống"}</span></div>
@@ -1174,7 +1200,7 @@ export function InvoiceFormPage() {
             <button className="primary-button" type="button" onClick={() => setCheckoutOpen(true)} disabled={!lines.some((line) => line.product_id)}>Thanh toán</button>
           </div>
         {checkoutOpen ? createPortal(<div className="pos-checkout-backdrop" onClick={(event) => { if (event.target === event.currentTarget && !submitting) setCheckoutOpen(false); }}>
-        <aside ref={checkoutRef} className="checkout-panel pos-checkout-overlay" role="dialog" aria-modal="true" aria-label="Thanh toán hóa đơn" onKeyDown={(event) => {
+        <aside ref={checkoutRef} className="checkout-panel pos-checkout-overlay" style={customerPanelWidth ? { "--pos-customer-panel-width": `${customerPanelWidth}px` } as CSSProperties : undefined} role="dialog" aria-modal="true" aria-label="Thanh toán hóa đơn" onKeyDown={(event) => {
           if (shippingSettingsOpen) return;
           if (event.key === "Escape" && !submitting) { event.stopPropagation(); setCheckoutOpen(false); }
           if (event.key === "Tab") {
@@ -1232,11 +1258,23 @@ export function InvoiceFormPage() {
                   disabled={charge.charge_type === "shipping" && !applyShippingFee}
                   inputMode="numeric"
                   value={formatNumberInput(charge.amount, false)}
+                  onFocus={(event) => event.currentTarget.select()}
+                  onMouseUp={(event) => event.preventDefault()}
                   onChange={(event) => updateCharge(index, normalizeNumberInput(event.target.value, false))}
                 />
               </label>
             ) : null)}
           </div>
+          <label className="charge-field">
+            <span>Giảm giá</span>
+            <input
+              inputMode="numeric"
+              value={formatNumberInput(discount, false)}
+              onFocus={(event) => event.currentTarget.select()}
+              onMouseUp={(event) => event.preventDefault()}
+              onChange={(event) => setDiscount(normalizeNumberInput(event.target.value, false))}
+            />
+          </label>
           <label>
             Lý do sửa / ghi chú lịch sử
             <textarea value={reason} onChange={(event) => setReason(event.target.value)} placeholder="Ví dụ: Khách đổi số lượng" />
@@ -1249,6 +1287,10 @@ export function InvoiceFormPage() {
             <div>
               <span>Thu khác</span>
               <strong>{money(totals.extra)}</strong>
+            </div>
+            <div>
+              <span>Giảm giá</span>
+              <strong>-{money(totals.discountAmount)}</strong>
             </div>
             <div className="summary-total">
               <span>Tổng thanh toán</span>

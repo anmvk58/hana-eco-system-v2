@@ -34,6 +34,7 @@ class Invoice(Base, TimestampMixin, SoftDeleteMixin):
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
     subtotal: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=0, nullable=False)
     total_extra_charges: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=0, nullable=False)
+    discount_amount: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=0, server_default="0", nullable=False)
     total_amount: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=0, nullable=False)
 
     customer = relationship("Customer", back_populates="invoices")

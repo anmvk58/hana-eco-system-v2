@@ -55,6 +55,7 @@ class InvoiceCreate(ORMBase):
     note: str | None = None
     items: list[InvoiceItemCreate] = Field(min_length=1)
     extra_charges: list[InvoiceExtraChargeCreate] = Field(default_factory=list)
+    discount_amount: Decimal = Field(default=Decimal("0"), ge=0)
     reason: str | None = Field(default=None, description="Ghi chú lý do tạo/sửa, sẽ lưu vào invoice_history.")
 
 
@@ -66,6 +67,7 @@ class InvoiceUpdate(ORMBase):
     note: str | None = None
     items: list[InvoiceItemCreate] = Field(min_length=1)
     extra_charges: list[InvoiceExtraChargeCreate] = Field(default_factory=list)
+    discount_amount: Decimal | None = Field(default=None, ge=0)
     reason: str | None = Field(default=None, description="Ghi chú lý do sửa, sẽ lưu vào invoice_history.")
 
     @model_validator(mode="after")
@@ -170,6 +172,7 @@ class InvoiceRead(ORMBase):
     note: str | None
     subtotal: Decimal
     total_extra_charges: Decimal
+    discount_amount: Decimal
     total_amount: Decimal
     items: list[InvoiceItemRead]
     extra_charges: list[InvoiceExtraChargeRead]

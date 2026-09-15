@@ -50,6 +50,7 @@ def create_app() -> FastAPI:
         ensure_invoice_status_values()
         ensure_invoice_audit_columns()
         ensure_invoice_payment_column()
+        ensure_invoice_discount_column()
         ensure_invoice_external_handoff_columns()
         ensure_internal_cod_collection_columns()
         with SessionLocal() as db:
@@ -186,6 +187,17 @@ def ensure_invoice_payment_column() -> None:
         return
     with engine.begin() as connection:
         connection.execute(text("ALTER TABLE invoices ADD COLUMN is_paid_by_transfer BOOLEAN NOT NULL DEFAULT FALSE"))
+
+
+def ensure_invoice_discount_column() -> None:
+    inspector = inspect(engine)
+    if not inspector.has_table("invoices"):
+        return
+    invoice_columns = {column["name"] for column in inspector.get_columns("invoices")}
+    if "discount_amount" in invoice_columns:
+        return
+    with engine.begin() as connection:
+        connection.execute(text("ALTER TABLE invoices ADD COLUMN discount_amount DECIMAL(14,2) NOT NULL DEFAULT 0"))
 
 
 def ensure_invoice_external_handoff_columns() -> None:

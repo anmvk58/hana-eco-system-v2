@@ -161,6 +161,7 @@ export interface InvoicePayload {
   note?: string;
   items: InvoiceItemPayload[];
   extra_charges: InvoiceExtraChargePayload[];
+  discount_amount?: string;
   reason?: string;
 }
 
@@ -208,6 +209,7 @@ export interface Invoice {
   note?: string | null;
   subtotal: string;
   total_extra_charges: string;
+  discount_amount: string;
   total_amount: string;
   items: InvoiceItem[];
   extra_charges: InvoiceExtraCharge[];
