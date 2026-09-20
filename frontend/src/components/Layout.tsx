@@ -150,7 +150,7 @@ export function Layout({ children }: { children: ReactNode }) {
   }
 
   return (
-    <div className={`app-shell${isSidebarCollapsed ? " sidebar-collapsed" : ""}${isLoggingOut ? " auth-logging-out" : ""}`}>
+    <div className={`app-shell${isSidebarCollapsed ? " sidebar-collapsed" : ""}${isLoggingOut ? " auth-logging-out" : ""}${isSalesPage ? " sales-shell" : ""}`}>
       <aside className={`sidebar${isMobileSidebarOpen ? " mobile-open" : ""}`}>
         <div className="brand">
           <div className="brand-mark">H</div>

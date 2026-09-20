@@ -38,6 +38,11 @@ const defaultCharges: DraftCharge[] = [
   { charge_type: "other", name: "Phụ thu khác", amount: "0" },
 ];
 const quickProductSlotCount = 15;
+const normalizeProductSearch = (value: string) => value
+  .normalize("NFD")
+  .replace(/[\u0300-\u036f]/g, "")
+  .replace(/[đĐ]/g, "d")
+  .toLowerCase();
 const blankCustomerForm = {
   code: "",
   name: "",
@@ -425,9 +430,17 @@ export function InvoiceFormPage() {
   }, [customerSearch, customers]);
 
   const filteredProducts = useMemo(() => {
-    const keyword = productSearch.trim().toLowerCase();
+    const keyword = normalizeProductSearch(productSearch.trim());
     if (!keyword) return [];
-    return products.filter((product) => `${product.code} ${product.name}`.toLowerCase().includes(keyword));
+    return products
+      .filter((product) => normalizeProductSearch(product.code).includes(keyword) || normalizeProductSearch(product.name).includes(keyword))
+      .sort((left, right) => {
+        const rank = (code: string) => {
+          const normalizedCode = normalizeProductSearch(code);
+          return normalizedCode === keyword ? 0 : normalizedCode.startsWith(keyword) ? 1 : normalizedCode.includes(keyword) ? 2 : 3;
+        };
+        return rank(left.code) - rank(right.code);
+      });
   }, [productSearch, products]);
 
   const suggestedProducts = useMemo(() => filteredProducts.slice(0, 8), [filteredProducts]);
@@ -455,11 +468,11 @@ export function InvoiceFormPage() {
 
   const quickConfigCandidates = useMemo(() => {
     const selectedIds = new Set(quickProductSlots.flatMap((product) => product ? [product.id] : []));
-    const keyword = quickConfigSearch.trim().toLocaleLowerCase("vi");
+    const keyword = normalizeProductSearch(quickConfigSearch.trim());
     return products.filter((product) =>
       product.status === "active"
       && !selectedIds.has(product.id)
-      && (!keyword || `${product.code} ${product.name}`.toLocaleLowerCase("vi").includes(keyword)),
+      && (!keyword || normalizeProductSearch(`${product.code} ${product.name}`).includes(keyword)),
     );
   }, [products, quickConfigSearch, quickProductSlots]);
 
@@ -1025,6 +1038,7 @@ export function InvoiceFormPage() {
                       >
                         <button className="product-suggestion-select" disabled={quickPriceProduct?.id === product.id} onMouseDown={(event) => { event.preventDefault(); addProductToInvoice(product); }} type="button">
                           <span className="product-suggestion-identity">
+                            <span className="product-suggestion-code">{product.code}</span>
                             <span className="product-suggestion-name">{product.name}</span>
                           </span>
                           {quickPriceProduct?.id !== product.id ? <span className="product-suggestion-price">{numberText(product.sale_price)}</span> : null}
