@@ -315,6 +315,7 @@ export function InvoiceFormPage() {
       setToastTitle(isEditing ? "Cập nhật hóa đơn thành công" : "Tạo hóa đơn thành công");
       setToastMessage(`Hóa đơn ${invoiceToPrint.code} đã được lưu.`);
       setInvoiceToPrint(null);
+      if (isEditing) navigate(`/invoices/${invoiceToPrint.id}`);
     };
     window.addEventListener("afterprint", clearPrintedInvoice, { once: true });
 
@@ -877,7 +878,12 @@ export function InvoiceFormPage() {
       const saved = isEditing ? await api.invoices.update(editingId!, payload) : await api.invoices.create(payload);
       setCheckoutOpen(false);
       if (isEditing) {
-        navigate(`/invoices/${saved.id}`);
+        if (hasPermission("invoices.print")) {
+          setPrintTwoCopies(true);
+          setInvoiceToPrint(saved);
+        } else {
+          navigate(`/invoices/${saved.id}`);
+        }
         return;
       }
 

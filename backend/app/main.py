@@ -8,6 +8,7 @@ from app.database import Base, SessionLocal, engine
 from app.models import AuthSession, Customer, ExternalHandoverBatch, ExternalHandoverBatchItem, ExtraChargeSetting, InternalCodCollectionItem, InternalCodCollectionSession, Invoice, InvoiceCodeSequence, InvoiceExtraCharge, InvoiceHistory, InvoiceItem, Permission, Product, ProductCategory, Role, Shipper, User
 from app.services.access_control_service import ensure_defaults as ensure_access_control_defaults
 from app.services.extra_charge_setting_service import ensure_default_extra_charge_settings
+from app.services.invoice_service import backfill_invoice_revisions
 from app.services.ship_management_service import ensure_legacy_external_handover_batches
 
 
@@ -51,11 +52,13 @@ def create_app() -> FastAPI:
         ensure_invoice_audit_columns()
         ensure_invoice_payment_column()
         ensure_invoice_discount_column()
+        ensure_invoice_revision_column()
         ensure_invoice_external_handoff_columns()
         ensure_internal_cod_collection_columns()
         with SessionLocal() as db:
             ensure_access_control_defaults(db)
             ensure_default_extra_charge_settings(db)
+            backfill_invoice_revisions(db)
             ensure_legacy_external_handover_batches(db)
 
     @app.get("/health", tags=["system"])
@@ -198,6 +201,17 @@ def ensure_invoice_discount_column() -> None:
         return
     with engine.begin() as connection:
         connection.execute(text("ALTER TABLE invoices ADD COLUMN discount_amount DECIMAL(14,2) NOT NULL DEFAULT 0"))
+
+
+def ensure_invoice_revision_column() -> None:
+    inspector = inspect(engine)
+    if not inspector.has_table("invoices"):
+        return
+    invoice_columns = {column["name"] for column in inspector.get_columns("invoices")}
+    if "revision" in invoice_columns:
+        return
+    with engine.begin() as connection:
+        connection.execute(text("ALTER TABLE invoices ADD COLUMN revision INT NOT NULL DEFAULT 0"))
 
 
 def ensure_invoice_external_handoff_columns() -> None:

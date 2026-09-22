@@ -150,6 +150,7 @@ class InvoiceBulkAuditAssign(ORMBase):
 class InvoiceRead(ORMBase):
     id: int
     code: str
+    revision: int
     customer_id: int | None
     customer: CustomerRead | None = None
     status: InvoiceStatus

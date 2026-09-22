@@ -1,11 +1,12 @@
-import { ChevronLeft, ChevronRight, FileText, LoaderCircle, Minus, Pencil, Search, XCircle } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { ChevronLeft, ChevronRight, FileText, LoaderCircle, Search, XCircle } from "lucide-react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 
 import { api } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
 import { DateRangePicker } from "../components/DateRangePicker";
 import { EmptyState } from "../components/EmptyState";
+import { Modal } from "../components/Modal";
 import { StatusBadge } from "../components/StatusBadge";
 import { AuditBadge } from "../components/AuditBadge";
 import type { Invoice, InvoiceListItem, InvoiceStatus } from "../types";
@@ -45,6 +46,10 @@ export function InvoicesPage() {
   const [loading, setLoading] = useState(false);
   const [refreshVersion, setRefreshVersion] = useState(0);
   const [error, setError] = useState("");
+  const [cancellingInvoice, setCancellingInvoice] = useState<Invoice | null>(null);
+  const [cancelReason, setCancelReason] = useState("Khách hủy đơn");
+  const [cancelError, setCancelError] = useState("");
+  const [cancelling, setCancelling] = useState(false);
   const loadRequestId = useRef(0);
 
   async function loadInvoices(
@@ -169,12 +174,36 @@ export function InvoicesPage() {
     void loadInvoices(1, nextPageSize);
   }
 
-  async function cancel(invoice: Invoice) {
-    const reason = window.prompt(`Lý do hủy hóa đơn ${invoice.code}`, "Khách hủy đơn");
-    if (reason === null) return;
-    if (!reason.trim()) { setError("Vui lòng nhập lý do hủy hóa đơn"); return; }
-    try { await api.invoices.cancel(invoice.id, reason.trim()); await loadInvoices(); }
-    catch (err) { setError(err instanceof Error ? err.message : "Không hủy được hóa đơn"); }
+  function openCancelModal(invoice: Invoice) {
+    setCancellingInvoice(invoice);
+    setCancelReason("Khách hủy đơn");
+    setCancelError("");
+  }
+
+  function closeCancelModal() {
+    if (cancelling) return;
+    setCancellingInvoice(null);
+    setCancelError("");
+  }
+
+  async function cancel(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!cancellingInvoice) return;
+    if (!cancelReason.trim()) {
+      setCancelError("Vui lòng nhập lý do hủy hóa đơn");
+      return;
+    }
+    setCancelling(true);
+    setCancelError("");
+    try {
+      await api.invoices.cancel(cancellingInvoice.id, cancelReason.trim());
+      setCancellingInvoice(null);
+      await loadInvoices();
+    } catch (err) {
+      setCancelError(err instanceof Error ? err.message : "Không hủy được hóa đơn");
+    } finally {
+      setCancelling(false);
+    }
   }
 
   const currentPage = Math.min(page, totalPages);
@@ -247,14 +276,14 @@ export function InvoicesPage() {
         <table className="data-table invoice-list-table">
           <thead>
             <tr>
-              <th>Mã hóa đơn</th>
-              <th>Ngày bán</th>
+              <th className="invoice-code-column">Mã hóa đơn</th>
+              <th className="invoice-revision-column">Rev</th>
+              <th className="invoice-sold-at-column">Ngày bán</th>
               <th>Khách hàng</th>
-              <th>Số điện thoại</th>
-              <th>Địa chỉ</th>
+              <th className="invoice-phone-column">Số điện thoại</th>
+              <th className="invoice-address-column">Địa chỉ</th>
               <th>Trạng thái</th>
               <th>Audit</th>
-              <th className="edit-status-column">Sửa</th>
               <th className="numeric">Tiền hàng</th>
               <th className="numeric">Thu khác</th>
               <th className="numeric">Tổng thanh toán</th>
@@ -264,7 +293,7 @@ export function InvoicesPage() {
           <tbody>
             {invoices.map((invoice) => (
               <tr key={invoice.id}>
-                <td className="code-cell">
+                <td className="code-cell invoice-code-column">
                   <Link
                     to={`/invoices/${invoice.id}`}
                     state={{ invoiceListSearch: searchParams.toString() }}
@@ -272,24 +301,19 @@ export function InvoicesPage() {
                     {invoice.code}
                   </Link>
                 </td>
-                <td>{dateTime(invoice.sold_at)}</td>
+                <td className="invoice-revision-column">
+                  {invoice.revision > 0 ? (
+                    <strong className="invoice-revision-value">.{String(invoice.revision).padStart(2, "0")}</strong>
+                  ) : null}
+                </td>
+                <td className="invoice-sold-at-column">{dateTime(invoice.sold_at)}</td>
                 <td>{invoice.customer?.name ?? "Khách lẻ"}</td>
-                <td>{invoice.customer?.phone ?? ""}</td>
-                <td>{invoice.customer?.address || "-"}</td>
+                <td className="invoice-phone-column">{invoice.customer?.phone ?? ""}</td>
+                <td className="invoice-address-column">{invoice.customer?.address || "-"}</td>
                 <td>
                   <StatusBadge status={invoice.status} />
                 </td>
                 <td><AuditBadge label={invoice.audit_label} /></td>
-                <td className="edit-status-column">
-                  <span
-                    className={`edit-status-icon ${invoice.is_edited ? "edited" : "unchanged"}`}
-                    role="img"
-                    aria-label={invoice.is_edited ? "Đã chỉnh sửa" : "Chưa chỉnh sửa"}
-                    title={invoice.is_edited ? "Đã chỉnh sửa" : "Chưa chỉnh sửa"}
-                  >
-                    {invoice.is_edited ? <Pencil size={15}/> : <Minus size={17}/>}
-                  </span>
-                </td>
                 <td className="numeric">{numberText(invoice.subtotal)}</td>
                 <td className="numeric">{numberText(invoice.total_extra_charges)}</td>
                 <td className="numeric strong">{numberText(invoice.total_amount)}</td>
@@ -314,7 +338,7 @@ export function InvoicesPage() {
                       Sửa
                     </Link>
                   ) : null}
-                  {hasPermission("invoices.cancel") && invoice.status === "created" ? <button className="icon-button danger" type="button" onClick={() => void cancel(invoice)} aria-label="Hủy hóa đơn">
+                  {hasPermission("invoices.cancel") && invoice.status === "created" ? <button className="icon-button danger" type="button" onClick={() => openCancelModal(invoice)} aria-label="Hủy hóa đơn">
                     <XCircle size={16} />
                   </button> : null}
                 </td>
@@ -371,6 +395,46 @@ export function InvoicesPage() {
           </button>
         </div>
       </section> : null}
+
+      {cancellingInvoice ? (
+        <Modal title="Xác nhận hủy hóa đơn" className="invoice-cancel-modal" onClose={closeCancelModal}>
+          <form className="invoice-cancel-form" onSubmit={(event) => void cancel(event)}>
+            <section className="invoice-cancel-summary">
+              <span className="invoice-cancel-summary-icon"><XCircle size={24} /></span>
+              <div>
+                <small>Hóa đơn cần hủy</small>
+                <strong>{cancellingInvoice.code}</strong>
+                <span>{cancellingInvoice.customer?.name ?? "Khách lẻ"} · {numberText(cancellingInvoice.total_amount)}</span>
+              </div>
+            </section>
+            {cancelError ? <div className="alert error">{cancelError}</div> : null}
+            <label className="invoice-cancel-reason">
+              <span>Lý do hủy hóa đơn</span>
+              <input
+                autoFocus
+                value={cancelReason}
+                onChange={(event) => {
+                  setCancelReason(event.target.value);
+                  setCancelError("");
+                }}
+                disabled={cancelling}
+                placeholder="Nhập lý do hủy hóa đơn"
+              />
+              <small>Lý do này sẽ được lưu vào lịch sử hóa đơn.</small>
+            </label>
+            <div className="invoice-cancel-warning">
+              <XCircle size={18} />
+              <span>Hóa đơn sau khi hủy sẽ không thể chỉnh sửa và số lượng hàng sẽ được hoàn lại kho.</span>
+            </div>
+            <div className="form-actions">
+              <button className="secondary-button" type="button" disabled={cancelling} onClick={closeCancelModal}>Hủy</button>
+              <button className="primary-button danger-confirm-button" type="submit" disabled={cancelling || !cancelReason.trim()}>
+                {cancelling ? "Đang hủy..." : "OK"}
+              </button>
+            </div>
+          </form>
+        </Modal>
+      ) : null}
     </div>
   );
 }

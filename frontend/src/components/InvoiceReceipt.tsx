@@ -20,6 +20,8 @@ export function InvoiceReceipt({ invoice, className = "" }: { invoice: Invoice; 
   }, [invoice.code]);
 
   const customerName = invoice.customer?.name ?? "Khách lẻ";
+  const revisionText = String(invoice.revision).padStart(2, "0");
+  const printedInvoiceCode = invoice.revision > 0 ? `${invoice.code}.${revisionText}` : invoice.code;
   const customerPhone = invoice.customer?.phone || "-";
   const customerAddress = invoice.customer?.address || "-";
   const soldDate = new Intl.DateTimeFormat("vi-VN", {
@@ -44,7 +46,7 @@ export function InvoiceReceipt({ invoice, className = "" }: { invoice: Invoice; 
 
       <div className="k80-title">
         <strong>HÓA ĐƠN BÁN HÀNG</strong>
-        <span>Số HĐ: {invoice.code}</span>
+        <span>Số HĐ: {printedInvoiceCode}</span>
         <span>Ngày {soldDate}</span>
         <span>{soldTime}</span>
       </div>

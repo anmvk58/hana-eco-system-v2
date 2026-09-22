@@ -187,6 +187,7 @@ export interface InvoiceExtraCharge {
 export interface Invoice {
   id: number;
   code: string;
+  revision: number;
   customer_id?: number | null;
   customer?: Customer | null;
   status: InvoiceStatus;

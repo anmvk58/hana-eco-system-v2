@@ -124,7 +124,8 @@ export function Layout({ children }: { children: ReactNode }) {
     () => window.localStorage.getItem("hana-sidebar-collapsed") === "true",
   );
   const title = routeTitles[location.pathname] ?? (location.pathname.startsWith("/invoices/") ? "Chi tiết hóa đơn" : "Hana POS");
-  const isSalesPage = location.pathname === "/invoices/new";
+  const isSalesPage = location.pathname === "/invoices/new"
+    || /^\/invoices\/\d+\/edit$/.test(location.pathname);
   const visibleCatalogItems = catalogNavItems.filter((item) => item.permissions.every(hasPermission));
   const visibleReportItems = reportNavItems.filter((item) => item.permissions.every(hasPermission));
   const visibleShipManagementItems = shipManagementNavItems.filter((item) => item.permissions.every(hasPermission));

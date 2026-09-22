@@ -176,10 +176,12 @@ def invoice_query(invoice_id: int):
     )
 
 
-def get_invoice(db: Session, invoice_id: int, include_deleted: bool = False) -> Invoice:
+def get_invoice(db: Session, invoice_id: int, include_deleted: bool = False, for_update: bool = False) -> Invoice:
     stmt = invoice_query(invoice_id)
     if not include_deleted:
         stmt = stmt.where(Invoice.deleted_at.is_(None))
+    if for_update:
+        stmt = stmt.with_for_update()
     invoice = db.scalar(stmt)
     if not invoice:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Invoice not found")
@@ -243,46 +245,58 @@ def list_invoices(
         .limit(page_size)
     )
     invoices = list(db.scalars(stmt).all())
-    invoice_ids = [invoice.id for invoice in invoices]
-    edited_invoice_ids: set[int] = set()
-    if invoice_ids:
-        history_rows = db.execute(
-            select(InvoiceHistory.invoice_id, InvoiceHistory.before_data, InvoiceHistory.after_data).where(
-                InvoiceHistory.invoice_id.in_(invoice_ids),
-                InvoiceHistory.action == InvoiceHistoryAction.updated,
-            )
-        ).all()
-        edited_invoice_ids = {
-            invoice_id
-            for invoice_id, before_data, after_data in history_rows
-            if not after_data
-            or (
-                after_data.get("status") != InvoiceStatus.cancelled.value
-                and any(
-                    after_data.get(field) != (before_data or {}).get(field)
-                    for field in (
-                        "customer_id",
-                        "sold_at",
-                        "is_paid_by_transfer",
-                        "note",
-                        "subtotal",
-                        "total_extra_charges",
-                        "total_amount",
-                        "items",
-                        "extra_charges",
-                    )
-                )
-            )
-        }
     for invoice in invoices:
-        invoice.is_edited = invoice.id in edited_invoice_ids
+        invoice.is_edited = invoice.revision > 0
     return invoices, total, current_page, total_pages
+
+
+def is_content_edit(before_data: dict[str, Any] | None, after_data: dict[str, Any] | None) -> bool:
+    if not after_data or after_data.get("status") == InvoiceStatus.cancelled.value:
+        return False
+    before = before_data or {}
+    return any(
+        after_data.get(field) != before.get(field)
+        for field in (
+            "customer_id",
+            "sold_at",
+            "is_paid_by_transfer",
+            "note",
+            "subtotal",
+            "total_extra_charges",
+            "discount_amount",
+            "total_amount",
+            "items",
+            "extra_charges",
+        )
+    )
+
+
+def backfill_invoice_revisions(db: Session) -> None:
+    invoice_ids = list(db.scalars(select(Invoice.id).where(Invoice.revision == 0)).all())
+    if not invoice_ids:
+        return
+    history_rows = db.execute(
+        select(InvoiceHistory.invoice_id, InvoiceHistory.before_data, InvoiceHistory.after_data).where(
+            InvoiceHistory.invoice_id.in_(invoice_ids),
+            InvoiceHistory.action == InvoiceHistoryAction.updated,
+        )
+    ).all()
+    revision_counts: dict[int, int] = {}
+    for invoice_id, before_data, after_data in history_rows:
+        if is_content_edit(before_data, after_data):
+            revision_counts[invoice_id] = revision_counts.get(invoice_id, 0) + 1
+    if not revision_counts:
+        return
+    for invoice in db.scalars(select(Invoice).where(Invoice.id.in_(list(revision_counts)))).all():
+        invoice.revision = revision_counts[invoice.id]
+    db.commit()
 
 
 def snapshot_invoice(invoice: Invoice) -> dict[str, Any]:
     data = {
         "id": invoice.id,
         "code": invoice.code,
+        "revision": invoice.revision,
         "customer_id": invoice.customer_id,
         "status": invoice.status,
         "sold_at": invoice.sold_at,
@@ -397,7 +411,7 @@ def create_invoice(db: Session, payload: InvoiceCreate, user_id: int | None, use
 
 
 def update_invoice(db: Session, invoice_id: int, payload: InvoiceUpdate, user_id: int | None, user_name: str | None) -> Invoice:
-    invoice = get_invoice(db, invoice_id)
+    invoice = get_invoice(db, invoice_id, for_update=True)
     if invoice.status == InvoiceStatus.cancelled:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Không thể sửa hóa đơn đã hủy")
     if invoice.status == InvoiceStatus.completed:
@@ -423,6 +437,7 @@ def update_invoice(db: Session, invoice_id: int, payload: InvoiceUpdate, user_id
         invoice.items = build_invoice_items(db, payload.items)
         invoice.extra_charges = build_extra_charges(payload.extra_charges)
         recalculate_invoice(invoice)
+        invoice.revision += 1
         db.flush()
 
         apply_stock_change(db, invoice.items, direction=-1)
