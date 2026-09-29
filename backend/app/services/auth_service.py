@@ -10,7 +10,7 @@ from app.schemas.access_control import ChangePasswordPayload, LoginPayload
 from app.services.access_control_service import serialize_user, user_query
 
 
-SESSION_LIFETIME = timedelta(hours=24)
+SESSION_LIFETIME = timedelta(days=30)
 
 
 def login(db: Session, payload: LoginPayload) -> dict:

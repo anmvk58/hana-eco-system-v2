@@ -759,6 +759,15 @@ export function InvoiceFormPage() {
     applyDraft(draft);
   }
 
+  function toggleShippingFee(checked: boolean) {
+    setApplyShippingFee(checked);
+    if (checked) {
+      setCharges((current) => current.map((charge) =>
+        charge.charge_type === "shipping" ? { ...charge, amount: "30000" } : charge,
+      ));
+    }
+  }
+
   function addDraft() {
     if (submitting) return;
     if (drafts.length >= 20) {
@@ -1268,7 +1277,7 @@ export function InvoiceFormPage() {
                       <span>{applyShippingFee ? "Áp dụng" : "Không áp dụng"}</span>
                       <input
                         checked={applyShippingFee}
-                        onChange={(event) => setApplyShippingFee(event.target.checked)}
+                        onChange={(event) => toggleShippingFee(event.target.checked)}
                         type="checkbox"
                       />
                     </span>

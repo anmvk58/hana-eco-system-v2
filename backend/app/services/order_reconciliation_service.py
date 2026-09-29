@@ -1,4 +1,4 @@
-from datetime import date, datetime, time
+from datetime import date, datetime, time, timedelta
 
 from fastapi import HTTPException, status
 from sqlalchemy import or_, select
@@ -185,7 +185,18 @@ def list_external_handover_reconciliations(
     from_date: date | None,
     to_date: date | None,
 ) -> list[dict]:
-    batches = ship_management_service.list_batches(db, from_date, to_date)
+    if from_date and to_date and from_date > to_date:
+        raise HTTPException(status_code=422, detail="Ngày bắt đầu không được sau ngày kết thúc")
+    conditions = [ExternalHandoverBatch.status == ExternalHandoverBatchStatus.active]
+    if from_date:
+        conditions.append(ExternalHandoverBatch.created_at >= datetime.combine(from_date, time.min))
+    if to_date:
+        conditions.append(ExternalHandoverBatch.created_at < datetime.combine(to_date + timedelta(days=1), time.min))
+    batch_models = db.scalars(
+        ship_management_service.batch_query().where(*conditions)
+        .order_by(ExternalHandoverBatch.created_at.desc(), ExternalHandoverBatch.id.desc())
+    ).unique().all()
+    batches = [ship_management_service.serialize_batch(batch) for batch in batch_models]
     active_batches = [batch for batch in batches if batch["status"] == ExternalHandoverBatchStatus.active]
     if not active_batches:
         return []

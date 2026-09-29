@@ -259,6 +259,8 @@ export interface PendingInternalCodInvoice {
   id: number;
   code: string;
   customer_name?: string | null;
+  customer_phone?: string | null;
+  customer_address?: string | null;
   handed_over_at?: string | null;
   total_amount: string;
   is_paid_by_transfer: boolean;

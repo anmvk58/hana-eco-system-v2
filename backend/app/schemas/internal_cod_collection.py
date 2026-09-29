@@ -18,6 +18,8 @@ class PendingInternalCodInvoiceRead(ORMBase):
     id: int
     code: str
     customer_name: str | None
+    customer_phone: str | None
+    customer_address: str | None
     handed_over_at: datetime | None
     total_amount: Decimal
     is_paid_by_transfer: bool

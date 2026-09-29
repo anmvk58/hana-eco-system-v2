@@ -789,6 +789,20 @@ textarea {
   font-weight: 800;
 }
 
+.sold-products-filter {
+  align-items: center;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  color: var(--muted);
+  display: flex;
+  gap: 8px;
+  margin: 0 16px 12px;
+  min-height: 38px;
+  padding: 0 10px;
+}
+.sold-products-filter input { background: transparent; border: 0; min-width: 0; outline: 0; width: 100%; }
+
 .code-cell a {
   color: inherit;
   text-decoration: none;
@@ -4450,7 +4464,8 @@ label {
 .internal-cod-history-note { color: var(--muted); max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .internal-cod-amount { color: var(--teal-dark); font-size: 15px; }
 .compact-button { min-height: 34px; padding: 6px 10px; white-space: nowrap; }
-.modal-panel.internal-cod-collection-modal { max-width: 900px; width: min(900px, 100%); }
+.modal-panel.internal-cod-collection-modal { display: flex; flex-direction: column; max-height: calc(100dvh - 32px); max-width: 1040px; overflow: hidden; width: min(1040px, 100%); }
+.modal-panel.internal-cod-collection-modal > .internal-cod-collection-form { flex: 1; grid-template-rows: auto auto minmax(120px, 1fr) auto auto auto; min-height: 0; max-height: calc(100dvh - 96px); overflow: hidden; }
 .internal-cod-collection-form,
 .internal-cod-session-detail { gap: 13px; padding: 16px; width: 100%; }
 .internal-cod-modal-summary { display: grid; gap: 10px; grid-template-columns: repeat(4, minmax(0, 1fr)); }
@@ -4459,14 +4474,44 @@ label {
 .internal-cod-modal-summary small { color: var(--muted); font-size: 12px; font-weight: 700; }
 .internal-cod-modal-summary strong { color: var(--ink); font-size: 21px; }
 .internal-cod-modal-summary article.highlight strong { color: var(--teal-dark); }
-.internal-cod-invoice-list { border: 1px solid var(--line); border-radius: 10px; max-height: 330px; overflow: auto; }
+.internal-cod-calculator { align-items: center; background: #fff; border: 1px solid #cfe4e1; border-radius: 10px; display: grid; gap: 7px 10px; grid-template-columns: minmax(220px, 1.2fr) minmax(135px, .8fr) minmax(220px, 1.2fr); padding: 9px 11px; }
+.internal-cod-calculator > label { display: grid; gap: 6px; margin: 0; }
+.internal-cod-calculator input { min-height: 36px; }
+.internal-cod-calculator > small { align-self: start; color: var(--muted); font-size: 10px; grid-column: 1 / -1; grid-row: 2; }
+.internal-cod-calculator-results { display: contents; }
+.internal-cod-calculator-results article { background: #f6f9f9; border: 1px solid #e0e9e8; border-radius: 8px; display: grid; gap: 3px; grid-column: 2; grid-row: 1; padding: 7px 9px; }
+.internal-cod-calculator-results article.highlight { grid-column: 3; }
+.internal-cod-calculator-results article.highlight { background: #e8f7f4; border-color: #8accc1; }
+.internal-cod-calculator-results small { color: var(--muted); font-size: 11px; }
+.internal-cod-calculator-results strong { color: var(--ink); font-size: 15px; }
+.internal-cod-calculator-results .highlight strong { color: var(--teal-dark); }
+.internal-cod-calculator-error { color: #a33434; font-size: 12px; grid-column: 1 / -1; margin: 0; }
+@media (max-width: 760px) { .internal-cod-calculator-results { grid-template-columns: 1fr; } }
+.internal-cod-invoice-list { border: 1px solid var(--line); border-radius: 10px; display: flex; flex: 1 1 auto; flex-direction: column; min-height: 120px; min-width: 0; overflow: hidden; }
 .internal-cod-invoice-list-heading { align-items: center; background: #f7faf9; border-bottom: 1px solid var(--line); display: flex; gap: 12px; justify-content: space-between; padding: 10px 12px; }
 .internal-cod-invoice-list-heading > span { align-items: center; display: flex; gap: 7px; }
 .internal-cod-invoice-list-heading > span:first-child { display: grid; gap: 2px; }
 .internal-cod-invoice-list-heading strong { color: var(--ink); font-size: 13px; }
 .internal-cod-invoice-list-heading small { color: var(--muted); font-size: 10px; }
 .internal-cod-invoice-list-heading em { font-style: normal; }
-.internal-cod-invoice-list .data-table { min-width: 820px; }
+.internal-cod-invoice-table-wrap { flex: 1; min-height: 0; overflow: auto; }
+.internal-cod-invoice-list .data-table { min-width: 0; table-layout: fixed; width: 100%; }
+.internal-cod-invoice-list .data-table th:nth-child(1) { width: 17%; }
+.internal-cod-invoice-list .data-table th:nth-child(2) { width: 15%; }
+.internal-cod-invoice-list .data-table th:nth-child(3) { width: 42%; }
+.internal-cod-invoice-list .data-table th:nth-child(4) { width: 15%; }
+.internal-cod-invoice-list .data-table th:nth-child(5) { width: 11%; }
+.internal-cod-invoice-list .data-table td { overflow-wrap: anywhere; vertical-align: top; white-space: normal; }
+.internal-cod-invoice-list .data-table th:nth-child(1),
+.internal-cod-invoice-list .data-table td:nth-child(1),
+.internal-cod-invoice-list .data-table th:nth-child(5),
+.internal-cod-invoice-list .data-table td:nth-child(5) { white-space: nowrap; }
+.internal-cod-invoice-address { color: #536765; line-height: 1.4; }
+.internal-cod-customer-cell { display: grid; gap: 3px; min-width: 0; }
+.internal-cod-customer-cell > strong { overflow-wrap: anywhere; }
+.internal-cod-customer-cell > .order-reconciliation-phone,
+.internal-cod-customer-cell > small { font-size: 12px; }
+.internal-cod-invoice-mobile-list .internal-cod-phone-missing { color: var(--muted); font-size: 11px; }
 .internal-cod-invoice-list tr.transfer td { background: #f8fbff; }
 .internal-cod-invoice-list tr.cod-pending td { background: #fff; }
 .internal-cod-invoice-list tr.cod-collected td { background: #f7fbf8; }
@@ -4495,17 +4540,30 @@ label {
   .internal-cod-history-filter { align-items: stretch; flex-direction: column; width: 100%; }
   .internal-cod-history-filter .date-range-picker { width: 100%; }
   .internal-cod-history-filter > .icon-button { align-self: flex-end; }
-  .internal-cod-modal-summary { grid-template-columns: 1fr 1fr; }
+  .modal-panel.internal-cod-collection-modal { max-height: calc(100dvh - 18px); width: calc(100vw - 18px); }
+  .modal-panel.internal-cod-collection-modal > .internal-cod-collection-form { max-height: calc(100dvh - 80px); padding: 10px; }
+  .internal-cod-modal-summary { gap: 6px; grid-template-columns: 1fr 1fr; }
+  .internal-cod-modal-summary article { gap: 2px; padding: 7px 9px; }
+  .internal-cod-modal-summary strong { font-size: 17px; }
+  .internal-cod-modal-summary small { font-size: 10px; }
+  .internal-cod-calculator { gap: 6px; grid-template-columns: 1fr 1fr; padding: 8px; }
+  .internal-cod-calculator > label { grid-column: 1 / -1; }
+  .internal-cod-calculator > small { grid-column: 1 / -1; grid-row: auto; }
+  .internal-cod-calculator-results article,
+  .internal-cod-calculator-results article.highlight { grid-column: auto; grid-row: auto; }
+  .internal-cod-calculator-results small { font-size: 10px; }
+  .internal-cod-calculator-results strong { font-size: 14px; }
   .internal-cod-invoice-list-heading { align-items: flex-start; flex-direction: column; }
   .internal-cod-invoice-list-heading > span:last-child { flex-wrap: wrap; }
-  .internal-cod-invoice-list > .data-table { display: none; }
-  .internal-cod-invoice-mobile-list { display: grid; }
+  .internal-cod-invoice-table-wrap { display: none; }
+  .internal-cod-invoice-mobile-list { display: grid; flex: 1; min-height: 0; overflow-y: auto; }
   .internal-cod-invoice-mobile-list article { border-bottom: 1px solid var(--line); display: grid; gap: 8px; padding: 10px 11px; }
   .internal-cod-invoice-mobile-list article:last-child { border-bottom: 0; }
   .internal-cod-invoice-mobile-list article.transfer { background: #f8fbff; }
   .internal-cod-invoice-mobile-list article.cod-collected { background: #f7fbf8; }
   .internal-cod-invoice-mobile-list header, .internal-cod-invoice-mobile-list article > div { align-items: center; display: flex; gap: 8px; justify-content: space-between; }
-  .internal-cod-invoice-mobile-list header > strong { color: var(--teal-dark); font-size: 14px; }
+  .internal-cod-invoice-mobile-list header > strong,
+  .internal-cod-invoice-mobile-list header > a { color: var(--teal-dark); font-size: 14px; }
   .internal-cod-invoice-mobile-list article > div > span { display: grid; gap: 2px; min-width: 0; }
   .internal-cod-invoice-mobile-list article > div b { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .internal-cod-invoice-mobile-list article > div small { color: var(--muted); font-size: 11px; }
@@ -4586,6 +4644,11 @@ label {
 .order-reconciliation-table td > small { color: var(--muted); display: block; font-size: 11px; margin-top: 3px; }
 .order-reconciliation-table td > strong:not(.code-cell) { display: block; }
 .order-reconciliation-address { color: #536765; max-width: 230px; }
+.order-reconciliation-phone { background: transparent; border: 0; color: var(--secondary); cursor: pointer; display: block; font: inherit; margin: 3px 0 0; padding: 0; text-align: left; text-decoration: none; }
+.order-reconciliation-phone:hover { color: var(--secondary); }
+.order-reconciliation-phone:focus-visible { border-radius: 3px; outline: 2px solid var(--teal); outline-offset: 2px; }
+.order-reconciliation-invoice-link { color: var(--teal); text-decoration: none; }
+.order-reconciliation-invoice-link:hover { color: var(--secondary); text-decoration: underline; }
 .order-reconciliation-actions { display: flex; gap: 6px; }
 .payment-chip { align-items: center; border-radius: 999px; display: inline-flex; font-size: 12px; font-weight: 700; gap: 5px; padding: 5px 8px; white-space: nowrap; }
 .payment-chip.transfer { background: #eaf2ff; color: #245ba4; }
@@ -4614,6 +4677,26 @@ label {
 .order-reconciliation-external-confirm small { color: var(--muted); font-size: 11px; }
 .order-reconciliation-external-confirm strong { color: var(--ink); }
 .order-reconciliation-external-confirm .external-received-breakdown { align-items: flex-start; }
+.order-reconciliation-external-invoices { background: #fff; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+.order-reconciliation-external-invoices h3 { background: #f4f8f7; border-bottom: 1px solid var(--line); color: var(--ink); font-size: 13px; margin: 0; padding: 10px 12px; }
+.order-reconciliation-external-invoices-table { min-width: 0; table-layout: fixed; width: 100%; }
+.order-reconciliation-external-invoices-table th:nth-child(1) { width: 15%; }
+.order-reconciliation-external-invoices-table th:nth-child(2) { width: 20%; }
+.order-reconciliation-external-invoices-table th:nth-child(3) { width: 37%; }
+.order-reconciliation-external-invoices-table th:nth-child(4) { width: 16%; }
+.order-reconciliation-external-invoices-table th:nth-child(5) { width: 12%; }
+.order-reconciliation-external-invoices-table td { overflow-wrap: anywhere; vertical-align: top; white-space: normal; }
+.order-reconciliation-external-invoices-table td:nth-child(3) { line-height: 1.4; }
+.order-reconciliation-external-invoices-table-wrap { max-height: 210px; overflow: auto; }
+.order-reconciliation-external-invoices-mobile { display: none; }
+.order-reconciliation-external-invoices-mobile article { border-bottom: 1px solid var(--line); display: grid; gap: 3px; padding: 10px 12px; }
+.order-reconciliation-external-invoices-mobile article:last-child { border-bottom: 0; }
+.order-reconciliation-external-invoices-mobile header { align-items: center; display: flex; justify-content: space-between; }
+.order-reconciliation-external-invoices-mobile .order-reconciliation-phone { font-size: 13px; }
+.order-reconciliation-external-invoices-mobile header b { color: var(--ink); }
+.order-reconciliation-external-invoices-mobile small { color: var(--muted); }
+.order-reconciliation-external-invoices-mobile p { color: #536765; font-size: 12px; margin: 2px 0; }
+.order-reconciliation-external-invoices-mobile > article > span { margin-top: 4px; }
 .external-received-breakdown > span { width: 100%; }
 .external-received-breakdown > span > div { border-top: 1px dashed #d5e3e0; display: grid; gap: 5px; margin-top: 7px; padding-top: 7px; }
 .external-received-breakdown em { align-items: center; color: var(--muted); display: flex; font-size: 11px; font-style: normal; gap: 5px; justify-content: space-between; }
@@ -4626,11 +4709,17 @@ label {
 .order-reconciliation-modal.retail-collection label { gap: 7px; }
 .order-reconciliation-modal.retail-collection textarea { min-height: 92px; resize: vertical; }
 .order-reconciliation-modal.retail-collection .form-actions { background: #f4f8f7; border-top: 1px solid var(--line); margin: 2px -18px -18px; padding: 14px 18px; }
-.modal-panel.order-reconciliation-modal.external { border-radius: 13px; max-width: 720px; overflow: hidden; width: min(720px, 100%); }
+.modal-panel.order-reconciliation-modal.external { border-radius: 13px; max-width: 1040px; overflow: hidden; width: min(1040px, 100%); }
 .order-reconciliation-modal.external > form { background: #fbfdfd; gap: 14px; padding: 18px; }
 .order-reconciliation-modal.external .order-reconciliation-confirm-summary { background: #fff; box-shadow: 0 3px 12px rgba(22, 58, 53, .05); padding: 15px; }
-.order-reconciliation-modal.external .order-reconciliation-external-confirm { gap: 11px; }
-.order-reconciliation-modal.external .order-reconciliation-external-confirm article { background: #fff; border-radius: 10px; min-height: 68px; padding: 13px 14px; }
+.order-reconciliation-modal.external .order-reconciliation-external-confirm { gap: 8px; }
+.order-reconciliation-modal.external .order-reconciliation-external-confirm article { background: #fff; border-radius: 9px; min-height: 54px; padding: 8px 10px; }
+.order-reconciliation-modal.external .order-reconciliation-external-confirm article > svg { height: 16px; width: 16px; }
+.order-reconciliation-modal.external .order-reconciliation-external-confirm small { font-size: 10px; }
+.order-reconciliation-modal.external .order-reconciliation-external-confirm strong { font-size: 13px; }
+.order-reconciliation-modal.external .external-received-breakdown > span > div { gap: 3px; margin-top: 4px; padding-top: 4px; }
+.order-reconciliation-modal.external .external-received-breakdown em { font-size: 10px; }
+.order-reconciliation-modal.external .external-received-breakdown em b { font-size: 11px; }
 .order-reconciliation-modal.external .internal-cod-confirmation { background: #fff9e9; padding: 12px 14px; }
 .order-reconciliation-modal.external textarea { min-height: 86px; resize: vertical; }
 .order-reconciliation-modal.external .form-actions { background: #f4f8f7; border-top: 1px solid var(--line); margin: 2px -18px -18px; padding: 14px 18px; }
@@ -4681,11 +4770,13 @@ label {
   .modal-panel.order-reconciliation-modal.external { border-radius: 12px; max-height: calc(100dvh - 18px); width: 100%; }
   .order-reconciliation-modal.external > form { gap: 11px; padding: 12px; }
   .order-reconciliation-modal.external .order-reconciliation-confirm-summary { padding: 12px; }
+  .order-reconciliation-modal.external .order-reconciliation-external-invoices-table-wrap { display: none; }
+  .order-reconciliation-modal.external .order-reconciliation-external-invoices-mobile { display: block; max-height: 230px; overflow-y: auto; }
   .order-reconciliation-modal.external .order-reconciliation-external-confirm { gap: 8px; }
-  .order-reconciliation-modal.external .order-reconciliation-external-confirm article { min-height: 58px; padding: 10px 11px; }
-  .order-reconciliation-modal.external .order-reconciliation-external-confirm article.external-received-breakdown { min-height: 112px; }
-  .external-received-breakdown em { font-size: 12px; }
-  .external-received-breakdown em b { font-size: 13px; }
+  .order-reconciliation-modal.external .order-reconciliation-external-confirm article { min-height: 0; padding: 8px 9px; }
+  .order-reconciliation-modal.external .order-reconciliation-external-confirm article.external-received-breakdown { min-height: 0; }
+  .order-reconciliation-modal.external .external-received-breakdown em { font-size: 11px; }
+  .order-reconciliation-modal.external .external-received-breakdown em b { font-size: 12px; }
   .order-reconciliation-modal.external .internal-cod-confirmation { padding: 10px 11px; }
   .order-reconciliation-modal.external textarea { min-height: 72px; }
   .order-reconciliation-modal.external .form-actions { margin: 0 -12px -12px; padding: 11px 12px; }
