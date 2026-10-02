@@ -54,6 +54,7 @@ export class ApiError extends Error {
 }
 
 type InvoiceListFilters = {
+  product_code?: string;
   status?: InvoiceStatus;
   exclude_cancelled?: boolean;
   customer_id?: number;
@@ -234,7 +235,8 @@ export const api = {
       }),
   },
   customers: {
-    list: (search?: string, limit = 50) => request<Customer[]>("/customers", {}, { search, limit }),
+    list: (search?: string, skip = 0, limit = 50) => request<Customer[]>("/customers", {}, { search, skip, limit }),
+    page: (search?: string, skip = 0, limit = 50) => request<{ items: Customer[]; total: number; skip: number; limit: number }>("/customers/page", {}, { search, skip, limit }),
     create: (payload: CustomerPayload) => request<Customer>("/customers", { method: "POST", body: JSON.stringify(payload) }),
     update: (id: number, payload: Partial<CustomerPayload>) =>
       request<Customer>(`/customers/${id}`, { method: "PUT", body: JSON.stringify(payload) }),

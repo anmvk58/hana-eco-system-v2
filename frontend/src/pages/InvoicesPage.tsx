@@ -23,6 +23,8 @@ function positiveInteger(value: string | null, fallback: number) {
 export function InvoicesPage() {
   const { hasPermission } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
+  const productCode = searchParams.get("product_code") ?? "";
+  const productName = searchParams.get("product_name") ?? productCode;
   const [invoices, setInvoices] = useState<InvoiceListItem[]>([]);
   const initialStatus = searchParams.get("status");
   const [status, setStatus] = useState<InvoiceStatusFilter>(
@@ -67,6 +69,7 @@ export function InvoicesPage() {
     setError("");
     try {
       const data = await api.invoices.list({
+          product_code: productCode || undefined,
           status: selectedStatus === "created" || selectedStatus === "completed" || selectedStatus === "cancelled" ? selectedStatus : undefined,
           exclude_cancelled: selectedStatus === "active" ? true : undefined,
           code: normalizedInvoiceCode || undefined,
@@ -109,6 +112,10 @@ export function InvoicesPage() {
   ) {
     const normalizedInvoiceCode = normalizeInvoiceCodeSearch(selectedInvoiceCode);
     const nextSearchParams = new URLSearchParams();
+    if (productCode) {
+      nextSearchParams.set("product_code", productCode);
+      nextSearchParams.set("product_name", productName);
+    }
     nextSearchParams.set("status", selectedStatus);
     if (selectedFromDate) nextSearchParams.set("from_date", selectedFromDate);
     if (selectedToDate) nextSearchParams.set("to_date", selectedToDate);
@@ -269,6 +276,7 @@ export function InvoicesPage() {
         <FileText size={16} />
         <span>{loading ? "Đang cập nhật số lượng hóa đơn..." : <>Tìm thấy <strong>{numberText(total)}</strong> hóa đơn phù hợp với bộ lọc</>}</span>
       </div>
+      {productCode ? <div className="alert">Hóa đơn có sản phẩm: <strong>{productName}</strong> · Mã SP: {productCode}. Khoảng ngày lọc tính theo ngày bán.</div> : null}
 
       {error ? <div className="alert error">{error}</div> : null}
 

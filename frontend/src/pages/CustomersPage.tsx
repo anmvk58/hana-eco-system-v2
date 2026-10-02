@@ -5,6 +5,7 @@ import { api } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
 import { EmptyState } from "../components/EmptyState";
 import { Modal } from "../components/Modal";
+import { PaginationBar } from "../components/PaginationBar";
 import type { Customer, CustomerPayload } from "../types";
 import { utcDateTime } from "../utils/format";
 
@@ -19,18 +20,24 @@ const blankCustomer: CustomerPayload = {
 export function CustomersPage() {
   const { hasPermission } = useAuth();
   const [customers, setCustomers] = useState<Customer[]>([]);
+  const [totalCustomers, setTotalCustomers] = useState(0);
   const [search, setSearch] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<Customer | null>(null);
   const [form, setForm] = useState<CustomerPayload>(blankCustomer);
 
-  async function loadCustomers(keyword = search) {
+  async function loadCustomers(keyword = search, page = 1, limit = pageSize) {
     setLoading(true);
     setError("");
     try {
-      setCustomers(await api.customers.list(keyword));
+      const result = await api.customers.page(keyword, (page - 1) * limit, limit);
+      setCustomers(result.items);
+      setTotalCustomers(result.total);
+      setCurrentPage(page);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Không tải được khách hàng");
     } finally {
@@ -149,6 +156,8 @@ export function CustomersPage() {
           <EmptyState title="Chưa có khách hàng" description="Tạo khách hàng đầu tiên để lập hóa đơn nhanh hơn." />
         ) : null}
       </section>
+
+      <PaginationBar total={totalCustomers} page={currentPage} pageSize={pageSize} itemLabel="khách hàng" onPageChange={(page) => void loadCustomers(search, page)} onPageSizeChange={(nextPageSize) => { setPageSize(nextPageSize); void loadCustomers(search, 1, nextPageSize); }} />
 
       {modalOpen ? (
         <Modal

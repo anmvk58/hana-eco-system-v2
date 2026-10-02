@@ -28,6 +28,7 @@ def list_invoices(
     include_deleted: bool = False,
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, ge=1, le=100),
+    product_code: str | None = Query(default=None, min_length=1, max_length=40),
     db: Session = Depends(get_db),
 ):
     items, total, current_page, total_pages = invoice_service.list_invoices(
@@ -44,6 +45,7 @@ def list_invoices(
         include_deleted,
         page,
         page_size,
+        product_code=product_code,
     )
     return InvoicePage(
         items=items,

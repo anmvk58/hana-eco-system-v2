@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.api.deps import require_any_permission, require_permission
-from app.schemas.customer import CustomerCreate, CustomerRead, CustomerUpdate
+from app.schemas.customer import CustomerCreate, CustomerPageRead, CustomerRead, CustomerUpdate
 from app.services import customer_service
 
 
@@ -19,6 +19,16 @@ def list_customers(
     db: Session = Depends(get_db),
 ):
     return customer_service.list_customers(db, search, include_deleted, skip, limit)
+
+
+@router.get("/page", response_model=CustomerPageRead, dependencies=[Depends(require_any_permission("customers.view"))])
+def list_customers_page(
+    search: str | None = Query(default=None, description="Tìm theo tiền tố số điện thoại"),
+    skip: int = Query(default=0, ge=0),
+    limit: int = Query(default=50, ge=1, le=200),
+    db: Session = Depends(get_db),
+):
+    return customer_service.list_customers_page(db, search, skip, limit)
 
 
 @router.post("", response_model=CustomerRead, status_code=status.HTTP_201_CREATED, dependencies=[Depends(require_permission("customers.create"))])

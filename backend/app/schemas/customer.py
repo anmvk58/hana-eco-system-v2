@@ -49,3 +49,10 @@ class CustomerRead(CustomerBase):
     updated_at: datetime
     deleted_at: datetime | None = None
 
+
+class CustomerPageRead(ORMBase):
+    items: list[CustomerRead]
+    total: int
+    skip: int
+    limit: int
+

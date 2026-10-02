@@ -802,6 +802,10 @@ textarea {
   padding: 0 10px;
 }
 .sold-products-filter input { background: transparent; border: 0; min-width: 0; outline: 0; width: 100%; }
+.sold-products-drilldown-hint { color: var(--muted); font-size: 13px; margin: 0 16px 14px; }
+.sold-product-invoice-link { align-items: center; display: inline-flex; gap: 6px; }
+.sold-product-invoice-link svg { flex-shrink: 0; }
+.sold-product-invoice-link:focus-visible { outline: 2px solid var(--teal); outline-offset: 4px; }
 
 .code-cell a {
   color: inherit;

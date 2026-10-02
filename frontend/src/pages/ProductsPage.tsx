@@ -5,6 +5,7 @@ import { api } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
 import { EmptyState } from "../components/EmptyState";
 import { Modal } from "../components/Modal";
+import { PaginationBar } from "../components/PaginationBar";
 import { StatusBadge } from "../components/StatusBadge";
 import type { Product, ProductCategory, ProductPayload, ProductStatus } from "../types";
 import { money, numberText } from "../utils/format";
@@ -27,6 +28,8 @@ export function ProductsPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<ProductCategory[]>([]);
   const [search, setSearch] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
@@ -40,6 +43,7 @@ export function ProductsPage() {
     setError("");
     try {
       setProducts(await api.products.listAll(keyword));
+      setCurrentPage(1);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Không tải được sản phẩm");
     } finally {
@@ -50,6 +54,8 @@ export function ProductsPage() {
   async function loadCategories() {
     setCategories(await api.productCategories.list());
   }
+
+  const visibleProducts = products.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
   useEffect(() => {
     void Promise.all([loadProducts(""), loadCategories()]).catch((err) =>
@@ -170,7 +176,7 @@ export function ProductsPage() {
             </tr>
           </thead>
           <tbody>
-            {products.map((product) => (
+            {visibleProducts.map((product) => (
               <tr key={product.id}>
                 <td className="code-cell">{product.code}</td>
                 <td>{product.name}</td>
@@ -198,6 +204,8 @@ export function ProductsPage() {
           <EmptyState title="Chưa có sản phẩm" description="Thêm sản phẩm để bắt đầu tạo hóa đơn." />
         ) : null}
       </section>
+
+      <PaginationBar total={products.length} page={currentPage} pageSize={pageSize} itemLabel="sản phẩm" onPageChange={setCurrentPage} onPageSizeChange={(nextPageSize) => { setPageSize(nextPageSize); setCurrentPage(1); }} />
 
       {modalOpen ? (
         <Modal

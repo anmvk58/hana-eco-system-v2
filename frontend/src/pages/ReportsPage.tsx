@@ -105,8 +105,8 @@ export function ReportsPage() {
             <tbody>
               {byProduct.map((item) => (
                 <tr key={item.key}>
-                  <td className="code-cell">{item.key}</td>
-                  <td>{item.name}</td>
+                  <td>{item.key}</td>
+                  <td className="code-cell">{item.name}</td>
                   <td className="numeric">{item.quantity}</td>
                   <td className="numeric strong">{money(item.revenue)}</td>
                 </tr>

@@ -1,7 +1,7 @@
 from datetime import datetime
 
 from fastapi import HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -25,6 +25,26 @@ def list_customers(
             stmt = stmt.where(Customer.phone.like(f"{phone_prefix}%"))
     stmt = stmt.order_by(Customer.created_at.desc()).offset(skip).limit(limit)
     return list(db.scalars(stmt).all())
+
+
+def list_customers_page(
+    db: Session,
+    search: str | None = None,
+    skip: int = 0,
+    limit: int = 50,
+) -> dict:
+    conditions = [Customer.deleted_at.is_(None)]
+    if search:
+        phone_prefix = "".join(search.split())
+        if phone_prefix:
+            conditions.append(Customer.phone.like(f"{phone_prefix}%"))
+    total = db.scalar(select(func.count(Customer.id)).where(*conditions)) or 0
+    items = db.scalars(
+        select(Customer).where(*conditions)
+        .order_by(Customer.created_at.desc(), Customer.id.desc())
+        .offset(skip).limit(limit)
+    ).all()
+    return {"items": list(items), "total": total, "skip": skip, "limit": limit}
 
 
 def get_customer(db: Session, customer_id: int, include_deleted: bool = False) -> Customer:
