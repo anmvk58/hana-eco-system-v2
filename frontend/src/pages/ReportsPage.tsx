@@ -5,7 +5,7 @@ import { api } from "../api/client";
 import { DateRangePicker } from "../components/DateRangePicker";
 import { EmptyState } from "../components/EmptyState";
 import type { Invoice } from "../types";
-import { dateOnly, money, todayInputValue } from "../utils/format";
+import { dateOnly, money, numberText, todayInputValue } from "../utils/format";
 
 interface ProductRevenue {
   key: string;
@@ -107,7 +107,7 @@ export function ReportsPage() {
                 <tr key={item.key}>
                   <td>{item.key}</td>
                   <td className="code-cell">{item.name}</td>
-                  <td className="numeric">{item.quantity}</td>
+                  <td className="numeric">{numberText(item.quantity, 3)}</td>
                   <td className="numeric strong">{money(item.revenue)}</td>
                 </tr>
               ))}
