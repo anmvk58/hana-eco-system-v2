@@ -382,7 +382,7 @@ export function InvoiceFormPage() {
     }
     let cancelled = false;
     const timer = window.setTimeout(() => {
-      void api.customers.list(phonePrefix, 20)
+      void api.customers.list(phonePrefix, 0, 20)
         .then((data) => { if (!cancelled) setCustomers(data); })
         .catch((err) => { if (!cancelled) setError(err instanceof Error ? err.message : "Không tìm được khách hàng"); });
     }, 300);
