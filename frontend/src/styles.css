@@ -8,6 +8,9 @@
   -webkit-font-smoothing: antialiased;
   --teal: #007f72;
   --teal-dark: #00675d;
+  --input-focus-border: #68afa6;
+  --input-focus-shadow: 0 0 0 3px rgba(0, 127, 114, 0.1);
+  --input-focus-transition: border-color 150ms ease, box-shadow 150ms ease;
   --secondary: #6558d3;
   --orange: #f47b20;
   --line: #d8e0e5;
@@ -384,8 +387,24 @@ select[multiple] { min-height: 120px; }
   flex: 1 1 320px;
 }
 
+.toolbar :is(.invoice-search-box, .invoice-customer-name-search) > svg {
+  color: var(--teal);
+  flex-shrink: 0;
+}
+
 .toolbar .invoice-search-box {
+  flex: 0.5 1 110px;
+  min-width: 0;
+}
+
+.toolbar .invoice-customer-name-search {
   flex: 1 1 220px;
+  min-width: 0;
+}
+
+@media (max-width: 640px) {
+  .toolbar .invoice-search-box { flex: 1 1 calc(50% - 5px); }
+  .toolbar .invoice-customer-name-search { flex-basis: 100%; }
 }
 
 .invoice-filter-loading {
@@ -683,6 +702,28 @@ textarea {
   width: 100%;
 }
 
+.product-revenue-table {
+  min-width: 420px;
+  table-layout: fixed;
+}
+
+.product-revenue-table td:first-child {
+  overflow-wrap: anywhere;
+}
+
+.product-revenue-table td.numeric {
+  white-space: nowrap;
+}
+
+.daily-revenue-table {
+  min-width: 0;
+  table-layout: fixed;
+}
+
+.daily-revenue-table th:first-child { width: 40%; }
+.daily-revenue-table th:last-child { width: 60%; }
+.daily-revenue-table td { overflow-wrap: anywhere; }
+
 .invoice-list-table {
   min-width: 1240px;
 }
@@ -802,6 +843,7 @@ textarea {
   padding: 0 10px;
 }
 .sold-products-filter input { background: transparent; border: 0; min-width: 0; outline: 0; width: 100%; }
+.report-product-filter { margin-top: 12px; }
 .sold-products-drilldown-hint { color: var(--muted); font-size: 13px; margin: 0 16px 14px; }
 .sold-product-invoice-link { align-items: center; display: inline-flex; gap: 6px; }
 .sold-product-invoice-link svg { flex-shrink: 0; }
@@ -1495,6 +1537,8 @@ textarea {
 }
 .handover-retail-note > span { display: grid; gap: 3px; }
 .handover-retail-note small { color: #5275a1; font-size: 11px; }
+.handover-retail-note-field textarea { min-height: 72px; resize: vertical; font-weight: 400; }
+.handover-retail-note-field textarea:focus { border-color: var(--teal); box-shadow: 0 0 0 3px rgba(0, 128, 112, .12); outline: none; }
 .delivery-status {
   align-items: center;
   color: #087346;
@@ -1672,6 +1716,12 @@ label {
 .sale-draft-tab:hover { background: #e8eeee; }
 .sale-draft-tab.active { background: var(--teal); border-color: var(--teal-dark); box-shadow: 0 -2px 8px rgba(0, 103, 93, .22); }
 .sale-draft-tab.active::before { background: var(--teal-dark); }
+.sale-draft-tab.editing { background: #fff0d9; border-color: #eed5ad; }
+.sale-draft-tab.editing > button:first-child { color: #865015; }
+.sale-draft-tab.editing::before { background: #d18a28; }
+.sale-draft-tab.editing.active { background: #a86417; border-color: #875012; box-shadow: 0 -2px 8px rgba(135, 80, 18, .2); }
+.sale-draft-tab.editing.active > button:first-child { color: #fff; }
+.sale-draft-tab.editing.active::before { background: #774510; }
 .sale-draft-tab > button:first-child { background: transparent; border: 0; color: #556169; cursor: pointer; flex: 1; font-size: 14px; font-weight: 550; min-width: 0; overflow: hidden; padding: 11px 8px 9px 13px; text-align: left; text-overflow: ellipsis; white-space: nowrap; }
 .sale-draft-tab.active > button:first-child { color: #fff; font-weight: 750; }
 .sale-draft-close { align-items: center; align-self: stretch; background: transparent; border: 0; color: #84908f; cursor: pointer; display: flex; justify-content: center; padding: 3px 9px 0; }
@@ -2117,6 +2167,33 @@ label {
   min-height: 34px;
 }
 
+.product-search-empty .suggestion-empty { justify-content: center; padding: 28px 16px; text-align: center; }
+.product-search-create { align-items: center; background: #eef4f5; border: 0; border-top: 1px solid var(--line); color: var(--teal-dark); cursor: pointer; display: flex; font-size: 14px; font-weight: 600; gap: 6px; justify-content: center; min-height: 46px; padding: 12px 16px; width: 100%; }
+.product-search-create:hover { background: #e0f1ed; }
+.product-search-create:focus-visible { outline: 2px solid var(--teal); outline-offset: -3px; }
+.modal-panel.product-modal { border-radius: 12px; max-width: 720px; width: min(720px, 100%); }
+.product-modal .modal-header { background: #f8fbfa; padding: 16px 20px; }
+.product-modal-form { gap: 12px 16px; padding: 16px; }
+.product-modal-section-title { border-top: 1px solid var(--line); color: #41505c; font-size: 13px; font-weight: 700; padding-top: 10px; }
+.product-modal-form input, .product-modal-form select { min-width: 0; transition: border-color 150ms ease, box-shadow 150ms ease; width: 100%; }
+.product-modal-form input, .product-modal-form select, .product-modal-form input::placeholder { font-weight: 400; }
+.product-modal-form input:focus, .product-modal-form select:focus { border-color: var(--teal); box-shadow: 0 0 0 3px rgba(0, 127, 114, .12); outline: none; }
+.product-modal-form input:disabled, .product-modal-form select:disabled { background: #f1f4f5; color: #65727a; }
+.product-modal-form input[type="number"] { font-variant-numeric: tabular-nums; text-align: right; }
+.product-modal-category { align-items: center; background: #f7faf9; border: 1px solid var(--line); border-radius: 8px; display: grid; gap: 8px; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr) auto; padding: 10px 12px; }
+.product-modal-category-heading { color: #41505c; font-size: 12px; grid-column: 1 / -1; }
+.product-modal-category > button { white-space: nowrap; }
+.product-modal-category-error { grid-column: 1 / -1; }
+.product-modal-form > .form-actions { background: #f5f8f8; border-top: 1px solid var(--line); border-radius: 0 0 12px 12px; margin: 2px -16px -16px; padding: 12px 16px; position: sticky; bottom: -16px; z-index: 1; }
+.product-modal-reset { margin-right: auto; }
+@media (max-width: 760px) {
+  .product-modal .modal-header { padding: 14px 16px; }
+  .product-modal-form { padding: 16px; }
+  .product-modal-category { grid-template-columns: minmax(0, 1fr) auto; padding: 10px; }
+  .product-modal-category > input[aria-label="Tên ngành hàng mới"] { grid-column: 1 / -1; }
+  .product-modal-form > .form-actions { bottom: -16px; flex-wrap: wrap; margin: 2px -16px -16px; padding: 12px 16px; }
+}
+
 .line-table {
   display: grid;
   gap: 8px;
@@ -2321,6 +2398,64 @@ label {
   display: grid;
   gap: 14px;
   grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.report-metric-card {
+  --report-accent: #087f72;
+  --report-tint: #e8f6f2;
+  background: linear-gradient(135deg, #fff 55%, var(--report-tint));
+  border: 1px solid var(--line);
+  border-top: 3px solid var(--report-accent);
+  border-radius: 8px;
+  box-shadow: 0 3px 12px rgba(28, 55, 62, 0.05);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  justify-content: space-between;
+  min-width: 0;
+  padding: 14px 16px 16px;
+  position: relative;
+}
+
+.report-metric-subtotal { --report-accent: #3567b7; --report-tint: #edf3fd; }
+.report-metric-shipping { --report-accent: #7660b3; --report-tint: #f3effb; }
+.report-metric-discount { --report-accent: #aa681d; --report-tint: #fff5e7; }
+
+.report-metric-heading {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  padding-right: 36px;
+}
+
+.report-metric-heading > span {
+  color: #52606d;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.report-metric-icon {
+  align-items: center;
+  background: var(--report-tint);
+  border-radius: 7px;
+  color: var(--report-accent);
+  display: flex;
+  height: 28px;
+  justify-content: center;
+  position: absolute;
+  right: 16px;
+  top: 12px;
+  width: 28px;
+}
+
+.report-metric-value {
+  color: var(--report-accent);
+  font-size: 20px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 800;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
 }
 
 .dashboard-period-filter {
@@ -4648,6 +4783,8 @@ label {
 .order-reconciliation-table td > small { color: var(--muted); display: block; font-size: 11px; margin-top: 3px; }
 .order-reconciliation-table td > strong:not(.code-cell) { display: block; }
 .order-reconciliation-address { color: #536765; max-width: 230px; }
+.order-reconciliation-table td.order-reconciliation-handover-note { min-width: 140px; max-width: 240px; }
+.order-reconciliation-handover-note { white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.45; }
 .order-reconciliation-phone { background: transparent; border: 0; color: var(--secondary); cursor: pointer; display: block; font: inherit; margin: 3px 0 0; padding: 0; text-align: left; text-decoration: none; }
 .order-reconciliation-phone:hover { color: var(--secondary); }
 .order-reconciliation-phone:focus-visible { border-radius: 3px; outline: 2px solid var(--teal); outline-offset: 2px; }
@@ -4964,4 +5101,91 @@ label {
   .receipt-k80 {
     width: 80mm;
   }
+}
+
+/* Shared payment and reconciliation note shortcuts. */
+.modal-panel.internal-cod-collection-modal > .internal-cod-collection-form { overflow-y: auto; }
+.payment-note-input { display: grid; gap: 8px; min-width: 0; }
+.payment-note-input textarea { font-weight: 400; }
+.payment-note-shortcuts { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.payment-note-chip { border: 1px solid #cce2dd; background: #f1f8f6; color: var(--teal-dark); border-radius: 7px; padding: 6px 10px; font: inherit; font-size: 12px; cursor: pointer; }
+.payment-note-chip:hover, .payment-note-chip.selected { background: #dbf0e9; border-color: var(--teal); }
+.payment-note-chip:focus-visible, .payment-note-configure:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
+.payment-note-configure { display: inline-flex; align-items: center; gap: 4px; border: 0; background: transparent; color: var(--muted); font: inherit; font-size: 12px; padding: 6px; cursor: pointer; margin-left: auto; }
+.payment-note-settings { background: #f5f9f8; border: 1px solid var(--line); border-radius: 8px; padding: 10px; display: grid; gap: 9px; }
+.payment-note-settings > p, .payment-note-error { font-size: 12px; margin: 0; }
+.payment-note-settings > p { color: var(--muted); }
+.payment-note-settings-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; max-height: 240px; overflow-y: auto; }
+.payment-note-settings-item { display: flex; align-items: flex-end; gap: 5px; min-width: 0; }
+.payment-note-settings-item label { flex: 1; min-width: 0; }
+.payment-note-remove { background: transparent; border: 1px solid var(--line); border-radius: 6px; color: #b53a32; cursor: pointer; display: grid; place-items: center; min-height: 38px; width: 32px; flex-shrink: 0; }
+.payment-note-remove:hover { background: #fff0ed; }
+.payment-note-add { justify-self: start; }
+.payment-note-settings-fields input { width: 100%; min-width: 0; font-weight: 400; }
+.payment-note-settings-actions { display: flex; justify-content: flex-end; gap: 6px; }
+.payment-note-error { color: #b53a32; }
+@media (max-width: 640px) {
+  .payment-note-settings-fields { grid-template-columns: 1fr; }
+  .payment-note-chip, .payment-note-configure { font-size: 13px; }
+}
+
+/* Shared focus treatment for editable controls and borderless composite fields. */
+:root :is(input, select, textarea) {
+  transition: var(--input-focus-transition);
+}
+
+:root :is(input, select, textarea):not(:disabled):not([readonly]):focus {
+  border-color: var(--input-focus-border);
+  box-shadow: var(--input-focus-shadow);
+  outline: none;
+}
+
+:root :is(
+  .global-search, .search-box, .line-search, .sold-products-filter,
+  .internal-handover-assigned-search, .internal-handover-shipper-filter,
+  .shipping-claim-search-panel, .internal-cod-filter-card,
+  .internal-cod-history-search, .order-reconciliation-search
+) {
+  transition: var(--input-focus-transition);
+}
+
+:root :is(
+  .global-search, .search-box, .line-search, .sold-products-filter,
+  .internal-handover-assigned-search, .internal-handover-shipper-filter,
+  .shipping-claim-search-panel, .internal-cod-filter-card,
+  .internal-cod-history-search, .order-reconciliation-search
+):has(:is(input, select, textarea):not(:disabled):not([readonly]):focus) {
+  border-color: var(--input-focus-border);
+  box-shadow: var(--input-focus-shadow);
+}
+
+/* The surrounding field owns the ring; its borderless control stays transparent. */
+:root :is(
+  .global-search, .search-box, .line-search, .sold-products-filter,
+  .internal-handover-assigned-search, .internal-handover-shipper-filter,
+  .shipping-claim-search-panel, .internal-cod-filter-card,
+  .internal-cod-history-search, .order-reconciliation-search
+) :is(input, select, textarea):not(:disabled):not([readonly]):focus {
+  box-shadow: none;
+  outline: none;
+}
+
+:root .line-search.pos-customer-selected:has(input:not(:disabled):not([readonly]):focus) {
+  box-shadow: inset 3px 0 0 var(--teal), var(--input-focus-shadow);
+}
+
+:root .invoice-cancel-reason:focus-within {
+  border-color: var(--input-focus-border);
+  box-shadow: none;
+}
+
+:root .date-range-trigger:is(:focus, .open),
+:root .dashboard-chart-filter:is(:focus-within, .open) {
+  border-color: var(--input-focus-border);
+  box-shadow: var(--input-focus-shadow);
+  outline: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root { --input-focus-transition: none; }
 }

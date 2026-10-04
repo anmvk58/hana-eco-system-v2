@@ -19,6 +19,7 @@ class Invoice(Base, TimestampMixin, SoftDeleteMixin):
     status: Mapped[InvoiceStatus] = mapped_column(Enum(InvoiceStatus), default=InvoiceStatus.created, index=True, nullable=False)
     sold_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True, nullable=False)
     audit_label: Mapped[InvoiceAuditLabel | None] = mapped_column(Enum(InvoiceAuditLabel), index=True, nullable=True)
+    handover_note: Mapped[str | None] = mapped_column(String(500), nullable=True)
     assigned_shipper_id: Mapped[int | None] = mapped_column(ForeignKey("shippers.id"), index=True, nullable=True)
     audited_at: Mapped[datetime | None] = mapped_column(DateTime, index=True, nullable=True)
     audited_by_user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), index=True, nullable=True)

@@ -60,6 +60,7 @@ type InvoiceListFilters = {
   customer_id?: number;
   code?: string;
   customer_phone?: string;
+  customer_name?: string;
   from_date?: string;
   to_date?: string;
   page?: number;
@@ -204,6 +205,10 @@ export const api = {
       request<ExternalHandoverBatch>(`/ship-management/external-handover-batches/${id}`, { method: "PUT", body: JSON.stringify(payload) }),
     cancelExternalBatch: (id: number) =>
       request<ExternalHandoverBatch>(`/ship-management/external-handover-batches/${id}/cancel`, { method: "POST" }),
+  },
+  paymentNoteSettings: {
+    get: () => request<{ notes: string[] }>("/payment-note-settings"),
+    update: (notes: string[]) => request<{ notes: string[] }>("/payment-note-settings", { method: "PUT", body: JSON.stringify({ notes }) }),
   },
   internalCodCollections: {
     summary: (collectionDate?: string) =>

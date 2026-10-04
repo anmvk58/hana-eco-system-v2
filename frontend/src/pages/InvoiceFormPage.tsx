@@ -1,15 +1,17 @@
 import { BadgeCheck, Edit2, LoaderCircle, Minus, Plus, RefreshCw, Save, Search, Settings, Trash2, X } from "lucide-react";
 import { CSSProperties, FormEvent, KeyboardEvent, memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { useNavigate, useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 
 import { api } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
 import { InvoiceReceipt } from "../components/InvoiceReceipt";
 import { Modal } from "../components/Modal";
+import { ProductModal } from "../components/ProductModal";
 import { ToastNotification } from "../components/ToastNotification";
 import {
   createSaleDraft,
+  createInvoiceEditDraft,
   createSaleDraftCollection,
   readSaleDraftCollection,
   saleDraftStorageKey,
@@ -148,10 +150,10 @@ export function InvoiceFormPage() {
   const { currentUser, hasPermission } = useAuth();
   const { invoiceId } = useParams();
   const navigate = useNavigate();
-  const editingId = invoiceId ? Number(invoiceId) : null;
-  const isEditing = Boolean(editingId);
+  const requestedInvoiceId = invoiceId ? Number(invoiceId) : null;
+  const location = useLocation();
   const storedDraftCollectionRef = useRef<SaleDraftCollection | null>(
-    !isEditing && currentUser ? readSaleDraftCollection(currentUser.id) : null,
+    currentUser ? readSaleDraftCollection(currentUser.id) : null,
   );
   const initialDraftCollectionRef = useRef<SaleDraftCollection>(
     storedDraftCollectionRef.current ?? createSaleDraftCollection(defaultCharges),
@@ -164,10 +166,15 @@ export function InvoiceFormPage() {
   const [nextDraftSequence, setNextDraftSequence] = useState(initialDraftCollectionRef.current.nextSequence);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
-  const [invoice, setInvoice] = useState<Invoice | null>(null);
-  const [customerId, setCustomerId] = useState(isEditing ? "" : initialDraft.customerId);
-  const [customerSearch, setCustomerSearch] = useState(isEditing ? "" : initialDraft.customerSearch);
-  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(isEditing ? null : initialDraft.selectedCustomer);
+  const invoice = drafts.find((draft) => draft.id === activeDraftId)?.editingInvoice ?? null;
+  const editingId = invoice?.id ?? null;
+  const isEditing = Boolean(invoice);
+  const [openingInvoice, setOpeningInvoice] = useState(Boolean(requestedInvoiceId));
+  const [invoiceLoadError, setInvoiceLoadError] = useState("");
+  const [invoiceLoadVersion, setInvoiceLoadVersion] = useState(0);
+  const [customerId, setCustomerId] = useState(initialDraft.customerId);
+  const [customerSearch, setCustomerSearch] = useState(initialDraft.customerSearch);
+  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(initialDraft.selectedCustomer);
   const [customerFocused, setCustomerFocused] = useState(false);
   const [customerModalOpen, setCustomerModalOpen] = useState(false);
   const [customerForm, setCustomerForm] = useState(blankCustomerForm);
@@ -175,14 +182,14 @@ export function InvoiceFormPage() {
   const [customerQuickEditForm, setCustomerQuickEditForm] = useState(blankCustomerQuickEditForm);
   const [customerQuickEditError, setCustomerQuickEditError] = useState("");
   const [customerQuickEditSaving, setCustomerQuickEditSaving] = useState(false);
-  const [note, setNote] = useState(isEditing ? "" : initialDraft.note);
-  const [reason, setReason] = useState(isEditing ? "" : initialDraft.reason);
-  const [lines, setLines] = useState<DraftLine[]>(isEditing ? [] : initialDraft.lines);
-  const [charges, setCharges] = useState<DraftCharge[]>(isEditing ? defaultCharges : initialDraft.charges);
-  const [discount, setDiscount] = useState(isEditing ? "0" : initialDraft.discount);
-  const [applyShippingFee, setApplyShippingFee] = useState(isEditing ? true : initialDraft.applyShippingFee);
-  const [isPaidByTransfer, setIsPaidByTransfer] = useState(isEditing ? false : initialDraft.isPaidByTransfer);
-  const [printTwoCopies, setPrintTwoCopies] = useState(isEditing ? true : initialDraft.printTwoCopies);
+  const [note, setNote] = useState(initialDraft.note);
+  const [reason, setReason] = useState(initialDraft.reason);
+  const [lines, setLines] = useState<DraftLine[]>(initialDraft.lines);
+  const [charges, setCharges] = useState<DraftCharge[]>(initialDraft.charges);
+  const [discount, setDiscount] = useState(initialDraft.discount);
+  const [applyShippingFee, setApplyShippingFee] = useState(initialDraft.applyShippingFee);
+  const [isPaidByTransfer, setIsPaidByTransfer] = useState(initialDraft.isPaidByTransfer);
+  const [printTwoCopies, setPrintTwoCopies] = useState(initialDraft.printTwoCopies);
   const [shippingSettingsOpen, setShippingSettingsOpen] = useState(false);
   useEffect(() => {
     if (!checkoutOpen) return;
@@ -196,6 +203,7 @@ export function InvoiceFormPage() {
   }, [checkoutOpen]);
   const [shippingDefaultAmount, setShippingDefaultAmount] = useState("0");
   const [productSearch, setProductSearch] = useState("");
+  const [newProductName, setNewProductName] = useState<string | null>(null);
   const [searchFocused, setSearchFocused] = useState(false);
   const [highlightedProductIndex, setHighlightedProductIndex] = useState(0);
   const [error, setError] = useState("");
@@ -221,6 +229,7 @@ export function InvoiceFormPage() {
   const [quickPriceError, setQuickPriceError] = useState("");
   const [quickPriceSaving, setQuickPriceSaving] = useState(false);
   const [invoiceToPrint, setInvoiceToPrint] = useState<Invoice | null>(null);
+  const [invoicePrintTwoCopies, setInvoicePrintTwoCopies] = useState(true);
   const [submitting, setSubmitting] = useState(false);
 
   const applyDraft = useCallback((draft: SaleDraft) => {
@@ -240,8 +249,28 @@ export function InvoiceFormPage() {
     setError("");
   }, []);
 
+  const workspaceRef = useRef({ drafts, activeDraftId, nextSequence: nextDraftSequence, customerId, customerSearch, selectedCustomer, note, reason, lines, charges, discount, applyShippingFee, isPaidByTransfer, printTwoCopies });
+  workspaceRef.current = { drafts, activeDraftId, nextSequence: nextDraftSequence, customerId, customerSearch, selectedCustomer, note, reason, lines, charges, discount, applyShippingFee, isPaidByTransfer, printTwoCopies };
+
+  function snapshotDrafts() {
+    const { drafts: currentDrafts, activeDraftId: currentId, nextSequence: _sequence, ...content } = workspaceRef.current;
+    return currentDrafts.map((draft) => draft.id === currentId ? { ...draft, ...content, updatedAt: new Date().toISOString() } : draft);
+  }
+
+  function commitWorkspace(collection: SaleDraftCollection, followRoute = true) {
+    const draft = collection.drafts.find((item) => item.id === collection.activeDraftId)!;
+    if (currentUser) writeSaleDraftCollection(currentUser.id, collection);
+    setDrafts(collection.drafts);
+    setNextDraftSequence(collection.nextSequence);
+    setActiveDraftId(draft.id);
+    applyDraft(draft);
+    if (followRoute) {
+      const path = draft.editingInvoice ? `/invoices/${draft.editingInvoice.id}/edit` : hasPermission("invoices.create") ? "/invoices/new" : "/invoices";
+      if (location.pathname !== path) navigate(path, { replace: true });
+    }
+  }
+
   useEffect(() => {
-    if (isEditing) return;
     setDrafts((currentDrafts) => currentDrafts.map((draft) => {
       if (draft.id !== activeDraftId) return draft;
       const nextContent = {
@@ -277,7 +306,7 @@ export function InvoiceFormPage() {
   }, [activeDraftId, applyShippingFee, charges, customerId, customerSearch, discount, isEditing, isPaidByTransfer, lines, note, printTwoCopies, reason, selectedCustomer]);
 
   useEffect(() => {
-    if (isEditing || !currentUser) return;
+    if (!currentUser) return;
     const timer = window.setTimeout(() => {
       writeSaleDraftCollection(currentUser.id, {
         version: 1,
@@ -290,9 +319,10 @@ export function InvoiceFormPage() {
   }, [activeDraftId, currentUser, drafts, isEditing, nextDraftSequence]);
 
   useEffect(() => {
-    if (isEditing || !currentUser) return;
+    if (!currentUser) return;
     const storageKey = saleDraftStorageKey(currentUser.id);
     const handleStorage = (event: StorageEvent) => {
+      if (submitting) return;
       if (event.key !== storageKey || !event.newValue) return;
       const collection = readSaleDraftCollection(currentUser.id);
       if (!collection) return;
@@ -306,16 +336,15 @@ export function InvoiceFormPage() {
     };
     window.addEventListener("storage", handleStorage);
     return () => window.removeEventListener("storage", handleStorage);
-  }, [activeDraftId, applyDraft, currentUser, isEditing]);
+  }, [activeDraftId, applyDraft, currentUser, isEditing, submitting]);
 
   useEffect(() => {
     if (!invoiceToPrint) return;
     let cancelled = false;
     const clearPrintedInvoice = () => {
-      setToastTitle(isEditing ? "Cập nhật hóa đơn thành công" : "Tạo hóa đơn thành công");
+      setToastTitle(invoiceToPrint.revision > 0 ? "Cập nhật hóa đơn thành công" : "Tạo hóa đơn thành công");
       setToastMessage(`Hóa đơn ${invoiceToPrint.code} đã được lưu.`);
       setInvoiceToPrint(null);
-      if (isEditing) navigate(`/invoices/${invoiceToPrint.id}`);
     };
     window.addEventListener("afterprint", clearPrintedInvoice, { once: true });
 
@@ -358,7 +387,7 @@ export function InvoiceFormPage() {
       setProducts(productData);
       const shipping = chargeSettingData.find((setting) => setting.charge_type === "shipping");
       setShippingDefaultAmount(shipping?.default_amount ?? "0");
-      if (!editingId && !storedDraftCollectionRef.current) {
+      if (!requestedInvoiceId && !storedDraftCollectionRef.current) {
         setCharges(buildChargesFromSettings(chargeSettingData));
       }
       setBaseDataReady(true);
@@ -371,7 +400,7 @@ export function InvoiceFormPage() {
         if (!cancelled) setBaseDataLoading(false);
       });
     return () => { cancelled = true; };
-  }, [editingId, baseDataRetryVersion]);
+  }, [baseDataRetryVersion]);
 
   useEffect(() => {
     if (isEditing || !customerFocused || customerId) return;
@@ -393,34 +422,30 @@ export function InvoiceFormPage() {
   }, [customerFocused, customerId, customerSearch, isEditing]);
 
   useEffect(() => {
-    if (!editingId) return;
-    async function loadInvoice() {
-      const data = await api.invoices.get(editingId!);
-      setInvoice(data);
-      setCustomerId(data.customer_id ? String(data.customer_id) : "");
-      setCustomerSearch(data.customer ? `${data.customer.phone ?? data.customer.code} - ${data.customer.name}` : "");
-      setSelectedCustomer(data.customer ?? null);
-      setIsPaidByTransfer(data.is_paid_by_transfer);
-      setNote(data.note ?? "");
-      setDiscount(data.discount_amount);
-      setLines(
-        data.items.map((item) => ({
-          product_id: item.product_id ? String(item.product_id) : "",
-          quantity: item.quantity,
-          unit_price: item.unit_price,
-        })),
-      );
-      setCharges(
-        defaultCharges.map((charge) => {
-          const found = data.extra_charges.find((item) => item.charge_type === charge.charge_type);
-          return found ? { charge_type: found.charge_type, name: charge.name, amount: found.amount } : charge;
-        }),
-      );
-      const shippingCharge = data.extra_charges.find((item) => item.charge_type === "shipping");
-      setApplyShippingFee(Boolean(shippingCharge && Number(shippingCharge.amount || 0) > 0));
-    }
-    void loadInvoice().catch((err) => setError(err instanceof Error ? err.message : "Không tải được hóa đơn"));
-  }, [editingId]);
+    if (!requestedInvoiceId) { setOpeningInvoice(false); setInvoiceLoadError(""); return; }
+    let cancelled = false;
+    setOpeningInvoice(true);
+    setInvoiceLoadError("");
+    void api.invoices.get(requestedInvoiceId)
+      .then((data) => {
+        if (cancelled) return;
+        if (data.status !== "created" || data.deleted_at) throw new Error("Chỉ có thể sửa hóa đơn đang tạo và chưa bị xóa.");
+        const workspace = workspaceRef.current;
+        const currentDrafts = snapshotDrafts();
+        const existing = currentDrafts.find((draft) => draft.editingInvoice?.id === data.id);
+        if (!existing && currentDrafts.length >= 20) throw new Error("Đã mở tối đa 20 tab. Vui lòng đóng bớt tab bán hàng trước khi sửa hóa đơn.");
+        const draft = existing ?? createInvoiceEditDraft(data, workspace.nextSequence, defaultCharges);
+        commitWorkspace({
+          version: 1,
+          drafts: existing ? currentDrafts : [...currentDrafts, draft],
+          activeDraftId: draft.id,
+          nextSequence: workspace.nextSequence + (existing ? 0 : 1),
+        }, false);
+      })
+      .catch((err) => { if (!cancelled) setInvoiceLoadError(err instanceof Error ? err.message : "Không tải được hóa đơn"); })
+      .finally(() => { if (!cancelled) setOpeningInvoice(false); });
+    return () => { cancelled = true; };
+  }, [requestedInvoiceId, invoiceLoadVersion]);
 
   const productMap = useMemo(() => new Map(products.map((product) => [product.id, product])), [products]);
 
@@ -674,7 +699,9 @@ export function InvoiceFormPage() {
       setCustomers((current) => current.some((customer) => customer.id === updated.id)
         ? current.map((customer) => customer.id === updated.id ? updated : customer)
         : [updated, ...current]);
-      setInvoice((current) => current && current.customer_id === updated.id ? { ...current, customer: updated } : current);
+      setDrafts((current) => current.map((draft) => draft.editingInvoice?.customer_id === updated.id
+        ? { ...draft, editingInvoice: { ...draft.editingInvoice, customer: updated } }
+        : draft));
       setCustomerQuickEditOpen(false);
       setCustomerQuickEditForm(blankCustomerQuickEditForm);
       setToastTitle("Cập nhật khách hàng thành công");
@@ -746,6 +773,7 @@ export function InvoiceFormPage() {
   }
 
   function draftLabel(draft: SaleDraft) {
+    if (draft.editingInvoice) return `Sửa · ${draft.editingInvoice.code}`;
     const customer = draft.selectedCustomer;
     if (!customer) return "Hóa đơn";
     return customer.phone ? `${customer.name} - ${customer.phone}` : customer.name;
@@ -755,8 +783,11 @@ export function InvoiceFormPage() {
     if (submitting || draftId === activeDraftId) return;
     const draft = drafts.find((item) => item.id === draftId);
     if (!draft) return;
-    setActiveDraftId(draft.id);
-    applyDraft(draft);
+    if (!hasPermission(draft.editingInvoice ? "invoices.update" : "invoices.create")) {
+      setError("Bạn không có quyền thao tác với tab hóa đơn này.");
+      return;
+    }
+    commitWorkspace({ version: 1, drafts: snapshotDrafts(), activeDraftId: draft.id, nextSequence: nextDraftSequence });
   }
 
   function toggleShippingFee(checked: boolean) {
@@ -769,7 +800,7 @@ export function InvoiceFormPage() {
   }
 
   function addDraft() {
-    if (submitting) return;
+    if (submitting || !hasPermission("invoices.create")) return;
     if (drafts.length >= 20) {
       setError("Chỉ được mở tối đa 20 đơn đang nhập. Vui lòng thanh toán hoặc đóng bớt đơn.");
       return;
@@ -779,20 +810,18 @@ export function InvoiceFormPage() {
       { charge_type: "packing", name: "Phí đóng hàng", amount: "0" },
       { charge_type: "other", name: "Phụ thu khác", amount: "0" },
     ]);
-    setDrafts((current) => [...current, draft]);
-    setNextDraftSequence((current) => current + 1);
-    setActiveDraftId(draft.id);
-    applyDraft(draft);
+    commitWorkspace({ version: 1, drafts: [...snapshotDrafts(), draft], activeDraftId: draft.id, nextSequence: nextDraftSequence + 1 });
   }
 
   function closeDraft(draftId: string) {
     if (submitting) return;
-    const index = drafts.findIndex((draft) => draft.id === draftId);
-    const closingDraft = drafts[index];
+    const currentDrafts = snapshotDrafts();
+    const index = currentDrafts.findIndex((draft) => draft.id === draftId);
+    const closingDraft = currentDrafts[index];
     if (!closingDraft) return;
-    if (isMeaningfulDraft(closingDraft) && !window.confirm("Xóa đơn đang nhập này? Dữ liệu chưa thanh toán sẽ bị mất.")) return;
+    if (isMeaningfulDraft(closingDraft) && !window.confirm(closingDraft.editingInvoice ? `Đóng tab sửa ${closingDraft.editingInvoice.code}? Thay đổi chưa lưu sẽ bị mất; hóa đơn gốc được giữ nguyên.` : "Xóa đơn đang nhập này? Dữ liệu chưa thanh toán sẽ bị mất.")) return;
 
-    let remaining = drafts.filter((draft) => draft.id !== draftId);
+    let remaining = currentDrafts.filter((draft) => draft.id !== draftId);
     let nextSequence = nextDraftSequence;
     if (remaining.length === 0) {
       const replacement = createSaleDraft(nextSequence, [
@@ -803,19 +832,14 @@ export function InvoiceFormPage() {
       nextSequence += 1;
       remaining = [replacement];
     }
-    setDrafts(remaining);
-    setNextDraftSequence(nextSequence);
-    if (draftId === activeDraftId) {
-      const nextDraft = remaining[Math.min(index, remaining.length - 1)];
-      setActiveDraftId(nextDraft.id);
-      applyDraft(nextDraft);
-    }
+    const nextDraft = draftId === activeDraftId ? remaining[Math.min(index, remaining.length - 1)] : remaining.find((draft) => draft.id === activeDraftId)!;
+    commitWorkspace({ version: 1, drafts: remaining, activeDraftId: nextDraft.id, nextSequence });
   }
 
   function finishActiveDraft() {
     if (!currentUser) return;
     const currentIndex = drafts.findIndex((draft) => draft.id === activeDraftId);
-    let remaining = drafts.filter((draft) => draft.id !== activeDraftId);
+    let remaining = snapshotDrafts().filter((draft) => draft.id !== activeDraftId);
     let nextSequence = nextDraftSequence;
     if (remaining.length === 0) {
       const replacement = createSaleDraft(nextSequence, [
@@ -833,11 +857,7 @@ export function InvoiceFormPage() {
       nextSequence,
       drafts: remaining,
     };
-    writeSaleDraftCollection(currentUser.id, collection);
-    setDrafts(remaining);
-    setNextDraftSequence(nextSequence);
-    setActiveDraftId(nextDraft.id);
-    applyDraft(nextDraft);
+    commitWorkspace(collection);
   }
 
   async function submit(event: FormEvent) {
@@ -846,8 +866,13 @@ export function InvoiceFormPage() {
       setCheckoutOpen(true);
       return;
     }
+    if (submitting || openingInvoice) return;
     setError("");
     setToastMessage("");
+    if (!hasPermission(isEditing ? "invoices.update" : "invoices.create")) {
+      setError("Bạn không có quyền lưu hóa đơn này.");
+      return;
+    }
     const cleanLines = lines.filter((line) => line.product_id);
     if (cleanLines.length === 0) {
       setError("Hóa đơn cần ít nhất một sản phẩm");
@@ -886,24 +911,15 @@ export function InvoiceFormPage() {
     try {
       const saved = isEditing ? await api.invoices.update(editingId!, payload) : await api.invoices.create(payload);
       setCheckoutOpen(false);
-      if (isEditing) {
-        if (hasPermission("invoices.print")) {
-          setPrintTwoCopies(true);
-          setInvoiceToPrint(saved);
-        } else {
-          navigate(`/invoices/${saved.id}`);
-        }
-        return;
-      }
-
-      finishActiveDraft();
+      const previousItems = invoice?.items ?? [];
       setProducts((current) => current.map((product) => {
-        const soldItem = saved.items.find((item) => item.product_id === product.id);
-        return soldItem
-          ? { ...product, stock_quantity: String(Number(product.stock_quantity) - Number(soldItem.quantity)) }
-          : product;
+        const previousQuantity = previousItems.filter((item) => item.product_id === product.id).reduce((sum, item) => sum + Number(item.quantity), 0);
+        const nextQuantity = saved.items.filter((item) => item.product_id === product.id).reduce((sum, item) => sum + Number(item.quantity), 0);
+        return { ...product, stock_quantity: String(Number(product.stock_quantity) + previousQuantity - nextQuantity) };
       }));
+      finishActiveDraft();
       if (hasPermission("invoices.print")) {
+        setInvoicePrintTwoCopies(isEditing ? true : printTwoCopies);
         setInvoiceToPrint(saved);
       } else {
         setToastTitle(isEditing ? "Cập nhật hóa đơn thành công" : "Tạo hóa đơn thành công");
@@ -941,6 +957,19 @@ export function InvoiceFormPage() {
     }
   }
 
+  if (openingInvoice || invoiceLoadError) {
+    return (
+      <section className="sales-loading-gate" aria-busy={openingInvoice}>
+        <h2>{openingInvoice ? "Đang mở tab sửa hóa đơn" : "Không mở được hóa đơn"}</h2>
+        {invoiceLoadError ? <p className="alert error">{invoiceLoadError}</p> : null}
+        {!openingInvoice ? <div className="form-actions">
+          {hasPermission("invoices.create") ? <button className="secondary-button" type="button" onClick={() => navigate("/invoices/new", { replace: true })}>Trở lại bán hàng</button> : null}
+          <button className="primary-button" type="button" onClick={() => setInvoiceLoadVersion((version) => version + 1)}>Thử tải lại</button>
+        </div> : null}
+      </section>
+    );
+  }
+
   if (!baseDataReady) {
     return (
       <section className="sales-loading-gate" aria-busy={baseDataLoading} aria-live="polite">
@@ -965,11 +994,10 @@ export function InvoiceFormPage() {
 
   return (
     <>
-      {!isEditing ? (
-        <nav className="sale-draft-tabs" aria-label="Các đơn đang nhập">
+      <nav className="sale-draft-tabs" aria-label="Các đơn đang nhập">
           <div className="sale-draft-tab-list" role="tablist">
             {drafts.map((draft) => (
-              <div className={`sale-draft-tab${draft.id === activeDraftId ? " active" : ""}`} key={draft.id}>
+              <div className={`sale-draft-tab${draft.editingInvoice ? " editing" : ""}${draft.id === activeDraftId ? " active" : ""}`} key={draft.id}>
                 <button
                   type="button"
                   role="tab"
@@ -990,23 +1018,13 @@ export function InvoiceFormPage() {
                 </button>
               </div>
             ))}
-            <button className="sale-draft-add" type="button" onClick={addDraft} disabled={drafts.length >= 20 || submitting} aria-label="Thêm hóa đơn mới" title="Thêm hóa đơn mới">
+            <button className="sale-draft-add" type="button" onClick={addDraft} disabled={drafts.length >= 20 || submitting || !hasPermission("invoices.create")} aria-label="Thêm hóa đơn mới" title="Thêm hóa đơn mới">
               <Plus size={18} />
             </button>
           </div>
-        </nav>
-      ) : null}
+      </nav>
       <form id="pos-invoice-form" className="invoice-workspace pos-workspace" onSubmit={(event) => void submit(event)}>
         <div className="pos-entry-column">
-          {isEditing ? (
-            <div className="panel-header">
-              <div>
-                <h2>{`Sửa hóa đơn ${invoice?.code ?? ""}`}</h2>
-                <span>Chỉ được sửa hàng hóa, số lượng, đơn giá và các khoản phí</span>
-              </div>
-            </div>
-          ) : null}
-
           {error ? <div className="alert error">{error}</div> : null}
 
 
@@ -1090,7 +1108,16 @@ export function InvoiceFormPage() {
                         ) : null}
                       </div>
                     ))}
-                    {suggestedProducts.length === 0 ? <div className="suggestion-empty">Không tìm thấy sản phẩm phù hợp</div> : null}
+                    {suggestedProducts.length === 0 ? (
+                      <div className="product-search-empty">
+                        <div className="suggestion-empty">Không tìm thấy sản phẩm phù hợp</div>
+                        {hasPermission("products.create") ? (
+                          <button className="product-search-create" type="button" onClick={() => { setNewProductName(productSearch.trim()); setSearchFocused(false); }}>
+                            <Plus size={17} />Thêm mới sản phẩm
+                          </button>
+                        ) : null}
+                      </div>
+                    ) : null}
                   </div>
                 ) : null}
               </div>
@@ -1226,7 +1253,7 @@ export function InvoiceFormPage() {
             onRemove={removeQuickProductSlot}
           />
           <div className="pos-payment-action">
-            <button className="primary-button" type="button" onClick={() => setCheckoutOpen(true)} disabled={!lines.some((line) => line.product_id)}>Thanh toán</button>
+            <button className="primary-button" type="button" onClick={() => setCheckoutOpen(true)} disabled={!lines.some((line) => line.product_id) || !hasPermission(isEditing ? "invoices.update" : "invoices.create")}>{isEditing ? "Lưu sửa hóa đơn" : "Thanh toán"}</button>
           </div>
         {checkoutOpen ? createPortal(<div className="pos-checkout-backdrop" onClick={(event) => { if (event.target === event.currentTarget && !submitting) setCheckoutOpen(false); }}>
         <aside ref={checkoutRef} className="checkout-panel pos-checkout-overlay" style={customerPanelWidth ? { "--pos-customer-panel-width": `${customerPanelWidth}px` } as CSSProperties : undefined} role="dialog" aria-modal="true" aria-label="Thanh toán hóa đơn" onKeyDown={(event) => {
@@ -1240,7 +1267,7 @@ export function InvoiceFormPage() {
             else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
           }
         }}>
-          <div className="pos-checkout-header"><h2>Thanh toán hóa đơn</h2><button autoFocus className="icon-button" type="button" aria-label="Đóng thanh toán" disabled={submitting} onClick={() => setCheckoutOpen(false)}><X size={20} /></button></div>
+          <div className="pos-checkout-header"><h2>{isEditing ? `Sửa ${invoice?.code}` : "Thanh toán hóa đơn"}</h2><button autoFocus className="icon-button" type="button" aria-label="Đóng thanh toán" disabled={submitting} onClick={() => setCheckoutOpen(false)}><X size={20} /></button></div>
           <div className="pos-checkout-scroll">
           {!isEditing && hasPermission("invoices.print") ? (
             <section className="print-settings-section">
@@ -1330,7 +1357,7 @@ export function InvoiceFormPage() {
           <div className="pos-checkout-footer">
           <button className="primary-button pos-checkout-submit" type="submit" form="pos-invoice-form" disabled={submitting}>
             <Save size={24} />
-            {submitting ? "Đang xử lý..." : "Thanh toán"}
+            {submitting ? "Đang xử lý..." : isEditing ? "Lưu sửa hóa đơn" : "Thanh toán"}
           </button>
           </div>
         </aside></div>, document.body) : null}
@@ -1360,6 +1387,22 @@ export function InvoiceFormPage() {
             </div>
           </div>
         </Modal>
+      ) : null}
+
+      {newProductName !== null && hasPermission("products.create") ? (
+        <ProductModal
+          initialName={newProductName}
+          prefillFromName
+          onClose={() => setNewProductName(null)}
+          onSaved={(product) => {
+            setProducts((current) => [product, ...current.filter((item) => item.id !== product.id)]);
+            setNewProductName(null);
+            setProductSearch(product.code);
+            setHighlightedProductIndex(0);
+            setError("");
+            window.requestAnimationFrame(() => productSearchRef.current?.focus({ preventScroll: true }));
+          }}
+        />
       ) : null}
 
       {customerModalOpen ? (
@@ -1481,7 +1524,7 @@ export function InvoiceFormPage() {
       {invoiceToPrint ? (
         <div className="auto-print-receipts">
           <InvoiceReceipt invoice={invoiceToPrint} className="auto-print-receipt" />
-          {printTwoCopies ? <InvoiceReceipt invoice={invoiceToPrint} className="auto-print-receipt receipt-copy-next-page" /> : null}
+          {invoicePrintTwoCopies ? <InvoiceReceipt invoice={invoiceToPrint} className="auto-print-receipt receipt-copy-next-page" /> : null}
         </div>
       ) : null}
       {toastMessage ? <ToastNotification title={toastTitle} message={toastMessage} onClose={() => setToastMessage("")} /> : null}

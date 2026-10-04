@@ -203,6 +203,7 @@ def list_invoices(
     page: int = 1,
     page_size: int = 20,
     product_code: str | None = None,
+    customer_name: str | None = None,
 ) -> tuple[list[Invoice], int, int, int]:
     conditions = []
     if product_code is not None:
@@ -217,6 +218,8 @@ def list_invoices(
         conditions.append(Invoice.customer_id == customer_id)
     if code_filter and code_filter.strip():
         conditions.append(Invoice.code.ilike(f"%{code_filter.strip()}%"))
+    if customer_name and customer_name.strip():
+        conditions.append(Invoice.customer.has(Customer.name.icontains(customer_name.strip(), autoescape=True)))
     if customer_phone and customer_phone.strip():
         normalized_phone = customer_phone.replace(" ", "").strip()
         conditions.append(Invoice.customer.has(Customer.phone.contains(normalized_phone)))
@@ -304,6 +307,7 @@ def snapshot_invoice(invoice: Invoice) -> dict[str, Any]:
         "status": invoice.status,
         "sold_at": invoice.sold_at,
         "audit_label": invoice.audit_label,
+        "handover_note": invoice.handover_note,
         "assigned_shipper_id": invoice.assigned_shipper_id,
         "audited_at": invoice.audited_at,
         "audited_by_user_id": invoice.audited_by_user_id,
@@ -602,6 +606,7 @@ def rollback_audit_label(
     previous_label = invoice.audit_label
     try:
         invoice.audit_label = None
+        invoice.handover_note = None
         invoice.assigned_shipper_id = None
         invoice.audited_at = None
         invoice.audited_by_user_id = None

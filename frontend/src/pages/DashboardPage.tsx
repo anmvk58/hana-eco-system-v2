@@ -1,6 +1,7 @@
 import { BarChart3, CalendarDays, Check, ChevronDown, CircleDollarSign, ReceiptText } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
+import { useLocation } from "react-router-dom";
 
 import { api } from "../api/client";
 import { DateRangePicker } from "../components/DateRangePicker";
@@ -84,6 +85,7 @@ function compactMoney(value: number) {
 }
 
 export function DashboardPage() {
+  const { key: navigationKey } = useLocation();
   const today = todayInputValue();
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
   const [topProducts, setTopProducts] = useState<DashboardProductSummary[]>([]);
@@ -123,7 +125,7 @@ export function DashboardPage() {
     return () => {
       active = false;
     };
-  }, [fromDate, toDate]);
+  }, [fromDate, toDate, navigationKey]);
 
   useEffect(() => {
     let active = true;
@@ -145,7 +147,7 @@ export function DashboardPage() {
     return () => {
       active = false;
     };
-  }, [today, topProductMetric, topProductTimePreset]);
+  }, [today, topProductMetric, topProductTimePreset, navigationKey]);
 
   useEffect(() => {
     let active = true;
@@ -167,7 +169,7 @@ export function DashboardPage() {
     return () => {
       active = false;
     };
-  }, [today, topCustomerTimePreset]);
+  }, [today, topCustomerTimePreset, navigationKey]);
 
   useEffect(() => {
     let active = true;
@@ -189,7 +191,7 @@ export function DashboardPage() {
     return () => {
       active = false;
     };
-  }, [orderStatusTimePreset, today]);
+  }, [orderStatusTimePreset, today, navigationKey]);
 
   function selectPreset(preset: TimePreset) {
     setTimePreset(preset);

@@ -23,6 +23,7 @@ export function ShipManagementPage() {
   const [handoverIds, setHandoverIds] = useState<number[]>([]);
   const [modalOpen, setModalOpen] = useState(false);
   const [kind, setKind] = useState<HandoverKind>("external_shipper");
+  const [retailNote, setRetailNote] = useState("");
   const [advanceMethod, setAdvanceMethod] = useState<ExternalAdvanceMethod>("transfer");
   const [shippingFee, setShippingFee] = useState("");
   const [transferAmount, setTransferAmount] = useState("");
@@ -94,6 +95,7 @@ export function ShipManagementPage() {
 
   function resetForm() {
     setKind("external_shipper");
+    setRetailNote("");
     setAdvanceMethod("transfer");
     setShippingFee("");
     setTransferAmount("");
@@ -102,6 +104,7 @@ export function ShipManagementPage() {
 
   function openHandoverModal() {
     setKind("external_shipper");
+    setRetailNote("");
     setAdvanceMethod("transfer");
     setShippingFee("");
     setTransferAmount(String(handoverInvoiceTotal));
@@ -151,6 +154,7 @@ export function ShipManagementPage() {
     }
 
     const payload: ShipHandoverPayload = { invoice_ids: selectedIds, audit_label: kind };
+    if (kind === "retail" && retailNote.trim()) payload.handover_note = retailNote.trim();
     if (kind === "external_shipper") {
       payload.external_handoff = {
         advance_method: advanceMethod,
@@ -277,7 +281,10 @@ export function ShipManagementPage() {
               {advanceMethod !== "transfer" ? <label>Tiền mặt thực tế<div className="handover-money-input"><input required inputMode="numeric" value={formatNumberInput(cashAmount, false)} onChange={(event) => setCashAmount(normalizeNumberInput(event.target.value, false))}/><b>₫</b></div></label> : null}
             </div>
           </section>
-        </> : <div className="handover-retail-note span-2"><Store size={20}/><span><strong>Đánh dấu Khách lẻ</strong><small>Các đơn đã chọn sẽ được audit là Khách lẻ và không gán cho shipper.</small></span></div>}
+        </> : <>
+          <div className="handover-retail-note span-2"><Store size={20}/><span><strong>Đánh dấu Khách lẻ</strong><small>Các đơn đã chọn sẽ được audit là Khách lẻ và không gán cho shipper.</small></span></div>
+          <label className="handover-retail-note-field span-2"><span>Ghi chú bàn giao (không bắt buộc)</span><textarea rows={2} maxLength={500} disabled={submitting} value={retailNote} onChange={(event) => setRetailNote(event.target.value)} placeholder="Nhập ghi chú cho các đơn đã chọn"/></label>
+        </>}
         <div className="form-actions handover-form-actions span-2"><button className="secondary-button" type="button" disabled={submitting} onClick={() => setModalOpen(false)}>Hủy</button><button className="primary-button" type="submit" disabled={submitting}>{submitting ? <LoaderCircle className="loading-spinner" size={17}/> : kind === "retail" ? <Store size={17}/> : <Truck size={17}/>}Xác nhận bàn giao</button></div>
       </form>
     </Modal> : null}

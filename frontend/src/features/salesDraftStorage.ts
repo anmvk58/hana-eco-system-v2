@@ -1,4 +1,4 @@
-import type { Customer, ExtraChargeType } from "../types";
+import type { Customer, ExtraChargeType, Invoice } from "../types";
 
 export interface SaleDraftLine {
   product_id: string;
@@ -13,6 +13,7 @@ export interface SaleDraftCharge {
 }
 
 export interface SaleDraft {
+  editingInvoice?: Invoice;
   id: string;
   sequence: number;
   customerId: string;
@@ -69,6 +70,26 @@ export function createSaleDraftCollection(charges: SaleDraftCharge[]): SaleDraft
   return { version: 1, activeDraftId: draft.id, nextSequence: 2, drafts: [draft] };
 }
 
+export function createInvoiceEditDraft(invoice: Invoice, sequence: number, charges: SaleDraftCharge[]): SaleDraft {
+  const draft = createSaleDraft(sequence, charges);
+  return {
+    ...draft,
+    editingInvoice: invoice,
+    customerId: invoice.customer_id ? String(invoice.customer_id) : "",
+    customerSearch: invoice.customer ? `${invoice.customer.phone ?? invoice.customer.code} - ${invoice.customer.name}` : "",
+    selectedCustomer: invoice.customer ?? null,
+    note: invoice.note ?? "",
+    discount: invoice.discount_amount,
+    isPaidByTransfer: invoice.is_paid_by_transfer,
+    lines: invoice.items.map((item) => ({ product_id: item.product_id ? String(item.product_id) : "", quantity: item.quantity, unit_price: item.unit_price })),
+    charges: charges.map((charge) => {
+      const found = invoice.extra_charges.find((item) => item.charge_type === charge.charge_type);
+      return found ? { ...charge, amount: found.amount } : { ...charge, amount: "0" };
+    }),
+    applyShippingFee: invoice.extra_charges.some((charge) => charge.charge_type === "shipping" && Number(charge.amount) > 0),
+  };
+}
+
 export function readSaleDraftCollection(userId: number): SaleDraftCollection | null {
   try {
     const raw = window.localStorage.getItem(saleDraftStorageKey(userId));
@@ -76,7 +97,8 @@ export function readSaleDraftCollection(userId: number): SaleDraftCollection | n
     const parsed = JSON.parse(raw) as Partial<SaleDraftCollection>;
     if (parsed.version !== 1 || !Array.isArray(parsed.drafts) || parsed.drafts.length === 0) return null;
     const drafts = parsed.drafts.filter((draft): draft is SaleDraft => Boolean(
-      draft && typeof draft.id === "string" && typeof draft.sequence === "number" && Array.isArray(draft.lines) && Array.isArray(draft.charges),
+      draft && typeof draft.id === "string" && typeof draft.sequence === "number" && Array.isArray(draft.lines) && Array.isArray(draft.charges)
+      && (!draft.editingInvoice || (Number.isInteger(draft.editingInvoice.id) && draft.editingInvoice.id > 0 && draft.editingInvoice.status === "created" && !draft.editingInvoice.deleted_at && typeof draft.editingInvoice.code === "string" && typeof draft.editingInvoice.sold_at === "string" && Array.isArray(draft.editingInvoice.items))),
     )).map((draft) => ({ ...draft, discount: typeof draft.discount === "string" ? draft.discount : "0" }));
     if (drafts.length === 0) return null;
     const activeDraftId = drafts.some((draft) => draft.id === parsed.activeDraftId) ? parsed.activeDraftId! : drafts[0].id;

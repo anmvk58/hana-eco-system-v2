@@ -9,6 +9,8 @@ from app.models import AuthSession, Customer, ExternalHandoverBatch, ExternalHan
 from app.services.access_control_service import ensure_defaults as ensure_access_control_defaults
 from app.services.extra_charge_setting_service import ensure_default_extra_charge_settings
 from app.services.invoice_service import backfill_invoice_revisions
+from app.services.payment_note_setting_service import ensure_defaults as ensure_payment_note_defaults
+from app.api.routers import payment_note_settings
 from app.services.ship_management_service import ensure_legacy_external_handover_batches
 
 
@@ -40,6 +42,7 @@ def create_app() -> FastAPI:
     app.include_router(ship_management.router, prefix=settings.api_prefix)
     app.include_router(internal_cod_collections.router, prefix=settings.api_prefix)
     app.include_router(order_reconciliation.router, prefix=settings.api_prefix)
+    app.include_router(payment_note_settings.router, prefix=settings.api_prefix)
 
     @app.on_event("startup")
     def on_startup() -> None:
@@ -58,6 +61,7 @@ def create_app() -> FastAPI:
         with SessionLocal() as db:
             ensure_access_control_defaults(db)
             ensure_default_extra_charge_settings(db)
+            ensure_payment_note_defaults(db)
             backfill_invoice_revisions(db)
             ensure_legacy_external_handover_batches(db)
 
@@ -162,6 +166,8 @@ def ensure_invoice_audit_columns() -> None:
         return
     invoice_columns = {column["name"] for column in inspector.get_columns("invoices")}
     statements: list[str] = []
+    if "handover_note" not in invoice_columns:
+        statements.append("ALTER TABLE invoices ADD COLUMN handover_note VARCHAR(500) NULL")
     if "audit_label" not in invoice_columns:
         statements.append("ALTER TABLE invoices ADD COLUMN audit_label ENUM('retail','internal_shipper','external_shipper') NULL")
     if "assigned_shipper_id" not in invoice_columns:

@@ -135,9 +135,13 @@ class InvoiceBulkAuditAssign(ORMBase):
     invoice_ids: list[int] = Field(min_length=1, max_length=100)
     audit_label: InvoiceAuditLabel
     external_handoff: ExternalHandoffCreate | None = None
+    handover_note: str | None = Field(default=None, max_length=500)
 
     @model_validator(mode="after")
     def validate_handover(self):
+        self.handover_note = (self.handover_note or "").strip() or None
+        if self.handover_note and self.audit_label != InvoiceAuditLabel.retail:
+            raise ValueError("Ghi chú bàn giao chỉ áp dụng cho đơn Khách lẻ")
         if self.audit_label == InvoiceAuditLabel.internal_shipper:
             raise ValueError("Không thể bàn giao Ship Ruột từ màn hình quản lý")
         if self.audit_label == InvoiceAuditLabel.external_shipper and self.external_handoff is None:
@@ -156,6 +160,7 @@ class InvoiceRead(ORMBase):
     status: InvoiceStatus
     sold_at: datetime
     audit_label: InvoiceAuditLabel | None
+    handover_note: str | None
     assigned_shipper_id: int | None
     assigned_shipper: ShipperRead | None = None
     audited_at: datetime | None

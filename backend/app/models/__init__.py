@@ -1,4 +1,5 @@
 from app.database import Base
+from app.models.payment_note_setting import PaymentNoteSetting
 from app.models.customer import Customer
 from app.models.extra_charge_setting import ExtraChargeSetting
 from app.models.external_handover import ExternalHandoverBatch, ExternalHandoverBatchItem
@@ -13,6 +14,7 @@ from app.models.user import AuthSession, Permission, Role, User, role_permission
 
 __all__ = [
     "Base",
+    "PaymentNoteSetting",
     "Customer",
     "ExtraChargeSetting",
     "ExternalHandoverBatch",

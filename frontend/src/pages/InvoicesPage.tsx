@@ -1,4 +1,4 @@
-import { ChevronLeft, ChevronRight, FileText, LoaderCircle, Search, XCircle } from "lucide-react";
+import { ChevronLeft, ChevronRight, FileText, LoaderCircle, Phone, Search, UserRound, XCircle } from "lucide-react";
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 
@@ -36,10 +36,13 @@ export function InvoicesPage() {
   const [toDate, setToDate] = useState(searchParams.get("to_date") ?? todayInputValue());
   const initialInvoiceCode = normalizeInvoiceCodeSearch(searchParams.get("code") ?? "");
   const initialCustomerPhone = searchParams.get("customer_phone") ?? "";
+  const initialCustomerName = searchParams.get("customer_name") ?? "";
   const [invoiceCode, setInvoiceCode] = useState(initialInvoiceCode);
   const [customerPhone, setCustomerPhone] = useState(initialCustomerPhone);
+  const [customerName, setCustomerName] = useState(initialCustomerName);
   const [appliedInvoiceCode, setAppliedInvoiceCode] = useState(initialInvoiceCode);
   const [appliedCustomerPhone, setAppliedCustomerPhone] = useState(initialCustomerPhone);
+  const [appliedCustomerName, setAppliedCustomerName] = useState(initialCustomerName);
   const [page, setPage] = useState(positiveInteger(searchParams.get("page"), 1));
   const initialPageSize = positiveInteger(searchParams.get("page_size"), 20);
   const [pageSize, setPageSize] = useState(PAGE_SIZE_OPTIONS.includes(initialPageSize) ? initialPageSize : 20);
@@ -62,6 +65,7 @@ export function InvoicesPage() {
     selectedToDate = toDate,
     selectedInvoiceCode = appliedInvoiceCode,
     selectedCustomerPhone = appliedCustomerPhone,
+    selectedCustomerName = appliedCustomerName,
   ) {
     const normalizedInvoiceCode = normalizeInvoiceCodeSearch(selectedInvoiceCode);
     const requestId = ++loadRequestId.current;
@@ -74,6 +78,7 @@ export function InvoicesPage() {
           exclude_cancelled: selectedStatus === "active" ? true : undefined,
           code: normalizedInvoiceCode || undefined,
           customer_phone: selectedCustomerPhone.trim() || undefined,
+          customer_name: selectedCustomerName.trim() || undefined,
           from_date: selectedFromDate || undefined,
           to_date: selectedToDate || undefined,
           page: requestedPage,
@@ -109,6 +114,7 @@ export function InvoicesPage() {
     selectedToDate: string,
     selectedInvoiceCode = invoiceCode,
     selectedCustomerPhone = customerPhone,
+    selectedCustomerName = customerName,
   ) {
     const normalizedInvoiceCode = normalizeInvoiceCodeSearch(selectedInvoiceCode);
     const nextSearchParams = new URLSearchParams();
@@ -121,6 +127,7 @@ export function InvoicesPage() {
     if (selectedToDate) nextSearchParams.set("to_date", selectedToDate);
     if (normalizedInvoiceCode) nextSearchParams.set("code", normalizedInvoiceCode);
     if (selectedCustomerPhone.trim()) nextSearchParams.set("customer_phone", selectedCustomerPhone.trim());
+    if (selectedCustomerName.trim()) nextSearchParams.set("customer_name", selectedCustomerName.trim());
     nextSearchParams.set("page", "1");
     nextSearchParams.set("page_size", String(pageSize));
     setStatus(selectedStatus);
@@ -129,6 +136,8 @@ export function InvoicesPage() {
     setInvoiceCode(normalizedInvoiceCode);
     setAppliedInvoiceCode(normalizedInvoiceCode);
     setAppliedCustomerPhone(selectedCustomerPhone.trim());
+    setCustomerName(selectedCustomerName.trim());
+    setAppliedCustomerName(selectedCustomerName.trim());
     setPage(1);
     setSearchParams(nextSearchParams, { replace: true });
     void loadInvoices(
@@ -139,6 +148,7 @@ export function InvoicesPage() {
       selectedToDate,
       normalizedInvoiceCode,
       selectedCustomerPhone,
+      selectedCustomerName,
     );
   }
 
@@ -226,7 +236,7 @@ export function InvoicesPage() {
     <div className="page-stack">
       <section className="toolbar">
         <div className="search-box invoice-search-box">
-          <Search size={17} />
+          <FileText size={17} aria-hidden="true" />
           <input
             value={invoiceCode}
             onChange={(event) => setInvoiceCode(event.target.value)}
@@ -234,12 +244,12 @@ export function InvoicesPage() {
             onKeyDown={(event) => {
               if (event.key === "Enter") searchInvoices();
             }}
-            placeholder="Tìm theo mã hóa đơn"
+            placeholder="Mã hóa đơn"
             aria-label="Tìm theo mã hóa đơn"
           />
         </div>
         <div className="search-box invoice-search-box">
-          <Search size={17} />
+          <Phone size={17} aria-hidden="true" />
           <input
             value={customerPhone}
             onChange={(event) => setCustomerPhone(event.target.value)}
@@ -247,8 +257,19 @@ export function InvoicesPage() {
             onKeyDown={(event) => {
               if (event.key === "Enter") searchInvoices();
             }}
-            placeholder="Tìm theo số điện thoại"
+            placeholder="Số điện thoại"
             aria-label="Tìm theo số điện thoại khách hàng"
+          />
+        </div>
+        <div className="search-box invoice-customer-name-search">
+          <UserRound size={17} aria-hidden="true" />
+          <input
+            value={customerName}
+            onChange={(event) => setCustomerName(event.target.value)}
+            maxLength={200}
+            onKeyDown={(event) => { if (event.key === "Enter") searchInvoices(); }}
+            placeholder="Tìm theo tên khách hàng"
+            aria-label="Tìm theo tên khách hàng"
           />
         </div>
         <button className="secondary-button" type="button" disabled={loading} onClick={searchInvoices}>

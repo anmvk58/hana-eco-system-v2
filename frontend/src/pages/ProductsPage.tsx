@@ -1,32 +1,18 @@
 import { Edit2, Plus, Search, Trash2 } from "lucide-react";
-import { FormEvent, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 
 import { api } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
 import { EmptyState } from "../components/EmptyState";
-import { Modal } from "../components/Modal";
+import { ProductModal } from "../components/ProductModal";
 import { PaginationBar } from "../components/PaginationBar";
 import { StatusBadge } from "../components/StatusBadge";
-import type { Product, ProductCategory, ProductPayload, ProductStatus } from "../types";
+import type { Product } from "../types";
 import { money, numberText } from "../utils/format";
-
-const blankProduct: ProductPayload = {
-  code: "",
-  name: "",
-  category_id: null,
-  unit: "cái",
-  sale_price: "0",
-  cost_price: "0",
-  stock_quantity: "0",
-  status: "active",
-  is_quick_select: false,
-  quick_select_order: 0,
-};
 
 export function ProductsPage() {
   const { hasPermission } = useAuth();
   const [products, setProducts] = useState<Product[]>([]);
-  const [categories, setCategories] = useState<ProductCategory[]>([]);
   const [search, setSearch] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
@@ -34,9 +20,6 @@ export function ProductsPage() {
   const [error, setError] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<Product | null>(null);
-  const [form, setForm] = useState<ProductPayload>(blankProduct);
-  const [newCategoryName, setNewCategoryName] = useState("");
-  const [newCategoryNote, setNewCategoryNote] = useState("");
 
   async function loadProducts(keyword = search) {
     setLoading(true);
@@ -51,82 +34,20 @@ export function ProductsPage() {
     }
   }
 
-  async function loadCategories() {
-    setCategories(await api.productCategories.list());
-  }
-
   const visibleProducts = products.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
   useEffect(() => {
-    void Promise.all([loadProducts(""), loadCategories()]).catch((err) =>
-      setError(err instanceof Error ? err.message : "Không tải được dữ liệu sản phẩm"),
-    );
+    void loadProducts("");
   }, []);
 
   function openCreate() {
     setEditing(null);
-    setForm(blankProduct);
-    setNewCategoryName("");
-    setNewCategoryNote("");
     setModalOpen(true);
   }
 
   function openEdit(product: Product) {
     setEditing(product);
-    setForm({
-      code: product.code,
-      name: product.name,
-      category_id: product.category_id ?? null,
-      unit: product.unit,
-      sale_price: product.sale_price,
-      cost_price: product.cost_price,
-      stock_quantity: product.stock_quantity,
-      status: product.status,
-      is_quick_select: product.is_quick_select,
-      quick_select_order: product.quick_select_order,
-    });
-    setNewCategoryName("");
-    setNewCategoryNote("");
     setModalOpen(true);
-  }
-
-  async function submit(event: FormEvent) {
-    event.preventDefault();
-    setError("");
-    try {
-      if (editing) {
-        await api.products.update(editing.id, form);
-      } else {
-        await api.products.create(form);
-      }
-      setEditing(null);
-      setForm(blankProduct);
-      setModalOpen(false);
-      await loadProducts();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Không lưu được sản phẩm");
-    }
-  }
-
-  async function createCategory() {
-    const name = newCategoryName.trim();
-    if (!name) {
-      setError("Vui lòng nhập tên ngành hàng");
-      return;
-    }
-    setError("");
-    try {
-      const category = await api.productCategories.create({
-        name,
-        note: newCategoryNote.trim() || undefined,
-      });
-      await loadCategories();
-      setForm({ ...form, category_id: category.id });
-      setNewCategoryName("");
-      setNewCategoryNote("");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Không tạo được ngành hàng");
-    }
   }
 
   async function remove(product: Product) {
@@ -208,108 +129,15 @@ export function ProductsPage() {
       <PaginationBar total={products.length} page={currentPage} pageSize={pageSize} itemLabel="sản phẩm" onPageChange={setCurrentPage} onPageSizeChange={(nextPageSize) => { setPageSize(nextPageSize); setCurrentPage(1); }} />
 
       {modalOpen ? (
-        <Modal
-          title={editing ? "Cập nhật sản phẩm" : "Thêm sản phẩm"}
-          onClose={() => {
+        <ProductModal
+          product={editing}
+          onClose={() => { setEditing(null); setModalOpen(false); }}
+          onSaved={() => {
             setEditing(null);
-            setForm(blankProduct);
             setModalOpen(false);
+            void loadProducts();
           }}
-        >
-          <form className="form-grid" onSubmit={(event) => void submit(event)}>
-            <label>
-              Mã sản phẩm
-              <input required value={form.code} onChange={(event) => setForm({ ...form, code: event.target.value })} />
-            </label>
-            <label>
-              Tên sản phẩm
-              <input required value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} />
-            </label>
-            <label>
-              Ngành hàng
-              <select
-                value={form.category_id ?? ""}
-                onChange={(event) => setForm({ ...form, category_id: event.target.value ? Number(event.target.value) : null })}
-              >
-                <option value="">Chưa phân loại</option>
-                {categories.map((category) => (
-                  <option key={category.id} value={category.id}>
-                    {category.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              Trạng thái
-              <select value={form.status} onChange={(event) => setForm({ ...form, status: event.target.value as ProductStatus })}>
-                <option value="active">Đang bán</option>
-                <option value="inactive">Ngừng bán</option>
-              </select>
-            </label>
-            <label>
-              Đơn vị tính
-              <input required value={form.unit} onChange={(event) => setForm({ ...form, unit: event.target.value })} />
-            </label>
-            <label>
-              Giá bán
-              <input
-                type="number"
-                min="0"
-                required
-                value={form.sale_price}
-                onChange={(event) => setForm({ ...form, sale_price: event.target.value })}
-              />
-            </label>
-            <label>
-              Giá vốn
-              <input
-                type="number"
-                min="0"
-                required
-                value={form.cost_price}
-                onChange={(event) => setForm({ ...form, cost_price: event.target.value })}
-              />
-            </label>
-            <label>
-              Tồn kho
-              <input
-                type="number"
-                required
-                value={form.stock_quantity}
-                onChange={(event) => setForm({ ...form, stock_quantity: event.target.value })}
-              />
-            </label>
-            {hasPermission("product_categories.create") ? <section className="inline-create span-2">
-              <div>
-                <strong>Tạo nhanh ngành hàng</strong>
-                <span>Ngành hàng mới sẽ được chọn ngay cho sản phẩm hiện tại.</span>
-              </div>
-              <input
-                value={newCategoryName}
-                onChange={(event) => setNewCategoryName(event.target.value)}
-                placeholder="Tên ngành hàng"
-              />
-              <input
-                value={newCategoryNote}
-                onChange={(event) => setNewCategoryNote(event.target.value)}
-                placeholder="Ghi chú"
-              />
-              <button className="secondary-button" type="button" onClick={() => void createCategory()}>
-                <Plus size={16} />
-                Tạo ngành hàng
-              </button>
-            </section> : null}
-
-            <div className="form-actions span-2">
-              <button className="secondary-button" type="button" onClick={() => setForm(blankProduct)}>
-                Làm mới
-              </button>
-              <button className="primary-button" type="submit">
-                Lưu sản phẩm
-              </button>
-            </div>
-          </form>
-        </Modal>
+        />
       ) : null}
     </div>
   );

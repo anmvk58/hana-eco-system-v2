@@ -193,6 +193,7 @@ export interface Invoice {
   status: InvoiceStatus;
   sold_at: string;
   audit_label?: InvoiceAuditLabel | null;
+  handover_note?: string | null;
   assigned_shipper_id?: number | null;
   assigned_shipper?: Shipper | null;
   audited_at?: string | null;
@@ -242,6 +243,7 @@ export interface ShipHandoverPayload {
   invoice_ids: number[];
   audit_label: "retail" | "external_shipper";
   external_handoff?: ExternalHandoffPayload;
+  handover_note?: string;
 }
 
 export interface InternalShipperHandoverPayload {

@@ -210,6 +210,7 @@ def recall_internal_shipper_assignment(
         if invoice.status == InvoiceStatus.completed:
             invoice.status = InvoiceStatus.created
         invoice.audit_label = None
+        invoice.handover_note = None
         invoice.assigned_shipper_id = None
         invoice.audited_at = None
         invoice.audited_by_user_id = None
@@ -254,6 +255,7 @@ def create_batch(db: Session, invoices: list[Invoice], external: ExternalHandoff
 
 def apply_external_handoff(invoice: Invoice, external: ExternalHandoffCreate, advance_amount: Decimal, current_user: User) -> None:
     invoice.audit_label = InvoiceAuditLabel.external_shipper
+    invoice.handover_note = None
     invoice.assigned_shipper_id = None
     invoice.audited_at = datetime.utcnow()
     invoice.audited_by_user_id = current_user.id
@@ -268,6 +270,7 @@ def apply_external_handoff(invoice: Invoice, external: ExternalHandoffCreate, ad
 
 def clear_external_handoff(invoice: Invoice) -> None:
     invoice.audit_label = None
+    invoice.handover_note = None
     invoice.assigned_shipper_id = None
     invoice.audited_at = None
     invoice.audited_by_user_id = None
@@ -308,6 +311,7 @@ def handover_invoices(db: Session, payload: InvoiceBulkAuditAssign, current_user
                 reason = f"Bàn giao Ship Ngoài - {batch.code}"
             else:
                 invoice.audit_label = InvoiceAuditLabel.retail
+                invoice.handover_note = payload.handover_note
                 invoice.assigned_shipper_id = None
                 invoice.audited_at = datetime.utcnow()
                 invoice.audited_by_user_id = current_user.id
