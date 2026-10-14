@@ -1,5 +1,11 @@
 # Database Schema
 
+## Time conventions
+
+All `datetime` columns store UTC without a timezone suffix, including `invoices.sold_at`. Application MySQL sessions use `+00:00`; API datetimes include `Z`. Frontend timestamps and inclusive date filters use `Asia/Ho_Chi_Minh`. Date-only business fields remain calendar dates. A date range compares UTC instants from Vietnam midnight through, but excluding, midnight after the final date.
+
+Startup migration `2026-10-11-invoice-sale-times-utc` converts legacy Vietnam-local sale times and normalizes invoice history timestamps once. `data_migrations` stores its unique key and UTC `applied_at`. `time_normalization_backups` stores the migration key, record type, record ID and original JSON values, uniquely identified by that triple, for audit and explicit recovery. Business amounts, inventory, existing codes and update timestamps remain unchanged.
+
 ## customers
 
 | Column | Type | Notes |

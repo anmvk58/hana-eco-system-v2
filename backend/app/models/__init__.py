@@ -1,4 +1,5 @@
 from app.database import Base
+from app.models.data_migration import DataMigration, TimeNormalizationBackup
 from app.models.payment_note_setting import PaymentNoteSetting
 from app.models.customer import Customer
 from app.models.extra_charge_setting import ExtraChargeSetting

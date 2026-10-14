@@ -1,4 +1,6 @@
-from datetime import date, datetime, time, timedelta
+from app.services.time_service import utc_now
+from datetime import date, datetime, time
+from decimal import Decimal
 
 from fastapi import HTTPException, status
 from sqlalchemy import or_, select
@@ -14,7 +16,9 @@ from app.models.retail_invoice_collection import RetailInvoiceCollection
 from app.models.shipper import Shipper
 from app.models.user import User
 from app.schemas.order_reconciliation import ExternalHandoverReconcileCreate, RetailInvoiceCollectCreate
-from app.services import ship_management_service
+from app.schemas.invoice import InvoiceTransferConfirm
+from app.services import ship_management_service, invoice_service
+from app.services.time_service import vietnam_day_utc_bounds, vietnam_date_conditions
 
 
 def invoice_load_options():
@@ -27,14 +31,7 @@ def invoice_load_options():
 
 
 def sale_date_conditions(from_date: date | None, to_date: date | None):
-    if from_date and to_date and from_date > to_date:
-        raise HTTPException(status_code=422, detail="Ngày bắt đầu không được sau ngày kết thúc")
-    conditions = []
-    if from_date:
-        conditions.append(Invoice.sold_at >= datetime.combine(from_date, time.min))
-    if to_date:
-        conditions.append(Invoice.sold_at <= datetime.combine(to_date, time.max))
-    return conditions
+    return vietnam_date_conditions(Invoice.sold_at, from_date, to_date)
 
 
 def list_unaudited_invoices(db: Session, from_date: date | None, to_date: date | None) -> list[Invoice]:
@@ -139,7 +136,7 @@ def collect_retail_invoice(
             customer_name=invoice.customer.name if invoice.customer else None,
             collected_amount=invoice.total_amount,
             is_paid_by_transfer=invoice.is_paid_by_transfer,
-            collected_at=datetime.utcnow(),
+            collected_at=utc_now(),
             collected_by_user_id=current_user.id,
             note=payload.note.strip() if payload.note and payload.note.strip() else None,
         )
@@ -188,13 +185,10 @@ def list_external_handover_reconciliations(
     if from_date and to_date and from_date > to_date:
         raise HTTPException(status_code=422, detail="Ngày bắt đầu không được sau ngày kết thúc")
     conditions = [ExternalHandoverBatch.status == ExternalHandoverBatchStatus.active]
-    if from_date:
-        conditions.append(ExternalHandoverBatch.created_at >= datetime.combine(from_date, time.min))
-    if to_date:
-        conditions.append(ExternalHandoverBatch.created_at < datetime.combine(to_date + timedelta(days=1), time.min))
+    conditions.extend(vietnam_date_conditions(ExternalHandoverBatch.handed_over_at, from_date, to_date))
     batch_models = db.scalars(
         ship_management_service.batch_query().where(*conditions)
-        .order_by(ExternalHandoverBatch.created_at.desc(), ExternalHandoverBatch.id.desc())
+        .order_by(ExternalHandoverBatch.handed_over_at.desc(), ExternalHandoverBatch.id.desc())
     ).unique().all()
     batches = [ship_management_service.serialize_batch(batch) for batch in batch_models]
     active_batches = [batch for batch in batches if batch["status"] == ExternalHandoverBatchStatus.active]
@@ -214,6 +208,49 @@ def list_external_handover_reconciliations(
         }
         for batch in active_batches
     ]
+
+
+def confirm_external_invoice_transfer(
+    db: Session, batch_id: int, invoice_id: int,
+    payload: InvoiceTransferConfirm, current_user: User,
+) -> dict:
+    try:
+        batch = ship_management_service.get_batch_model(db, batch_id, for_update=True)
+        if batch.status != ExternalHandoverBatchStatus.active or batch.reconciliation is not None:
+            raise HTTPException(status_code=409, detail="Phiên đã hủy hoặc đã kiểm kê, không thể đổi thanh toán")
+        active_ids = [item.invoice_id for item in batch.items if item.is_active]
+        if invoice_id not in active_ids:
+            raise HTTPException(status_code=409, detail="Đơn không còn thuộc phiên bàn giao này")
+        invoices = db.scalars(
+            select(Invoice).where(Invoice.id.in_(active_ids)).order_by(Invoice.id)
+            .with_for_update().execution_options(populate_existing=True)
+        ).all()
+        invoice = next(row for row in invoices if row.id == invoice_id)
+        if invoice.deleted_at or invoice.status == InvoiceStatus.cancelled or invoice.audit_label != InvoiceAuditLabel.external_shipper:
+            raise HTTPException(status_code=409, detail="Đơn không còn hợp lệ để đổi thanh toán")
+        invoice_service.ensure_payment_change_allowed(db, invoice, allow_external=True)
+        if not invoice.is_paid_by_transfer:
+            if invoice.total_amount != payload.expected_total_amount or (
+                payload.expected_revision is not None and invoice.revision != payload.expected_revision
+            ):
+                raise HTTPException(status_code=409, detail="Đơn vừa thay đổi. Vui lòng tải lại trước khi xác nhận")
+            before = {row.id: invoice_service.snapshot_invoice(row) for row in invoices}
+            invoice.is_paid_by_transfer = True
+            invoice.revision += 1
+            batch.advance_amount = sum((row.total_amount for row in invoices if not row.is_paid_by_transfer), Decimal("0")) - batch.shipping_fee
+            batch.updated_by_user_id = current_user.id
+            note = (payload.note or "").strip()
+            for row in invoices:
+                row.external_advance_amount = batch.advance_amount
+                reason = f"Điều chỉnh tiền phải nhận phiên {batch.code}: đơn {invoice.code} đã chuyển khoản"
+                if note:
+                    reason += f": {note}"
+                ship_management_service.add_invoice_history(db, row, before[row.id], current_user, reason)
+            db.commit()
+        return {"batch": ship_management_service.get_batch(db, batch_id), "reconciliation": None}
+    except Exception:
+        db.rollback()
+        raise
 
 
 def reconcile_external_handover_batch(
@@ -240,6 +277,11 @@ def reconcile_external_handover_batch(
         if existing:
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Phiên bàn giao này đã được kiểm kê")
 
+        if (payload.expected_advance_amount is not None and payload.expected_advance_amount != batch.advance_amount) or (
+            payload.expected_received_amount is not None and payload.expected_received_amount != batch.transfer_amount + batch.cash_amount
+        ):
+            raise HTTPException(status_code=409, detail="Số tiền của phiên vừa thay đổi. Vui lòng tải lại và kiểm tra trước khi xác nhận")
+
         reconciliation = ExternalHandoverBatchReconciliation(
             batch_id=batch.id,
             batch_code=batch.code,
@@ -247,7 +289,7 @@ def reconcile_external_handover_batch(
             expected_amount=batch.advance_amount,
             received_amount=batch.transfer_amount + batch.cash_amount,
             advance_method=batch.advance_method,
-            reconciled_at=datetime.utcnow(),
+            reconciled_at=utc_now(),
             reconciled_by_user_id=current_user.id,
             note=payload.note.strip() if payload.note and payload.note.strip() else None,
         )

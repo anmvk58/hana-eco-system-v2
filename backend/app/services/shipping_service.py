@@ -1,3 +1,4 @@
+from app.services.time_service import utc_now
 from datetime import date, datetime
 
 from fastapi import HTTPException, status
@@ -9,7 +10,7 @@ from app.models.invoice import Invoice
 from app.models.shipper import Shipper
 from app.models.user import User
 from app.services import invoice_service, shipper_service
-from app.services.time_service import VIETNAM_TIMEZONE, vietnam_day_utc_bounds
+from app.services.time_service import VIETNAM_TIMEZONE, vietnam_day_utc_bounds, vietnam_date_conditions
 
 
 def current_vietnam_day_utc_bounds() -> tuple[datetime, datetime]:
@@ -58,12 +59,7 @@ def list_claimed_invoices(
         Invoice.audit_label == InvoiceAuditLabel.internal_shipper,
         Invoice.deleted_at.is_(None),
     ]
-    if from_date:
-        start_utc, _ = vietnam_day_utc_bounds(from_date)
-        conditions.append(Invoice.audited_at >= start_utc)
-    if to_date:
-        _, end_utc = vietnam_day_utc_bounds(to_date)
-        conditions.append(Invoice.audited_at < end_utc)
+    conditions.extend(vietnam_date_conditions(Invoice.audited_at, from_date, to_date))
     query = (
         select(Invoice)
         .options(
@@ -99,7 +95,7 @@ def claim_invoices(db: Session, invoice_ids: list[int], current_user: User) -> l
             before_data = invoice_service.snapshot_invoice(invoice)
             invoice.audit_label = InvoiceAuditLabel.internal_shipper
             invoice.assigned_shipper_id = shipper.id
-            invoice.audited_at = datetime.utcnow()
+            invoice.audited_at = utc_now()
             invoice.audited_by_user_id = current_user.id
             db.flush()
             invoice_service.add_history(
@@ -134,7 +130,7 @@ def mark_invoice_delivered(db: Session, invoice_id: int, current_user: User) -> 
 
         before_data = invoice_service.snapshot_invoice(invoice)
         invoice.status = InvoiceStatus.completed
-        invoice.delivered_at = datetime.utcnow()
+        invoice.delivered_at = utc_now()
         invoice.delivered_by_user_id = current_user.id
         db.flush()
         invoice_service.add_history(

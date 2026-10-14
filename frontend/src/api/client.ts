@@ -233,6 +233,10 @@ export const api = {
       }),
     externalHandoverBatches: (fromDate?: string, toDate?: string) =>
       request<ExternalHandoverReconciliationRow[]>("/order-reconciliation/external-handover-batches", {}, { from_date: fromDate, to_date: toDate }),
+    confirmExternalTransfer: (batchId: number, invoiceId: number, expectedTotalAmount: string | number, expectedRevision?: number, note?: string) =>
+      request<ExternalHandoverReconciliationRow>(`/order-reconciliation/external-handover-batches/${batchId}/invoices/${invoiceId}/payment/transfer`, {
+        method: "POST", body: JSON.stringify({ expected_total_amount: expectedTotalAmount, expected_revision: expectedRevision, note }),
+      }),
     reconcileExternalHandoverBatch: (batchId: number, payload: ExternalHandoverReconcilePayload) =>
       request<ExternalHandoverReconciliationRow>(`/order-reconciliation/external-handover-batches/${batchId}/reconcile`, {
         method: "POST",
@@ -284,6 +288,8 @@ export const api = {
       request<DashboardOrderStatusCharts>("/dashboard/order-status-charts", {}, { from_date: fromDate, to_date: toDate }),
   },
   invoices: {
+    confirmTransfer: (id: number, expectedTotalAmount: string | number, expectedRevision?: number, note?: string) =>
+      request<Invoice>(`/invoices/${id}/payment/transfer`, { method: "POST", body: JSON.stringify({ expected_total_amount: expectedTotalAmount, expected_revision: expectedRevision, note }) }),
     list: (filters?: InvoiceListFilters) => request<InvoicePage>("/invoices", {}, filters),
     listAll: listAllInvoices,
     create: (payload: InvoicePayload) => request<Invoice>("/invoices", { method: "POST", body: JSON.stringify(payload) }),

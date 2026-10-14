@@ -1,3 +1,4 @@
+from app.services.time_service import utc_now
 from datetime import date, datetime
 from decimal import Decimal
 
@@ -12,7 +13,7 @@ from app.models.invoice import Invoice
 from app.models.shipper import Shipper
 from app.models.user import User
 from app.schemas.internal_cod_collection import InternalCodCollectionCreate
-from app.services.time_service import VIETNAM_TIMEZONE, vietnam_day_utc_bounds
+from app.services.time_service import VIETNAM_TIMEZONE, vietnam_day_utc_bounds, vietnam_date_conditions
 
 
 def pending_invoice_conditions():
@@ -98,6 +99,7 @@ def list_shipper_summaries(db: Session, collection_date: date | None) -> list[di
             "pending_invoices": [
                 {
                     "id": invoice.id,
+                    "revision": invoice.revision,
                     "code": invoice.code,
                     "customer_name": invoice.customer.name if invoice.customer else None,
                     "customer_phone": invoice.customer.phone if invoice.customer else None,
@@ -112,6 +114,7 @@ def list_shipper_summaries(db: Session, collection_date: date | None) -> list[di
             "handed_over_invoices": [
                 {
                     "id": invoice.id,
+                    "revision": invoice.revision,
                     "code": invoice.code,
                     "customer_name": invoice.customer.name if invoice.customer else None,
                     "customer_phone": invoice.customer.phone if invoice.customer else None,
@@ -161,12 +164,7 @@ def list_sessions(
     if from_date and to_date and from_date > to_date:
         raise HTTPException(status_code=422, detail="Ngày bắt đầu không được sau ngày kết thúc")
     conditions = []
-    if from_date:
-        start_utc, _ = vietnam_day_utc_bounds(from_date)
-        conditions.append(InternalCodCollectionSession.collected_at >= start_utc)
-    if to_date:
-        _, end_utc = vietnam_day_utc_bounds(to_date)
-        conditions.append(InternalCodCollectionSession.collected_at < end_utc)
+    conditions.extend(vietnam_date_conditions(InternalCodCollectionSession.collected_at, from_date, to_date))
     if shipper_id:
         conditions.append(InternalCodCollectionSession.shipper_id == shipper_id)
     sessions = db.scalars(
@@ -213,7 +211,7 @@ def create_session(
                 detail="Công nợ shipper vừa thay đổi. Vui lòng tải lại trước khi xác nhận thu tiền",
             )
 
-        now = datetime.utcnow()
+        now = utc_now()
         total_amount = sum((invoice.total_amount for invoice in invoices), Decimal("0"))
         session = InternalCodCollectionSession(
             code=f"TEMP-{now.timestamp()}",

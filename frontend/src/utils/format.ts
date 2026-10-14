@@ -1,3 +1,6 @@
+import { todayInputValue } from "./time";
+export { dateTime, dateOnly, utcDateTime, todayInputValue, localTimeValue, firstDayOfCurrentMonthInputValue, vietnamDateInputValue, timeOnly, shiftCalendarDate } from "./time";
+
 export function money(value: string | number | null | undefined) {
   const number = Number(value ?? 0);
   return `${new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 }).format(number)} ₫`;
@@ -36,64 +39,4 @@ export function formatNumberInput(value: string | number | null | undefined, all
   if (!allowDecimal) return formattedInteger;
   if (raw.endsWith(".")) return `${formattedInteger}.`;
   return decimalPart !== undefined ? `${formattedInteger}.${decimalPart}` : formattedInteger;
-}
-
-export function dateTime(value: string | null | undefined) {
-  if (!value) return "";
-  const hasTimezone = /(?:Z|[+-]\d{2}:\d{2})$/i.test(value);
-  const vietnamValue = hasTimezone ? value : `${value}+07:00`;
-  return new Intl.DateTimeFormat("vi-VN", {
-    dateStyle: "short",
-    timeStyle: "short",
-    timeZone: "Asia/Ho_Chi_Minh",
-  }).format(new Date(vietnamValue));
-}
-
-export function dateOnly(value: string | null | undefined) {
-  if (!value) return "";
-  const hasTimezone = /(?:Z|[+-]\d{2}:\d{2})$/i.test(value);
-  const vietnamValue = hasTimezone ? value : /^\d{4}-\d{2}-\d{2}$/.test(value) ? `${value}T00:00:00+07:00` : `${value}+07:00`;
-  return new Intl.DateTimeFormat("vi-VN", {
-    dateStyle: "short",
-    timeZone: "Asia/Ho_Chi_Minh",
-  }).format(new Date(vietnamValue));
-}
-
-export function todayInputValue() {
-  const parts = new Intl.DateTimeFormat("en-US", {
-    day: "2-digit",
-    month: "2-digit",
-    timeZone: "Asia/Ho_Chi_Minh",
-    year: "numeric",
-  }).formatToParts(new Date());
-  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
-  return `${values.year}-${values.month}-${values.day}`;
-}
-
-export function utcDateTime(value: string | null | undefined) {
-  if (!value) return "";
-  const hasTimezone = /(?:Z|[+-]\d{2}:\d{2})$/i.test(value);
-  const utcValue = hasTimezone ? value : `${value}Z`;
-  return new Intl.DateTimeFormat("vi-VN", {
-    dateStyle: "short",
-    timeStyle: "short",
-    timeZone: "Asia/Ho_Chi_Minh",
-  }).format(new Date(utcValue));
-}
-
-export function firstDayOfCurrentMonthInputValue() {
-  const today = todayInputValue();
-  return `${today.slice(0, 8)}01`;
-}
-
-export function localTimeValue(date = new Date()) {
-  const parts = new Intl.DateTimeFormat("en-US", {
-    hour: "2-digit",
-    hourCycle: "h23",
-    minute: "2-digit",
-    second: "2-digit",
-    timeZone: "Asia/Ho_Chi_Minh",
-  }).formatToParts(date);
-  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
-  return `${values.hour}:${values.minute}:${values.second}`;
 }

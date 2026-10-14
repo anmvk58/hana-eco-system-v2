@@ -1,3 +1,4 @@
+from app.services.time_service import utc_now
 from datetime import datetime
 
 from fastapi import HTTPException, status
@@ -84,6 +85,5 @@ def update_customer(db: Session, customer_id: int, payload: CustomerUpdate) -> C
 
 def soft_delete_customer(db: Session, customer_id: int) -> None:
     customer = get_customer(db, customer_id)
-    customer.deleted_at = datetime.utcnow()
+    customer.deleted_at = utc_now()
     db.commit()
-

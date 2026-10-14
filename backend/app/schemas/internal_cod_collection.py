@@ -16,6 +16,7 @@ class InternalCodCollectionCreate(ORMBase):
 
 class PendingInternalCodInvoiceRead(ORMBase):
     id: int
+    revision: int
     code: str
     customer_name: str | None
     customer_phone: str | None

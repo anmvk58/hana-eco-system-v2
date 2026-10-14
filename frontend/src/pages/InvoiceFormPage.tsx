@@ -1,3 +1,4 @@
+import { TransferPaymentLookup } from "../components/TransferPaymentLookup";
 import { BadgeCheck, Edit2, LoaderCircle, Minus, Plus, RefreshCw, Save, Search, Settings, Trash2, X } from "lucide-react";
 import { CSSProperties, FormEvent, KeyboardEvent, memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -20,7 +21,7 @@ import {
   type SaleDraftCollection,
 } from "../features/salesDraftStorage";
 import type { Customer, ExtraChargeSetting, ExtraChargeType, Invoice, InvoiceStatus, Product } from "../types";
-import { formatNumberInput, localTimeValue, money, normalizeNumberInput, numberText, todayInputValue } from "../utils/format";
+import { formatNumberInput, money, normalizeNumberInput, numberText, todayInputValue } from "../utils/format";
 
 interface DraftLine {
   product_id: string;
@@ -883,7 +884,7 @@ export function InvoiceFormPage() {
       return;
     }
 
-    const soldAt = isEditing && invoice ? invoice.sold_at : `${todayInputValue()}T${localTimeValue()}`;
+    const soldAt = isEditing && invoice ? invoice.sold_at : new Date().toISOString();
     const effectiveCharges = charges.filter((charge) => charge.charge_type !== "shipping" || applyShippingFee);
     const payload = {
       customer_id: isEditing && invoice ? invoice.customer_id ?? null : customerId ? Number(customerId) : null,
@@ -994,6 +995,7 @@ export function InvoiceFormPage() {
 
   return (
     <>
+      <TransferPaymentLookup/>
       <nav className="sale-draft-tabs" aria-label="Các đơn đang nhập">
           <div className="sale-draft-tab-list" role="tablist">
             {drafts.map((draft) => (

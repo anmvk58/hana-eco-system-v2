@@ -75,6 +75,12 @@ class InvoiceUpdate(ORMBase):
         return self
 
 
+class InvoiceTransferConfirm(ORMBase):
+    expected_total_amount: Decimal = Field(ge=0)
+    expected_revision: int | None = Field(default=None, ge=0)
+    note: str | None = Field(default=None, max_length=500)
+
+
 class InvoiceCancel(ORMBase):
     reason: str = Field(min_length=1, max_length=500)
 
@@ -215,4 +221,3 @@ class InvoiceHistoryRead(ORMBase):
     before_data: dict[str, Any] | None
     after_data: dict[str, Any] | None
     created_at: datetime
-

@@ -9,6 +9,7 @@ from app.models.enums import InvoiceAuditLabel, InvoiceStatus
 from app.schemas.invoice import InvoiceAuditAssign, InvoiceAuditRollback, InvoiceCancel, InvoiceCreate, InvoiceHistoryRead, InvoicePage, InvoiceRead, InvoiceUpdate
 from app.services import invoice_service
 from app.models.user import User
+from app.schemas.invoice import InvoiceTransferConfirm
 
 
 router = APIRouter(prefix="/invoices", tags=["invoices"])
@@ -82,6 +83,16 @@ def update_invoice(
     return invoice_service.update_invoice(db, invoice_id, payload, current_user.id, current_user.display_name)
 
 
+@router.post("/{invoice_id}/payment/transfer", response_model=InvoiceRead)
+def confirm_transfer(
+    invoice_id: int,
+    payload: InvoiceTransferConfirm,
+    current_user: User = Depends(require_any_permission("invoices.update", "order_reconciliation.manage")),
+    db: Session = Depends(get_db),
+):
+    return invoice_service.confirm_transfer(db, invoice_id, payload, current_user)
+
+
 @router.post("/{invoice_id}/cancel", response_model=InvoiceRead)
 def cancel_invoice(
     invoice_id: int,
@@ -131,4 +142,3 @@ def get_invoice_history(invoice_id: int, db: Session = Depends(get_db)):
 @router.get("/{invoice_id}/print", response_model=InvoiceRead, dependencies=[Depends(require_permission("invoices.print"))])
 def get_invoice_print_data(invoice_id: int, db: Session = Depends(get_db)):
     return invoice_service.get_invoice(db, invoice_id)
-

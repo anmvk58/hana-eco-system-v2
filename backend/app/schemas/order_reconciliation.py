@@ -34,6 +34,8 @@ class RetailInvoiceReconciliationRead(ORMBase):
 
 class ExternalHandoverReconcileCreate(ORMBase):
     note: str | None = Field(default=None, max_length=500)
+    expected_advance_amount: Decimal | None = None
+    expected_received_amount: Decimal | None = None
 
 
 class ExternalHandoverBatchReconciliationRead(ORMBase):

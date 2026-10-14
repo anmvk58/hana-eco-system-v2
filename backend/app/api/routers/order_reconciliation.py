@@ -7,7 +7,7 @@ from app.api.deps import require_permission
 from app.database import get_db
 from app.models.user import User
 from app.models.enums import InvoiceAuditLabel
-from app.schemas.invoice import InvoiceRead
+from app.schemas.invoice import InvoiceRead, InvoiceTransferConfirm
 from app.schemas.order_reconciliation import (
     ExternalHandoverReconcileCreate,
     ExternalHandoverReconciliationRowRead,
@@ -67,6 +67,20 @@ def list_external_handover_reconciliations(
     db: Session = Depends(get_db),
 ):
     return order_reconciliation_service.list_external_handover_reconciliations(db, from_date, to_date)
+
+
+@router.post(
+    "/external-handover-batches/{batch_id}/invoices/{invoice_id}/payment/transfer",
+    response_model=ExternalHandoverReconciliationRowRead,
+)
+def confirm_external_invoice_transfer(
+    batch_id: int,
+    invoice_id: int,
+    payload: InvoiceTransferConfirm,
+    current_user: User = Depends(require_permission("order_reconciliation.manage")),
+    db: Session = Depends(get_db),
+):
+    return order_reconciliation_service.confirm_external_invoice_transfer(db, batch_id, invoice_id, payload, current_user)
 
 
 @router.post(

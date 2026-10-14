@@ -1,3 +1,4 @@
+from app.services.time_service import utc_now
 from datetime import datetime, timedelta
 
 from fastapi import HTTPException, status
@@ -19,8 +20,8 @@ def login(db: Session, payload: LoginPayload) -> dict:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Tên đăng nhập hoặc mật khẩu không đúng")
 
     token = new_session_token()
-    expires_at = datetime.utcnow() + SESSION_LIFETIME
-    db.execute(delete(AuthSession).where(AuthSession.expires_at <= datetime.utcnow()))
+    expires_at = utc_now() + SESSION_LIFETIME
+    db.execute(delete(AuthSession).where(AuthSession.expires_at <= utc_now()))
     db.add(AuthSession(token_hash=hash_token(token), user_id=user.id, expires_at=expires_at))
     db.commit()
     return {

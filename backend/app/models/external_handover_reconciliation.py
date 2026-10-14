@@ -1,3 +1,4 @@
+from app.services.time_service import utc_now
 from datetime import datetime
 from decimal import Decimal
 
@@ -20,7 +21,7 @@ class ExternalHandoverBatchReconciliation(Base, TimestampMixin):
     expected_amount: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False)
     received_amount: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False)
     advance_method: Mapped[ExternalAdvanceMethod] = mapped_column(Enum(ExternalAdvanceMethod), nullable=False)
-    reconciled_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True, nullable=False)
+    reconciled_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, index=True, nullable=False)
     reconciled_by_user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), index=True, nullable=True)
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
 

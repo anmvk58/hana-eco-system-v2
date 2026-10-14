@@ -65,4 +65,4 @@ volumes:
   frontend_node_modules_local:
   mysql_data:
     external: true
-    name: ${MYSQL_VOLUME_NAME:-hanaecosystemv2_mysql_data}
+    name: ${MYSQL_VOLUME_NAME:-hana-eco-system-v2_mysql_data}

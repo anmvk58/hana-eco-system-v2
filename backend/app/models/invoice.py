@@ -1,3 +1,4 @@
+from app.services.time_service import utc_now
 from datetime import datetime
 from decimal import Decimal
 
@@ -17,7 +18,7 @@ class Invoice(Base, TimestampMixin, SoftDeleteMixin):
     revision: Mapped[int] = mapped_column(Integer, default=0, server_default="0", nullable=False)
     customer_id: Mapped[int | None] = mapped_column(ForeignKey("customers.id"), nullable=True, index=True)
     status: Mapped[InvoiceStatus] = mapped_column(Enum(InvoiceStatus), default=InvoiceStatus.created, index=True, nullable=False)
-    sold_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True, nullable=False)
+    sold_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, index=True, nullable=False)
     audit_label: Mapped[InvoiceAuditLabel | None] = mapped_column(Enum(InvoiceAuditLabel), index=True, nullable=True)
     handover_note: Mapped[str | None] = mapped_column(String(500), nullable=True)
     assigned_shipper_id: Mapped[int | None] = mapped_column(ForeignKey("shippers.id"), index=True, nullable=True)
@@ -97,7 +98,7 @@ class InvoiceHistory(Base):
     reason: Mapped[str | None] = mapped_column(Text, nullable=True)
     before_data: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     after_data: Mapped[dict | None] = mapped_column(JSON, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, index=True, nullable=False)
 
     invoice = relationship("Invoice", back_populates="histories")
     changed_by_user = relationship("User", back_populates="invoice_histories")

@@ -258,6 +258,7 @@ export interface InternalShipperAssignment {
 }
 
 export interface PendingInternalCodInvoice {
+  revision: number;
   id: number;
   code: string;
   customer_name?: string | null;
@@ -393,6 +394,8 @@ export interface ExternalHandoverReconciliationRow {
 }
 
 export interface ExternalHandoverReconcilePayload {
+  expected_advance_amount?: string;
+  expected_received_amount?: string;
   note?: string;
 }
 

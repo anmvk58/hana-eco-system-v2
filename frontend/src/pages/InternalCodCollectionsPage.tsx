@@ -1,3 +1,4 @@
+import { TransferPaymentButton } from "../components/TransferPaymentButton";
 import { ArrowRight, Banknote, CalendarDays, CheckCircle2, CreditCard, History, LoaderCircle, PackageCheck, ReceiptText, RefreshCw, Truck, WalletCards } from "lucide-react";
 import { FormEvent, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
@@ -8,7 +9,7 @@ import { Modal } from "../components/Modal";
 import { PaymentNoteInput } from "../components/PaymentNoteInput";
 import { ToastNotification } from "../components/ToastNotification";
 import type { InternalCodShipperSummary } from "../types";
-import { money, numberText, todayInputValue, utcDateTime } from "../utils/format";
+import { money, numberText, dateOnly, todayInputValue, utcDateTime } from "../utils/format";
 
 function evaluateAmountExpression(expression: string): number | null {
   const tokens = expression.match(/\d+(?:\.\d+)?|[()+\-*/]|\s+/g);
@@ -125,7 +126,7 @@ export function InternalCodCollectionsPage() {
 
   async function submitCollection(event: FormEvent) {
     event.preventDefault();
-    if (!collecting) return;
+    if (!collecting || collecting.pending_invoice_count === 0 || saving) return;
     setSaving(true);
     setError("");
     try {
@@ -148,6 +149,22 @@ export function InternalCodCollectionsPage() {
     } finally {
       setSaving(false);
     }
+  }
+
+  async function refreshAfterTransfer() {
+    // Reload both the table and the open collection before another submission.
+    setSaving(true);
+    try {
+      const next = await api.internalCodCollections.summary(collectionDate);
+      setSummaries(next);
+      setCollecting((current) => current ? next.find((summary) => summary.shipper.id === current.shipper.id) ?? null : null);
+      setAmountExpression("");
+      setToast("Đã ghi nhận chuyển khoản và cập nhật công nợ COD.");
+    } catch (err) {
+      setCollecting(null);
+      setError("Đã chuyển khoản nhưng chưa tải được công nợ mới. Vui lòng làm mới trước khi thu COD.");
+      throw err;
+    } finally { setSaving(false); }
   }
 
   const outstandingShippers = summaries.filter((summary) => summary.pending_invoice_count > 0);
@@ -216,17 +233,17 @@ export function InternalCodCollectionsPage() {
 
     {collecting ? <Modal title={`Thu COD từ ${collecting.shipper.user.display_name}`} className="internal-cod-collection-modal" onClose={() => !saving && setCollecting(null)}>
       <form className="page-stack internal-cod-collection-form" onSubmit={(event) => void submitCollection(event)}>
-        <section className="internal-cod-modal-summary"><article><small>Ngày bàn giao</small><strong>{new Date(`${collectionDate}T00:00:00`).toLocaleDateString("vi-VN")}</strong></article><article><small>Tổng số đơn</small><strong>{collecting.handed_over_invoice_count} đơn</strong></article><article><small>Đơn COD chờ thu</small><strong>{collecting.pending_invoice_count} đơn</strong></article><article className="highlight"><small>Số tiền phải nộp đủ</small><strong>{money(collecting.pending_cod_amount)}</strong></article></section>
+        <section className="internal-cod-modal-summary"><article><small>Ngày bàn giao</small><strong>{dateOnly(collectionDate)}</strong></article><article><small>Tổng số đơn</small><strong>{collecting.handed_over_invoice_count} đơn</strong></article><article><small>Đơn COD chờ thu</small><strong>{collecting.pending_invoice_count} đơn</strong></article><article className="highlight"><small>Số tiền phải nộp đủ</small><strong>{money(collecting.pending_cod_amount)}</strong></article></section>
         <section className="internal-cod-calculator">
           <label htmlFor="internal-cod-amount-expression">Biểu thức số tiền đối chiếu<input id="internal-cod-amount-expression" type="text" inputMode="decimal" value={amountExpression} onChange={(event) => setAmountExpression(event.target.value)} placeholder="Ví dụ: 13*30 + 60 + 40 - 50" aria-describedby="internal-cod-calculator-help" /></label>
           <small id="internal-cod-calculator-help">Hỗ trợ số, dấu + − × ÷ và ngoặc. Kết quả chỉ dùng để đối chiếu.</small>
           {amountExpression.trim() && expressionTotal === null ? <p className="internal-cod-calculator-error">Biểu thức chưa hợp lệ. Kiểm tra phép tính và dấu ngoặc.</p> : null}
           <div className="internal-cod-calculator-results"><article><small>Tổng biểu thức</small><strong>{expressionTotal === null ? "—" : money(expressionTotal)}</strong></article><article className="highlight"><small>Còn phải nộp (tiền COD − biểu thức)</small><strong>{remainingAmount === null ? "—" : money(remainingAmount)}</strong></article></div>
         </section>
-        <div className="internal-cod-invoice-list"><div className="internal-cod-invoice-list-heading"><span><strong>Toàn bộ đơn đã bàn giao</strong><small>{collecting.handed_over_invoice_count} đơn trong ngày</small></span><span><em className="payment-chip cash"><Banknote size={14}/>Thu COD</em><em className="payment-chip transfer"><CreditCard size={14}/>Đã chuyển khoản</em></span></div><div className="internal-cod-invoice-table-wrap"><table className="data-table"><thead><tr><th>Mã hóa đơn</th><th>Khách hàng</th><th>Địa chỉ</th><th>Hình thức thu tiền</th><th className="numeric">COD cần thu</th></tr></thead><tbody>{collecting.handed_over_invoices.map((invoice) => <tr className={invoice.is_paid_by_transfer ? "transfer" : invoice.is_cod_pending ? "cod-pending" : "cod-collected"} key={invoice.id}><td><Link className="code-cell order-reconciliation-invoice-link" to={`/invoices/${invoice.id}`} target="_blank" rel="noopener noreferrer">{invoice.code}</Link></td><td><div className="internal-cod-customer-cell"><strong>{invoice.customer_name || "Khách lẻ"}</strong>{invoice.customer_phone ? <button className="order-reconciliation-phone" type="button" onClick={() => void copyPhone(invoice.customer_phone)} title="Bấm để sao chép số điện thoại">{invoice.customer_phone}</button> : <small>Không có SĐT</small>}</div></td><td className="internal-cod-invoice-address">{invoice.customer_address || "—"}</td><td>{invoice.is_paid_by_transfer ? <span className="payment-chip transfer"><CreditCard size={14}/>Đã chuyển khoản</span> : invoice.is_cod_pending ? <span className="payment-chip cash"><Banknote size={14}/>Thu COD</span> : <span className="status-badge active"><CheckCircle2 size={14}/>Đã thu COD</span>}</td><td className="numeric strong internal-cod-amount-cell">{invoice.is_paid_by_transfer ? <span className="internal-cod-no-collection">Không thu</span> : invoice.is_cod_pending ? numberText(invoice.total_amount) : <span className="internal-cod-already-collected">Đã thu</span>}</td></tr>)}</tbody></table></div><div className="internal-cod-invoice-mobile-list">{collecting.handed_over_invoices.map((invoice) => <article className={invoice.is_paid_by_transfer ? "transfer" : invoice.is_cod_pending ? "cod-pending" : "cod-collected"} key={invoice.id}><header><Link className="code-cell order-reconciliation-invoice-link" to={`/invoices/${invoice.id}`} target="_blank" rel="noopener noreferrer">{invoice.code}</Link>{invoice.is_paid_by_transfer ? <span className="payment-chip transfer"><CreditCard size={14}/>Đã chuyển khoản</span> : invoice.is_cod_pending ? <span className="payment-chip cash"><Banknote size={14}/>Thu COD</span> : <span className="status-badge active"><CheckCircle2 size={14}/>Đã thu COD</span>}</header><div><span><b>{invoice.customer_name || "Khách lẻ"}</b>{invoice.customer_phone ? <button className="order-reconciliation-phone" type="button" onClick={() => void copyPhone(invoice.customer_phone)} title="Bấm để sao chép số điện thoại">{invoice.customer_phone}</button> : <small className="internal-cod-phone-missing">Không có SĐT</small>}<small>{invoice.customer_address || "Chưa có địa chỉ"}</small><small>{invoice.handed_over_at ? `Bàn giao ${utcDateTime(invoice.handed_over_at)}` : "Chưa có giờ bàn giao"}</small></span><strong className={invoice.is_paid_by_transfer ? "internal-cod-no-collection" : ""}>{invoice.is_paid_by_transfer ? "Không thu" : invoice.is_cod_pending ? money(invoice.total_amount) : "Đã thu"}</strong></div></article>)}</div></div>
+        <div className="internal-cod-invoice-list"><div className="internal-cod-invoice-list-heading"><span><strong>Toàn bộ đơn đã bàn giao</strong><small>{collecting.handed_over_invoice_count} đơn trong ngày</small></span><span><em className="payment-chip cash"><Banknote size={14}/>Thu COD</em><em className="payment-chip transfer"><CreditCard size={14}/>Đã chuyển khoản</em></span></div><div className="internal-cod-invoice-table-wrap"><table className="data-table"><thead><tr><th>Mã hóa đơn</th><th>Khách hàng</th><th>Địa chỉ</th><th>Hình thức thu tiền</th><th className="numeric">COD cần thu</th></tr></thead><tbody>{collecting.handed_over_invoices.map((invoice) => <tr className={invoice.is_paid_by_transfer ? "transfer" : invoice.is_cod_pending ? "cod-pending" : "cod-collected"} key={invoice.id}><td><Link className="code-cell order-reconciliation-invoice-link" to={`/invoices/${invoice.id}`} target="_blank" rel="noopener noreferrer">{invoice.code}</Link></td><td><div className="internal-cod-customer-cell"><strong>{invoice.customer_name || "Khách lẻ"}</strong>{invoice.customer_phone ? <button className="order-reconciliation-phone" type="button" onClick={() => void copyPhone(invoice.customer_phone)} title="Bấm để sao chép số điện thoại">{invoice.customer_phone}</button> : <small>Không có SĐT</small>}</div></td><td className="internal-cod-invoice-address">{invoice.customer_address || "—"}</td><td>{!invoice.is_paid_by_transfer ? <TransferPaymentButton invoice={invoice} disabled={saving || !invoice.is_cod_pending} onChanged={refreshAfterTransfer}/> : null}{invoice.is_paid_by_transfer ? <span className="payment-chip transfer"><CreditCard size={14}/>Đã chuyển khoản</span> : invoice.is_cod_pending ? <span className="payment-chip cash"><Banknote size={14}/>Thu COD</span> : <span className="status-badge active"><CheckCircle2 size={14}/>Đã thu COD</span>}</td><td className="numeric strong internal-cod-amount-cell">{invoice.is_paid_by_transfer ? <span className="internal-cod-no-collection">Không thu</span> : invoice.is_cod_pending ? numberText(invoice.total_amount) : <span className="internal-cod-already-collected">Đã thu</span>}</td></tr>)}</tbody></table></div><div className="internal-cod-invoice-mobile-list">{collecting.handed_over_invoices.map((invoice) => <article className={invoice.is_paid_by_transfer ? "transfer" : invoice.is_cod_pending ? "cod-pending" : "cod-collected"} key={invoice.id}><header><Link className="code-cell order-reconciliation-invoice-link" to={`/invoices/${invoice.id}`} target="_blank" rel="noopener noreferrer">{invoice.code}</Link>{!invoice.is_paid_by_transfer ? <TransferPaymentButton invoice={invoice} disabled={saving || !invoice.is_cod_pending} onChanged={refreshAfterTransfer}/> : null}{invoice.is_paid_by_transfer ? <span className="payment-chip transfer"><CreditCard size={14}/>Đã chuyển khoản</span> : invoice.is_cod_pending ? <span className="payment-chip cash"><Banknote size={14}/>Thu COD</span> : <span className="status-badge active"><CheckCircle2 size={14}/>Đã thu COD</span>}</header><div><span><b>{invoice.customer_name || "Khách lẻ"}</b>{invoice.customer_phone ? <button className="order-reconciliation-phone" type="button" onClick={() => void copyPhone(invoice.customer_phone)} title="Bấm để sao chép số điện thoại">{invoice.customer_phone}</button> : <small className="internal-cod-phone-missing">Không có SĐT</small>}<small>{invoice.customer_address || "Chưa có địa chỉ"}</small><small>{invoice.handed_over_at ? `Bàn giao ${utcDateTime(invoice.handed_over_at)}` : "Chưa có giờ bàn giao"}</small></span><strong className={invoice.is_paid_by_transfer ? "internal-cod-no-collection" : ""}>{invoice.is_paid_by_transfer ? "Không thu" : invoice.is_cod_pending ? money(invoice.total_amount) : "Đã thu"}</strong></div></article>)}</div></div>
         <PaymentNoteInput label="Ghi chú thu tiền" placeholder="Ví dụ: Shipper đã nộp đủ tiền mặt" value={note} onChange={setNote} disabled={saving}/>
         <div className="internal-cod-confirmation"><CheckCircle2 size={19}/><span>Khi xác nhận, chỉ {collecting.pending_invoice_count} đơn có nhãn <strong>Thu COD</strong> được đánh dấu đã thu. Đơn <strong>Đã chuyển khoản</strong> không tính vào tiền shipper phải nộp.</span></div>
-        <div className="form-actions"><button className="secondary-button" type="button" disabled={saving} onClick={() => setCollecting(null)}>Hủy</button><button className="primary-button" disabled={saving}>{saving ? <LoaderCircle className="loading-spinner" size={17}/> : <Banknote size={17}/>}Xác nhận đã thu đủ</button></div>
+        <div className="form-actions"><button className="secondary-button" type="button" disabled={saving} onClick={() => setCollecting(null)}>Hủy</button><button className="primary-button" disabled={saving || loading || collecting.pending_invoice_count === 0}>{saving ? <LoaderCircle className="loading-spinner" size={17}/> : <Banknote size={17}/>}Xác nhận đã thu đủ</button></div>
       </form>
     </Modal> : null}
 

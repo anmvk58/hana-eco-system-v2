@@ -1,3 +1,4 @@
+from app.services.time_service import utc_now
 from datetime import date, datetime
 from decimal import Decimal
 
@@ -16,7 +17,7 @@ from app.models.user import User
 from app.schemas.external_handover import ExternalHandoverBatchUpdate
 from app.schemas.invoice import ExternalHandoffCreate, InternalShipperHandover, InternalShipperRecall, InvoiceBulkAuditAssign
 from app.services import invoice_service
-from app.services.time_service import VIETNAM_TIMEZONE, vietnam_day_utc_bounds
+from app.services.time_service import VIETNAM_TIMEZONE, vietnam_day_utc_bounds, vietnam_date_conditions, utc_to_vietnam
 
 
 def invoice_load_options():
@@ -37,15 +38,9 @@ def unaudited_query():
 
 
 def list_unaudited_invoices(db: Session, from_date: date | None, to_date: date | None) -> list[Invoice]:
-    today = datetime.now(VIETNAM_TIMEZONE).date()
-    effective_from = from_date or today
-    effective_to = to_date or today
-    if effective_from > effective_to:
-        raise HTTPException(status_code=422, detail="Ngày bắt đầu không được sau ngày kết thúc")
-    start_utc, _ = vietnam_day_utc_bounds(effective_from)
-    _, end_utc = vietnam_day_utc_bounds(effective_to)
+    conditions = vietnam_date_conditions(Invoice.created_at, from_date, to_date)
     return list(db.scalars(
-        unaudited_query().where(Invoice.created_at >= start_utc, Invoice.created_at < end_utc)
+        unaudited_query().where(*conditions)
         .order_by(Invoice.created_at, Invoice.id)
     ).unique().all())
 
@@ -101,7 +96,7 @@ def handover_to_internal_shipper(
                 detail="Một hoặc nhiều đơn không còn ở trạng thái chưa audit. Không có đơn nào được bàn giao",
             )
 
-        audited_at = datetime.utcnow()
+        audited_at = utc_now()
         for invoice in invoices:
             before_data = invoice_service.snapshot_invoice(invoice)
             invoice.audit_label = InvoiceAuditLabel.internal_shipper
@@ -128,21 +123,14 @@ def list_internal_shipper_assignments(
     from_date: date | None,
     to_date: date | None,
 ) -> list[dict]:
-    today = datetime.now(VIETNAM_TIMEZONE).date()
-    effective_from = from_date or today
-    effective_to = to_date or today
-    if effective_from > effective_to:
-        raise HTTPException(status_code=422, detail="Ngày bắt đầu không được sau ngày kết thúc")
-    start_utc, _ = vietnam_day_utc_bounds(effective_from)
-    _, end_utc = vietnam_day_utc_bounds(effective_to)
+    conditions = vietnam_date_conditions(Invoice.audited_at, from_date, to_date)
     invoices = list(db.scalars(
         select(Invoice)
         .options(*invoice_load_options())
         .where(
             Invoice.audit_label == InvoiceAuditLabel.internal_shipper,
             Invoice.assigned_shipper_id.is_not(None),
-            Invoice.audited_at >= start_utc,
-            Invoice.audited_at < end_utc,
+            *conditions,
             Invoice.deleted_at.is_(None),
         )
         .order_by(Invoice.audited_at.desc(), Invoice.id.desc())
@@ -232,7 +220,7 @@ def recall_internal_shipper_assignment(
 
 
 def create_batch(db: Session, invoices: list[Invoice], external: ExternalHandoffCreate, current_user: User) -> ExternalHandoverBatch:
-    now = datetime.utcnow()
+    now = utc_now()
     cod_total = sum((invoice.total_amount for invoice in invoices if not invoice.is_paid_by_transfer), Decimal("0"))
     batch = ExternalHandoverBatch(
         code=f"TEMP-{now.timestamp()}",
@@ -247,7 +235,7 @@ def create_batch(db: Session, invoices: list[Invoice], external: ExternalHandoff
     )
     db.add(batch)
     db.flush()
-    batch.code = f"BG-{now:%y%m%d}-{batch.id:04d}"
+    batch.code = f"BG-{utc_to_vietnam(now):%y%m%d}-{batch.id:04d}"
     for invoice in invoices:
         db.add(ExternalHandoverBatchItem(batch_id=batch.id, invoice_id=invoice.id, added_by_user_id=current_user.id))
     return batch
@@ -257,7 +245,7 @@ def apply_external_handoff(invoice: Invoice, external: ExternalHandoffCreate, ad
     invoice.audit_label = InvoiceAuditLabel.external_shipper
     invoice.handover_note = None
     invoice.assigned_shipper_id = None
-    invoice.audited_at = datetime.utcnow()
+    invoice.audited_at = utc_now()
     invoice.audited_by_user_id = current_user.id
     invoice.external_shipper_name = None
     invoice.external_shipper_phone = None
@@ -313,7 +301,7 @@ def handover_invoices(db: Session, payload: InvoiceBulkAuditAssign, current_user
                 invoice.audit_label = InvoiceAuditLabel.retail
                 invoice.handover_note = payload.handover_note
                 invoice.assigned_shipper_id = None
-                invoice.audited_at = datetime.utcnow()
+                invoice.audited_at = utc_now()
                 invoice.audited_by_user_id = current_user.id
                 clear_finance_only(invoice)
                 reason = "Đánh dấu đơn Khách lẻ"
@@ -367,12 +355,7 @@ def list_batches(db: Session, from_date: date | None, to_date: date | None) -> l
     if from_date and to_date and from_date > to_date:
         raise HTTPException(status_code=422, detail="Ngày bắt đầu không được sau ngày kết thúc")
     conditions = []
-    if from_date:
-        start_utc, _ = vietnam_day_utc_bounds(from_date)
-        conditions.append(ExternalHandoverBatch.handed_over_at >= start_utc)
-    if to_date:
-        _, end_utc = vietnam_day_utc_bounds(to_date)
-        conditions.append(ExternalHandoverBatch.handed_over_at < end_utc)
+    conditions.extend(vietnam_date_conditions(ExternalHandoverBatch.handed_over_at, from_date, to_date))
     batches = db.scalars(
         batch_query().where(*conditions)
         .order_by(ExternalHandoverBatch.handed_over_at.desc(), ExternalHandoverBatch.id.desc())
@@ -412,7 +395,7 @@ def update_batch(db: Session, batch_id: int, payload: ExternalHandoverBatchUpdat
         final_invoices = current_invoices + added_invoices
         cod_total = sum((invoice.total_amount for invoice in final_invoices if not invoice.is_paid_by_transfer), Decimal("0"))
         advance_amount = cod_total - payload.external_handoff.shipping_fee
-        now = datetime.utcnow()
+        now = utc_now()
 
         for invoice_id in removed_ids:
             item = active_items[invoice_id]
@@ -452,7 +435,7 @@ def cancel_batch(db: Session, batch_id: int, current_user: User) -> dict:
             raise HTTPException(status_code=409, detail="Bảng kê đã được hủy trước đó")
         if batch.reconciliation is not None:
             raise HTTPException(status_code=409, detail="Bảng kê đã kiểm kê và nhận tiền, không thể hủy")
-        now = datetime.utcnow()
+        now = utc_now()
         for item in [item for item in batch.items if item.is_active]:
             before = invoice_service.snapshot_invoice(item.invoice)
             item.is_active, item.removed_at, item.removed_by_user_id = False, now, current_user.id
@@ -492,7 +475,7 @@ def ensure_legacy_external_handover_batches(db: Session) -> None:
         )
         db.add(batch)
         db.flush()
-        batch.code = f"BG-{batch.handed_over_at:%y%m%d}-{batch.id:04d}"
+        batch.code = f"BG-{utc_to_vietnam(batch.handed_over_at):%y%m%d}-{batch.id:04d}"
         for invoice in grouped:
             db.add(ExternalHandoverBatchItem(batch_id=batch.id, invoice_id=invoice.id, added_by_user_id=invoice.audited_by_user_id))
     if groups:

@@ -1,3 +1,4 @@
+import { todayInputValue, dateOnly, parseCalendarDate, calendarDateValue } from "../utils/time";
 import { CalendarDays, ChevronLeft, ChevronRight, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
@@ -9,19 +10,12 @@ interface DateRangePickerProps {
 
 const weekDays = ["T2", "T3", "T4", "T5", "T6", "T7", "CN"];
 
-function isoDate(date: Date) {
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${date.getFullYear()}-${month}-${day}`;
-}
+function isoDate(date: Date) { return calendarDateValue(date); }
 
-function parseDate(value: string) {
-  const [year, month, day] = value.split("-").map(Number);
-  return new Date(year, month - 1, day);
-}
+function parseDate(value: string) { return parseCalendarDate(value); }
 
 function displayDate(value: string) {
-  return value ? new Intl.DateTimeFormat("vi-VN").format(parseDate(value)) : "";
+  return value ? dateOnly(value) : "";
 }
 
 export function DateRangePicker({ from, to, onChange }: DateRangePickerProps) {
@@ -29,8 +23,8 @@ export function DateRangePicker({ from, to, onChange }: DateRangePickerProps) {
   const [open, setOpen] = useState(false);
   const [visibleMonth, setVisibleMonth] = useState(() => {
     const initial = from || to;
-    const date = initial ? parseDate(initial) : new Date();
-    return new Date(date.getFullYear(), date.getMonth(), 1);
+    const date = parseDate(initial || todayInputValue());
+    return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), 1));
   });
 
   useEffect(() => {
@@ -50,13 +44,13 @@ export function DateRangePicker({ from, to, onChange }: DateRangePickerProps) {
   }, [open]);
 
   const days = useMemo(() => {
-    const first = new Date(visibleMonth.getFullYear(), visibleMonth.getMonth(), 1);
-    const mondayOffset = (first.getDay() + 6) % 7;
+    const first = new Date(Date.UTC(visibleMonth.getUTCFullYear(), visibleMonth.getUTCMonth(), 1));
+    const mondayOffset = (first.getUTCDay() + 6) % 7;
     const calendarStart = new Date(first);
-    calendarStart.setDate(first.getDate() - mondayOffset);
+    calendarStart.setUTCDate(first.getUTCDate() - mondayOffset);
     return Array.from({ length: 42 }, (_, index) => {
       const day = new Date(calendarStart);
-      day.setDate(calendarStart.getDate() + index);
+      day.setUTCDate(calendarStart.getUTCDate() + index);
       return day;
     });
   }, [visibleMonth]);
@@ -81,16 +75,16 @@ export function DateRangePicker({ from, to, onChange }: DateRangePickerProps) {
   }
 
   function chooseToday() {
-    const today = isoDate(new Date());
+    const today = todayInputValue();
     onChange(today, today);
-    setVisibleMonth(new Date());
+    setVisibleMonth(parseDate(today));
     setOpen(false);
   }
 
   function chooseCurrentMonth() {
-    const today = new Date();
-    onChange(isoDate(new Date(today.getFullYear(), today.getMonth(), 1)), isoDate(today));
-    setVisibleMonth(new Date(today.getFullYear(), today.getMonth(), 1));
+    const today = parseDate(todayInputValue());
+    onChange(isoDate(new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), 1))), isoDate(today));
+    setVisibleMonth(new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), 1)));
     setOpen(false);
   }
 
@@ -105,9 +99,9 @@ export function DateRangePicker({ from, to, onChange }: DateRangePickerProps) {
       {open ? (
         <div className="date-range-popover" role="dialog" aria-label="Chọn khoảng thời gian">
           <div className="date-range-calendar-header">
-            <button type="button" onClick={() => setVisibleMonth((month) => new Date(month.getFullYear(), month.getMonth() - 1, 1))} aria-label="Tháng trước"><ChevronLeft size={18} /></button>
-            <strong>Tháng {visibleMonth.getMonth() + 1}/{visibleMonth.getFullYear()}</strong>
-            <button type="button" onClick={() => setVisibleMonth((month) => new Date(month.getFullYear(), month.getMonth() + 1, 1))} aria-label="Tháng sau"><ChevronRight size={18} /></button>
+            <button type="button" onClick={() => setVisibleMonth((month) => new Date(Date.UTC(month.getUTCFullYear(), month.getUTCMonth() - 1, 1)))} aria-label="Tháng trước"><ChevronLeft size={18} /></button>
+            <strong>Tháng {visibleMonth.getUTCMonth() + 1}/{visibleMonth.getUTCFullYear()}</strong>
+            <button type="button" onClick={() => setVisibleMonth((month) => new Date(Date.UTC(month.getUTCFullYear(), month.getUTCMonth() + 1, 1)))} aria-label="Tháng sau"><ChevronRight size={18} /></button>
           </div>
           <div className="date-range-weekdays">
             {weekDays.map((day) => <span key={day}>{day}</span>)}
@@ -115,10 +109,10 @@ export function DateRangePicker({ from, to, onChange }: DateRangePickerProps) {
           <div className="date-range-days">
             {days.map((day) => {
               const value = isoDate(day);
-              const outside = day.getMonth() !== visibleMonth.getMonth();
+              const outside = day.getUTCMonth() !== visibleMonth.getUTCMonth();
               const endpoint = value === from || value === to;
               const inRange = Boolean(from && to && value > from && value < to);
-              const today = value === isoDate(new Date());
+              const today = value === todayInputValue();
               return (
                 <button
                   className={`${outside ? "outside " : ""}${inRange ? "in-range " : ""}${endpoint ? "endpoint " : ""}${today ? "today" : ""}`.trim()}
@@ -127,7 +121,7 @@ export function DateRangePicker({ from, to, onChange }: DateRangePickerProps) {
                   onClick={() => selectDay(day)}
                   aria-pressed={endpoint}
                 >
-                  {day.getDate()}
+                  {day.getUTCDate()}
                 </button>
               );
             })}

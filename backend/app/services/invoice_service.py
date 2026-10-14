@@ -1,3 +1,4 @@
+from app.services.time_service import utc_now
 from datetime import date, datetime, time
 from decimal import Decimal, ROUND_HALF_UP
 from typing import Any
@@ -17,11 +18,52 @@ from app.models.product import Product
 from app.models.retail_invoice_collection import RetailInvoiceCollection
 from app.models.shipper import Shipper
 from app.models.user import User
-from app.schemas.invoice import InvoiceCreate, InvoiceExtraChargeCreate, InvoiceItemCreate, InvoiceUpdate
-from app.services.time_service import vietnam_local_datetime
+from app.schemas.invoice import InvoiceCreate, InvoiceExtraChargeCreate, InvoiceItemCreate, InvoiceTransferConfirm, InvoiceUpdate
+from app.services.time_service import to_utc_naive, utc_to_vietnam, utc_iso, vietnam_date_conditions
 
 
 MONEY_QUANT = Decimal("0.01")
+
+
+def ensure_payment_change_allowed(db: Session, invoice: Invoice, *, allow_external: bool = False) -> None:
+    if db.scalar(select(InternalCodCollectionItem.id).where(InternalCodCollectionItem.invoice_id == invoice.id)):
+        raise HTTPException(status_code=409, detail="Đơn đã thuộc phiên thu COD. Cần điều chỉnh đối soát trước khi đổi thanh toán")
+    if db.scalar(select(RetailInvoiceCollection.id).where(RetailInvoiceCollection.invoice_id == invoice.id)):
+        raise HTTPException(status_code=409, detail="Đơn đã kiểm kê/thu tiền. Cần điều chỉnh đối soát trước khi đổi thanh toán")
+    if not allow_external and (invoice.audit_label == InvoiceAuditLabel.external_shipper or db.scalar(
+        select(ExternalHandoverBatchItem.id).where(
+            ExternalHandoverBatchItem.invoice_id == invoice.id,
+            ExternalHandoverBatchItem.is_active.is_(True),
+        )
+    )):
+        raise HTTPException(status_code=409, detail="Đơn đã bàn giao Ship Ngoài. Cần điều chỉnh bảng giao và đối soát trước khi đổi thanh toán")
+
+
+def confirm_transfer(db: Session, invoice_id: int, payload: InvoiceTransferConfirm, current_user: User) -> Invoice:
+    try:
+        invoice = get_invoice(db, invoice_id, for_update=True)
+        if invoice.status == InvoiceStatus.cancelled:
+            raise HTTPException(status_code=409, detail="Không thể đổi thanh toán của đơn đã hủy")
+        if invoice.is_paid_by_transfer:
+            return invoice
+        if invoice.total_amount != payload.expected_total_amount or (
+            payload.expected_revision is not None and invoice.revision != payload.expected_revision
+        ):
+            raise HTTPException(status_code=409, detail="Đơn vừa thay đổi. Vui lòng tải lại và kiểm tra số tiền trước khi xác nhận")
+        ensure_payment_change_allowed(db, invoice)
+        before = snapshot_invoice(invoice)
+        invoice.is_paid_by_transfer = True
+        invoice.revision += 1
+        db.flush()
+        note = (payload.note or "").strip()
+        add_history(db, invoice, InvoiceHistoryAction.updated, before, snapshot_invoice(invoice),
+                    current_user.id, current_user.display_name,
+                    "Xác nhận khách đã chuyển khoản đủ tiền" + (f": {note}" if note else ""))
+        db.commit()
+        return get_invoice(db, invoice_id)
+    except Exception:
+        db.rollback()
+        raise
 
 
 def to_money(value: Decimal) -> Decimal:
@@ -73,7 +115,7 @@ def ensure_invoice_sequence_row(db: Session, date_key: str) -> None:
 
 
 def reserve_invoice_code(db: Session, sold_at: datetime | None = None) -> str:
-    current = vietnam_local_datetime(sold_at)
+    current = utc_to_vietnam(sold_at or utc_now())
     date_key = current.strftime("%y%m%d")
     ensure_invoice_sequence_row(db, date_key)
     sequence = db.scalar(select(InvoiceCodeSequence).where(InvoiceCodeSequence.date_key == date_key).with_for_update())
@@ -227,10 +269,7 @@ def list_invoices(
         conditions.append(Invoice.audit_label.is_(None))
     elif audit_label:
         conditions.append(Invoice.audit_label == audit_label)
-    if from_date:
-        conditions.append(Invoice.sold_at >= datetime.combine(from_date, time.min))
-    if to_date:
-        conditions.append(Invoice.sold_at <= datetime.combine(to_date, time.max))
+    conditions.extend(vietnam_date_conditions(Invoice.sold_at, from_date, to_date))
 
     total = db.scalar(select(func.count(Invoice.id)).where(*conditions)) or 0
     total_pages = max(1, (total + page_size - 1) // page_size)
@@ -351,7 +390,7 @@ def snapshot_invoice(invoice: Invoice) -> dict[str, Any]:
             for charge in invoice.extra_charges
         ],
     }
-    return jsonable_encoder(data)
+    return jsonable_encoder(data, custom_encoder={datetime: utc_iso})
 
 
 def add_history(
@@ -380,7 +419,7 @@ def add_history(
 
 def create_invoice(db: Session, payload: InvoiceCreate, user_id: int | None, user_name: str | None) -> Invoice:
     validate_customer(db, payload.customer_id)
-    sold_at = vietnam_local_datetime(payload.sold_at)
+    sold_at = to_utc_naive(payload.sold_at)
     try:
         invoice = Invoice(
             code=payload.code or reserve_invoice_code(db, sold_at),
@@ -425,11 +464,13 @@ def update_invoice(db: Session, invoice_id: int, payload: InvoiceUpdate, user_id
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Không thể sửa hóa đơn đã hoàn thành")
     if payload.customer_id != invoice.customer_id:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cannot change invoice customer")
-    if payload.sold_at is not None and not same_datetime_to_second(vietnam_local_datetime(payload.sold_at), invoice.sold_at):
+    if payload.sold_at is not None and not same_datetime_to_second(to_utc_naive(payload.sold_at), invoice.sold_at):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cannot change invoice sold time")
     before_data = snapshot_invoice(invoice)
 
     try:
+        if payload.is_paid_by_transfer is not None and payload.is_paid_by_transfer != invoice.is_paid_by_transfer:
+            ensure_payment_change_allowed(db, invoice)
         apply_stock_change(db, invoice.items, direction=1)
 
         invoice.status = InvoiceStatus.created
@@ -475,7 +516,7 @@ def soft_delete_invoice(db: Session, invoice_id: int, user_id: int | None, user_
     before_data = snapshot_invoice(invoice)
     if invoice.status in (InvoiceStatus.created, InvoiceStatus.completed):
         apply_stock_change(db, invoice.items, direction=1)
-    invoice.deleted_at = datetime.utcnow()
+    invoice.deleted_at = utc_now()
     after_data = snapshot_invoice(invoice)
     add_history(
         db,
@@ -542,7 +583,7 @@ def assign_audit_label(
     try:
         invoice.audit_label = audit_label
         invoice.assigned_shipper_id = None
-        invoice.audited_at = datetime.utcnow()
+        invoice.audited_at = utc_now()
         invoice.audited_by_user_id = current_user.id
         db.flush()
         label_name = "Khách lẻ" if audit_label == InvoiceAuditLabel.retail else "Ship Ngoài"

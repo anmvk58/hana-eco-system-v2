@@ -5189,3 +5189,17 @@ label {
 @media (prefers-reduced-motion: reduce) {
   :root { --input-focus-transition: none; }
 }
+
+.transfer-payment-confirmation { display: grid; gap: 14px; padding: 20px; }
+.transfer-payment-confirmation p { margin: 0; }
+.transfer-payment-confirmation label { display: grid; gap: 8px; }
+.transfer-payment-confirmation textarea { min-height: 80px; }
+.transfer-payment-result { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 0; border-top: 1px solid #e2e8f0; }
+.secondary-button.transfer-payment-button { width: 34px; min-width: 34px; padding: 0; flex: 0 0 auto; gap: 0; justify-content: center; align-self: center; }
+.invoice-list-action-button.transfer-payment-button { flex: 0 0 auto; cursor: pointer; }
+.external-invoice-payment-actions { display: inline-flex; align-items: center; gap: 6px; }
+.external-invoice-payment-actions .transfer-payment-button,
+.internal-cod-invoice-list .transfer-payment-button { background: var(--secondary); border-color: var(--secondary); color: #fff; }
+.external-invoice-payment-actions .transfer-payment-button:hover:not(:disabled),
+.internal-cod-invoice-list .transfer-payment-button:hover:not(:disabled) { filter: brightness(.92); }
+.order-reconciliation-card footer > .transfer-payment-button { width: 38px; min-width: 38px; min-height: 38px; flex: 0 0 auto; }

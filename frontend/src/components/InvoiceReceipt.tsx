@@ -3,7 +3,7 @@ import { useEffect, useRef } from "react";
 
 import posLogo from "../assets/pos_logo2.png";
 import type { Invoice } from "../types";
-import { numberText } from "../utils/format";
+import { numberText, dateOnly, timeOnly } from "../utils/format";
 
 export function InvoiceReceipt({ invoice, className = "" }: { invoice: Invoice; className?: string }) {
   const barcodeRef = useRef<SVGSVGElement | null>(null);
@@ -24,15 +24,8 @@ export function InvoiceReceipt({ invoice, className = "" }: { invoice: Invoice; 
   const printedInvoiceCode = invoice.revision > 0 ? `${invoice.code}.${revisionText}` : invoice.code;
   const customerPhone = invoice.customer?.phone || "-";
   const customerAddress = invoice.customer?.address || "-";
-  const soldDate = new Intl.DateTimeFormat("vi-VN", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  }).format(new Date(invoice.sold_at));
-  const soldTime = new Intl.DateTimeFormat("vi-VN", {
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(new Date(invoice.sold_at));
+  const soldDate = dateOnly(invoice.sold_at);
+  const soldTime = timeOnly(invoice.sold_at);
   const shippingFee = invoice.extra_charges.find((charge) => charge.charge_type === "shipping")?.amount ?? "0";
   const packingFee = invoice.extra_charges.find((charge) => charge.charge_type === "packing")?.amount ?? "0";
   const otherFees = invoice.extra_charges

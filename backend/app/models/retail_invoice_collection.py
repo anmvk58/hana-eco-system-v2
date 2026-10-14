@@ -1,3 +1,4 @@
+from app.services.time_service import utc_now
 from datetime import datetime
 from decimal import Decimal
 
@@ -18,7 +19,7 @@ class RetailInvoiceCollection(Base, TimestampMixin):
     customer_name: Mapped[str | None] = mapped_column(String(200), nullable=True)
     collected_amount: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False)
     is_paid_by_transfer: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0", nullable=False)
-    collected_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True, nullable=False)
+    collected_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, index=True, nullable=False)
     collected_by_user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), index=True, nullable=True)
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
 

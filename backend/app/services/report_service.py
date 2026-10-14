@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.models.enums import InvoiceStatus
 from app.models.invoice import Invoice, InvoiceItem
+from app.services.time_service import vietnam_date_conditions
 
 
 def sold_products(db: Session, from_date: date | None, to_date: date | None):
@@ -25,8 +26,5 @@ def sold_products(db: Session, from_date: date | None, to_date: date | None):
         .group_by(InvoiceItem.product_code)
         .order_by(func.sum(InvoiceItem.quantity).desc(), InvoiceItem.product_code)
     )
-    if from_date:
-        stmt = stmt.where(Invoice.sold_at >= datetime.combine(from_date, time.min))
-    if to_date:
-        stmt = stmt.where(Invoice.sold_at <= datetime.combine(to_date, time.max))
+    stmt = stmt.where(*vietnam_date_conditions(Invoice.sold_at, from_date, to_date))
     return list(db.execute(stmt).mappings().all())

@@ -7,7 +7,7 @@ import { useAuth } from "../auth/AuthContext";
 import { DateRangePicker } from "../components/DateRangePicker";
 import { EmptyState } from "../components/EmptyState";
 import type { DashboardTimePreset, Invoice } from "../types";
-import { money, numberText, todayInputValue } from "../utils/format";
+import { money, numberText, todayInputValue, vietnamDateInputValue, shiftCalendarDate } from "../utils/format";
 
 interface ProductRevenue {
   key: string;
@@ -24,10 +24,7 @@ const timePresets: Array<{ value: DashboardTimePreset; label: string }> = [
   { value: "custom", label: "Khoảng ngày" },
 ];
 
-function shiftDate(value: string, days: number) {
-  const [year, month, day] = value.split("-").map(Number);
-  return new Date(Date.UTC(year, month - 1, day + days)).toISOString().slice(0, 10);
-}
+function shiftDate(value: string, days: number) { return shiftCalendarDate(value, days); }
 
 export function ReportsPage() {
   const { hasPermission } = useAuth();
@@ -115,7 +112,7 @@ export function ReportsPage() {
   const byDay = useMemo(() => {
     const map = new Map<string, number>();
     invoices.forEach((invoice) => {
-      const key = invoice.sold_at.slice(0, 10);
+      const key = vietnamDateInputValue(invoice.sold_at);
       map.set(key, (map.get(key) ?? 0) + Number(invoice.total_amount));
     });
     return Array.from(map.entries()).sort(([a], [b]) => a.localeCompare(b));
@@ -252,4 +249,3 @@ function ReportMetric({ label, value, icon: Icon, tone }: {
     </div>
   );
 }
-

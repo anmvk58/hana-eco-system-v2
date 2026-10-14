@@ -15,7 +15,7 @@ import type {
   DashboardSummary,
   DashboardTimePreset,
 } from "../types";
-import { money, numberText, todayInputValue } from "../utils/format";
+import { money, numberText, todayInputValue, dateOnly, shiftCalendarDate } from "../utils/format";
 
 type TimePreset = DashboardTimePreset;
 type RankingTimePreset = Exclude<DashboardTimePreset, "custom">;
@@ -42,17 +42,9 @@ const productMetricOptions: Array<{ value: DashboardProductMetric; label: string
 
 const pieColors = ["#15947f", "#e7832e", "#376fd0", "#8d63c7", "#d7556b", "#49a4b6", "#a58b26", "#61717c", "#53a85a", "#c5689e"];
 
-function previousDate(value: string) {
-  const [year, month, day] = value.split("-").map(Number);
-  const result = new Date(Date.UTC(year, month - 1, day - 1));
-  return result.toISOString().slice(0, 10);
-}
+function previousDate(value: string) { return shiftCalendarDate(value, -1); }
 
-function shiftDate(value: string, days: number) {
-  const [year, month, day] = value.split("-").map(Number);
-  const result = new Date(Date.UTC(year, month - 1, day + days));
-  return result.toISOString().slice(0, 10);
-}
+function shiftDate(value: string, days: number) { return shiftCalendarDate(value, days); }
 
 function rankingDateRange(preset: RankingTimePreset, today: string) {
   if (preset === "yesterday") {
@@ -500,7 +492,7 @@ function RevenueChart({
   const maxValue = Math.max(...data.map((point) => point.value), 0);
   const axisMax = revenueAxisMax(maxValue);
   const axisTicks = Array.from({ length: 5 }, (_, index) => axisMax * (1 - index / 4));
-  const formatDate = (value: string) => new Intl.DateTimeFormat("vi-VN").format(new Date(`${value}T00:00:00+07:00`));
+  const formatDate = (value: string) => dateOnly(value);
   const rangeLabel = !fromDate || !toDate ? "Đang chọn khoảng ngày" : fromDate === toDate
     ? formatDate(fromDate)
     : `${formatDate(fromDate)} – ${formatDate(toDate)}`;

@@ -12,6 +12,7 @@ from app.services.invoice_service import backfill_invoice_revisions
 from app.services.payment_note_setting_service import ensure_defaults as ensure_payment_note_defaults
 from app.api.routers import payment_note_settings
 from app.services.ship_management_service import ensure_legacy_external_handover_batches
+from app.services.time_migration_service import ensure_utc_sale_times
 
 
 settings = get_settings()
@@ -58,6 +59,7 @@ def create_app() -> FastAPI:
         ensure_invoice_revision_column()
         ensure_invoice_external_handoff_columns()
         ensure_internal_cod_collection_columns()
+        ensure_utc_sale_times(engine)
         with SessionLocal() as db:
             ensure_access_control_defaults(db)
             ensure_default_extra_charge_settings(db)

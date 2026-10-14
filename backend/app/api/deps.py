@@ -1,3 +1,4 @@
+from app.services.time_service import utc_now
 from datetime import datetime
 
 from fastapi import Depends, HTTPException, status
@@ -22,7 +23,7 @@ def get_current_user(
     auth_session = db.scalar(
         select(AuthSession)
         .options(selectinload(AuthSession.user).selectinload(User.roles))
-        .where(AuthSession.token_hash == hash_token(credentials.credentials), AuthSession.expires_at > datetime.utcnow())
+        .where(AuthSession.token_hash == hash_token(credentials.credentials), AuthSession.expires_at > utc_now())
     )
     user = auth_session.user if auth_session else None
     if not user or not user.is_active:
@@ -50,4 +51,3 @@ def require_any_permission(*codes: str):
         return current_user
 
     return dependency
-

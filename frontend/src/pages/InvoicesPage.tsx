@@ -1,3 +1,4 @@
+import { TransferPaymentButton } from "../components/TransferPaymentButton";
 import { ChevronLeft, ChevronRight, FileText, LoaderCircle, Phone, Search, UserRound, XCircle } from "lucide-react";
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
@@ -347,6 +348,7 @@ export function InvoicesPage() {
                 <td className="numeric">{numberText(invoice.total_extra_charges)}</td>
                 <td className="numeric strong">{numberText(invoice.total_amount)}</td>
                 <td className="row-actions">
+                  <TransferPaymentButton invoice={invoice} variant="invoice-list" onChanged={async () => { await loadInvoices(); }}/>
                   <Link
                     className="invoice-list-action-button invoice-list-view-button"
                     to={`/invoices/${invoice.id}`}
@@ -467,4 +469,3 @@ export function InvoicesPage() {
     </div>
   );
 }
-

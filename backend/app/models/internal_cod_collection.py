@@ -1,3 +1,4 @@
+from app.services.time_service import utc_now
 from datetime import datetime
 from decimal import Decimal
 
@@ -16,7 +17,7 @@ class InternalCodCollectionSession(Base, TimestampMixin):
     shipper_id: Mapped[int] = mapped_column(ForeignKey("shippers.id"), index=True, nullable=False)
     invoice_count: Mapped[int] = mapped_column(Integer, nullable=False)
     total_amount: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False)
-    collected_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True, nullable=False)
+    collected_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, index=True, nullable=False)
     collected_by_user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), index=True, nullable=True)
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
 

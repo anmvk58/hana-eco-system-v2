@@ -1,3 +1,4 @@
+from app.services.time_service import utc_now
 from datetime import datetime
 from decimal import Decimal
 
@@ -17,7 +18,7 @@ class ExternalHandoverBatch(Base, TimestampMixin):
     status: Mapped[ExternalHandoverBatchStatus] = mapped_column(
         Enum(ExternalHandoverBatchStatus), default=ExternalHandoverBatchStatus.active, index=True, nullable=False
     )
-    handed_over_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True, nullable=False)
+    handed_over_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, index=True, nullable=False)
     advance_method: Mapped[ExternalAdvanceMethod] = mapped_column(Enum(ExternalAdvanceMethod), nullable=False)
     transfer_amount: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=0, nullable=False)
     cash_amount: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=0, nullable=False)
@@ -47,7 +48,7 @@ class ExternalHandoverBatchItem(Base):
     batch_id: Mapped[int] = mapped_column(ForeignKey("external_handover_batches.id", ondelete="CASCADE"), index=True)
     invoice_id: Mapped[int] = mapped_column(ForeignKey("invoices.id"), index=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, index=True, nullable=False)
-    added_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    added_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, nullable=False)
     added_by_user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
     removed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     removed_by_user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)

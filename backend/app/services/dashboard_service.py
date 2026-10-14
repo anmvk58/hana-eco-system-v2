@@ -33,8 +33,8 @@ def date_range(from_date: date | None, to_date: date | None) -> tuple[date, date
     selected_to = to_date or from_date or today
     if selected_from > selected_to:
         raise HTTPException(status_code=422, detail="Ngày bắt đầu không được sau ngày kết thúc")
-    start = datetime.combine(selected_from, time.min)
-    end_exclusive = datetime.combine(selected_to + timedelta(days=1), time.min)
+    start = vietnam_day_utc_bounds(selected_from)[0]
+    end_exclusive = vietnam_day_utc_bounds(selected_to)[1]
     return selected_from, selected_to, start, end_exclusive
 
 
@@ -61,7 +61,7 @@ def revenue_points(
         granularity = "month"
         bucket_format = "%Y-%m"
 
-    bucket = func.date_format(Invoice.sold_at, bucket_format)
+    bucket = func.date_format(func.convert_tz(Invoice.sold_at, "+00:00", "+07:00"), bucket_format)
     rows = db.execute(
         select(bucket.label("bucket"), func.coalesce(func.sum(Invoice.subtotal), 0).label("value"))
         .where(
@@ -84,7 +84,7 @@ def revenue_points(
         ]
 
     if granularity == "month":
-        first_month = start.replace(day=1)
+        first_month = datetime.combine(start_date.replace(day=1), time.min)
         month_count = (end_date.year - start_date.year) * 12 + end_date.month - start_date.month + 1
         points = []
         for index in range(month_count):
@@ -99,7 +99,7 @@ def revenue_points(
 
     points = []
     for index in range(number_of_days):
-        value = start + timedelta(days=index)
+        value = datetime.combine(start_date, time.min) + timedelta(days=index)
         key = value.strftime("%Y-%m-%d")
         points.append(DashboardRevenuePoint(
             key=key, label=value.strftime("%d/%m"), full_label=f"Ngày {value.strftime('%d/%m/%Y')}",
