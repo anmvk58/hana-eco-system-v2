@@ -1,7 +1,7 @@
 from app.database import Base
 from app.models.data_migration import DataMigration, TimeNormalizationBackup
 from app.models.payment_note_setting import PaymentNoteSetting
-from app.models.customer import Customer
+from app.models.customer import Customer, CustomerNameSearch
 from app.models.extra_charge_setting import ExtraChargeSetting
 from app.models.external_handover import ExternalHandoverBatch, ExternalHandoverBatchItem
 from app.models.external_handover_reconciliation import ExternalHandoverBatchReconciliation
@@ -17,6 +17,7 @@ __all__ = [
     "Base",
     "PaymentNoteSetting",
     "Customer",
+    "CustomerNameSearch",
     "ExtraChargeSetting",
     "ExternalHandoverBatch",
     "ExternalHandoverBatchItem",

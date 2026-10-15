@@ -25,6 +25,21 @@ from app.services.time_service import to_utc_naive, utc_to_vietnam, utc_iso, vie
 MONEY_QUANT = Decimal("0.01")
 
 
+def ensure_invoice_content_change_allowed(db: Session, invoice: Invoice) -> None:
+    for model in (InternalCodCollectionItem, RetailInvoiceCollection):
+        if db.scalar(select(model.id).where(model.invoice_id == invoice.id).with_for_update()):
+            raise HTTPException(status_code=409, detail="Hóa đơn đã thu tiền/kiểm kê, không thể sửa, hủy hoặc xóa")
+    # Active external batches own their finance totals. Remove the order through
+    # the handover workflow before changing it, including pending batches.
+    if invoice.audit_label == InvoiceAuditLabel.external_shipper or db.scalar(
+        select(ExternalHandoverBatchItem.id).where(
+            ExternalHandoverBatchItem.invoice_id == invoice.id,
+            ExternalHandoverBatchItem.is_active.is_(True),
+        ).with_for_update()
+    ):
+        raise HTTPException(status_code=409, detail="Hóa đơn thuộc bàn giao Ship Ngoài. Cần điều chỉnh bàn giao trước khi sửa, hủy hoặc xóa")
+
+
 def ensure_payment_change_allowed(db: Session, invoice: Invoice, *, allow_external: bool = False) -> None:
     if db.scalar(select(InternalCodCollectionItem.id).where(InternalCodCollectionItem.invoice_id == invoice.id)):
         raise HTTPException(status_code=409, detail="Đơn đã thuộc phiên thu COD. Cần điều chỉnh đối soát trước khi đổi thanh toán")
@@ -469,6 +484,7 @@ def update_invoice(db: Session, invoice_id: int, payload: InvoiceUpdate, user_id
     before_data = snapshot_invoice(invoice)
 
     try:
+        ensure_invoice_content_change_allowed(db, invoice)
         if payload.is_paid_by_transfer is not None and payload.is_paid_by_transfer != invoice.is_paid_by_transfer:
             ensure_payment_change_allowed(db, invoice)
         apply_stock_change(db, invoice.items, direction=1)
@@ -512,23 +528,28 @@ def update_invoice(db: Session, invoice_id: int, payload: InvoiceUpdate, user_id
 
 
 def soft_delete_invoice(db: Session, invoice_id: int, user_id: int | None, user_name: str | None, reason: str | None = None) -> None:
-    invoice = get_invoice(db, invoice_id)
-    before_data = snapshot_invoice(invoice)
-    if invoice.status in (InvoiceStatus.created, InvoiceStatus.completed):
-        apply_stock_change(db, invoice.items, direction=1)
-    invoice.deleted_at = utc_now()
-    after_data = snapshot_invoice(invoice)
-    add_history(
-        db,
-        invoice,
-        InvoiceHistoryAction.deleted,
-        before_data=before_data,
-        after_data=after_data,
-        user_id=user_id,
-        user_name=user_name,
-        reason=reason,
-    )
-    db.commit()
+    try:
+        invoice = get_invoice(db, invoice_id, for_update=True)
+        ensure_invoice_content_change_allowed(db, invoice)
+        before_data = snapshot_invoice(invoice)
+        if invoice.status in (InvoiceStatus.created, InvoiceStatus.completed):
+            apply_stock_change(db, invoice.items, direction=1)
+        invoice.deleted_at = utc_now()
+        after_data = snapshot_invoice(invoice)
+        add_history(
+            db,
+            invoice,
+            InvoiceHistoryAction.deleted,
+            before_data=before_data,
+            after_data=after_data,
+            user_id=user_id,
+            user_name=user_name,
+            reason=reason,
+        )
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
 
 
 def cancel_invoice(db: Session, invoice_id: int, user_id: int, user_name: str, reason: str) -> Invoice:
@@ -541,6 +562,7 @@ def cancel_invoice(db: Session, invoice_id: int, user_id: int, user_name: str, r
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Không thể hủy hóa đơn đã hoàn thành")
     before_data = snapshot_invoice(invoice)
     try:
+        ensure_invoice_content_change_allowed(db, invoice)
         apply_stock_change(db, invoice.items, direction=1)
         invoice.status = InvoiceStatus.cancelled
         db.flush()

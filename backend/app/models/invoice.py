@@ -2,7 +2,7 @@ from app.services.time_service import utc_now
 from datetime import datetime
 from decimal import Decimal
 
-from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, Integer, JSON, Numeric, String, Text
+from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, Index, Integer, JSON, Numeric, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -12,6 +12,11 @@ from app.models.mixins import SoftDeleteMixin, TimestampMixin
 
 class Invoice(Base, TimestampMixin, SoftDeleteMixin):
     __tablename__ = "invoices"
+    __table_args__ = (
+        Index("ix_invoices_audit_handover", "audit_label", "deleted_at", "audited_at", "id"),
+        Index("ix_invoices_shipper_handover", "assigned_shipper_id", "audit_label", "deleted_at", "audited_at", "id"),
+        Index("ix_invoices_audit_sale", "audit_label", "deleted_at", "sold_at", "id"),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
     code: Mapped[str] = mapped_column(String(60), unique=True, index=True, nullable=False)
@@ -19,12 +24,12 @@ class Invoice(Base, TimestampMixin, SoftDeleteMixin):
     customer_id: Mapped[int | None] = mapped_column(ForeignKey("customers.id"), nullable=True, index=True)
     status: Mapped[InvoiceStatus] = mapped_column(Enum(InvoiceStatus), default=InvoiceStatus.created, index=True, nullable=False)
     sold_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, index=True, nullable=False)
-    audit_label: Mapped[InvoiceAuditLabel | None] = mapped_column(Enum(InvoiceAuditLabel), index=True, nullable=True)
+    audit_label: Mapped[InvoiceAuditLabel | None] = mapped_column(Enum(InvoiceAuditLabel), nullable=True)
     handover_note: Mapped[str | None] = mapped_column(String(500), nullable=True)
     assigned_shipper_id: Mapped[int | None] = mapped_column(ForeignKey("shippers.id"), index=True, nullable=True)
-    audited_at: Mapped[datetime | None] = mapped_column(DateTime, index=True, nullable=True)
+    audited_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     audited_by_user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), index=True, nullable=True)
-    delivered_at: Mapped[datetime | None] = mapped_column(DateTime, index=True, nullable=True)
+    delivered_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     delivered_by_user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), index=True, nullable=True)
     is_paid_by_transfer: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0", nullable=False)
     external_shipper_name: Mapped[str | None] = mapped_column(String(160), nullable=True)

@@ -46,9 +46,9 @@ export function InvoiceReceipt({ invoice, className = "" }: { invoice: Invoice; 
 
       <div className="k80-customer">
         <div className="k80-customer-info">Khách hàng: {customerName}</div>
-        <div className="k80-customer-info">SĐT: {customerPhone}</div>
+        <div className="k80-customer-info k80-customer-phone">SĐT: {customerPhone}</div>
         <div className="k80-customer-info">Địa chỉ: {customerAddress}</div>
-        <div className="k80-customer-note">Ghi chú: {invoice.note || ""}</div>
+        <div className="k80-customer-note">Ghi chú: {invoice.note?.toLocaleUpperCase("vi-VN") || ""}</div>
       </div>
 
       <div className="k80-items">

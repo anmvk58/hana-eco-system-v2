@@ -12,7 +12,7 @@ router = APIRouter(prefix="/customers", tags=["customers"])
 
 @router.get("", response_model=list[CustomerRead], dependencies=[Depends(require_any_permission("customers.view", "invoices.create", "invoices.update", "dashboard.view"))])
 def list_customers(
-    search: str | None = Query(default=None, description="Tìm theo tiền tố số điện thoại"),
+    search: str | None = Query(default=None, description="Tìm theo đầu số điện thoại hoặc một phần tên khách hàng"),
     include_deleted: bool = False,
     skip: int = 0,
     limit: int = Query(default=50, le=200),
@@ -23,7 +23,7 @@ def list_customers(
 
 @router.get("/page", response_model=CustomerPageRead, dependencies=[Depends(require_any_permission("customers.view"))])
 def list_customers_page(
-    search: str | None = Query(default=None, description="Tìm theo tiền tố số điện thoại"),
+    search: str | None = Query(default=None, description="Tìm theo đầu số điện thoại hoặc một phần tên khách hàng"),
     skip: int = Query(default=0, ge=0),
     limit: int = Query(default=50, ge=1, le=200),
     db: Session = Depends(get_db),

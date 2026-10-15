@@ -464,3 +464,8 @@ export interface InvoiceHistory {
   after_data?: Record<string, unknown> | null;
   created_at: string;
 }
+export interface GeneralReport {
+  summary: { revenue: string; subtotal: string; shipping: string; discount: string };
+  products: Array<{ key: string; name: string; quantity: string; revenue: string }>;
+  days: Array<{ day: string; revenue: string }>;
+}

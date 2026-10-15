@@ -13,6 +13,7 @@ from app.services.payment_note_setting_service import ensure_defaults as ensure_
 from app.api.routers import payment_note_settings
 from app.services.ship_management_service import ensure_legacy_external_handover_batches
 from app.services.time_migration_service import ensure_utc_sale_times
+from app.services.search_index_service import ensure_search_indexes
 
 
 settings = get_settings()
@@ -52,6 +53,7 @@ def create_app() -> FastAPI:
         ensure_product_quick_select_columns()
         ensure_user_password_column()
         ensure_unique_customer_phone()
+        ensure_customer_name_index()
         ensure_invoice_status_values()
         ensure_invoice_audit_columns()
         ensure_invoice_payment_column()
@@ -59,6 +61,7 @@ def create_app() -> FastAPI:
         ensure_invoice_revision_column()
         ensure_invoice_external_handoff_columns()
         ensure_internal_cod_collection_columns()
+        ensure_search_indexes(engine)
         ensure_utc_sale_times(engine)
         with SessionLocal() as db:
             ensure_access_control_defaults(db)
@@ -134,6 +137,16 @@ def ensure_unique_customer_phone() -> None:
         if phone_index:
             connection.execute(text("DROP INDEX ix_customers_phone ON customers"))
         connection.execute(text("CREATE UNIQUE INDEX ix_customers_phone ON customers (phone)"))
+
+
+def ensure_customer_name_index() -> None:
+    inspector = inspect(engine)
+    if not inspector.has_table("customers"):
+        return
+    if any(index["column_names"] == ["name"] for index in inspector.get_indexes("customers")):
+        return
+    with engine.begin() as connection:
+        connection.execute(text("CREATE INDEX ix_customers_name ON customers (name)"))
 
 
 def ensure_invoice_status_values() -> None:

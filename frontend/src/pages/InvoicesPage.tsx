@@ -249,6 +249,17 @@ export function InvoicesPage() {
             aria-label="Tìm theo mã hóa đơn"
           />
         </div>
+        <div className="search-box invoice-customer-name-search">
+          <UserRound size={17} aria-hidden="true" />
+          <input
+            value={customerName}
+            onChange={(event) => setCustomerName(event.target.value)}
+            maxLength={200}
+            onKeyDown={(event) => { if (event.key === "Enter") searchInvoices(); }}
+            placeholder="Tìm theo tên khách hàng"
+            aria-label="Tìm theo tên khách hàng"
+          />
+        </div>
         <div className="search-box invoice-search-box">
           <Phone size={17} aria-hidden="true" />
           <input
@@ -260,17 +271,6 @@ export function InvoicesPage() {
             }}
             placeholder="Số điện thoại"
             aria-label="Tìm theo số điện thoại khách hàng"
-          />
-        </div>
-        <div className="search-box invoice-customer-name-search">
-          <UserRound size={17} aria-hidden="true" />
-          <input
-            value={customerName}
-            onChange={(event) => setCustomerName(event.target.value)}
-            maxLength={200}
-            onKeyDown={(event) => { if (event.key === "Enter") searchInvoices(); }}
-            placeholder="Tìm theo tên khách hàng"
-            aria-label="Tìm theo tên khách hàng"
           />
         </div>
         <button className="secondary-button" type="button" disabled={loading} onClick={searchInvoices}>

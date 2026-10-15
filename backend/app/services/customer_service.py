@@ -2,12 +2,36 @@ from app.services.time_service import utc_now
 from datetime import datetime
 
 from fastapi import HTTPException, status
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select, union
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.models.customer import Customer
+from app.models.customer import Customer, CustomerNameSearch
+from app.customer_search import normalized_customer_name
 from app.schemas.customer import CustomerCreate, CustomerUpdate
+
+
+def customer_query(search: str | None, *, include_deleted: bool = False):
+    stmt = select(Customer)
+    if not include_deleted:
+        stmt = stmt.where(Customer.deleted_at.is_(None))
+    keyword = " ".join((search or "").split())
+    if not keyword:
+        return stmt
+    phone = Customer.phone.startswith("".join(keyword.split()), autoescape=True)
+    name = Customer.name.contains(keyword, autoescape=True)
+    normalized = normalized_customer_name(keyword)
+    if include_deleted or len(normalized) < 2:
+        return stmt.where(or_(phone, name))
+    # Every name suffix is indexed, so substring lookup becomes an indexed prefix
+    # lookup. The original LIKE below verifies final results under DB collation.
+    names = select(CustomerNameSearch.customer_id.label("id")).where(
+        CustomerNameSearch.term.startswith(normalized, autoescape=True))
+    ids = union(select(Customer.id).where(phone), names).subquery("customer_candidates")
+    # MySQL otherwise chooses to scan all active customers for common words.
+    # Drive this query from the indexed candidate IDs and look up customers by PK.
+    return stmt.select_from(ids).join(Customer, Customer.id == ids.c.id)\
+        .where(or_(phone, name)).prefix_with("STRAIGHT_JOIN", dialect="mysql")
 
 
 def list_customers(
@@ -17,14 +41,8 @@ def list_customers(
     skip: int = 0,
     limit: int = 50,
 ) -> list[Customer]:
-    stmt = select(Customer)
-    if not include_deleted:
-        stmt = stmt.where(Customer.deleted_at.is_(None))
-    if search:
-        phone_prefix = "".join(search.split())
-        if phone_prefix:
-            stmt = stmt.where(Customer.phone.like(f"{phone_prefix}%"))
-    stmt = stmt.order_by(Customer.created_at.desc()).offset(skip).limit(limit)
+    stmt = customer_query(search, include_deleted=include_deleted)
+    stmt = stmt.order_by(Customer.created_at.desc(), Customer.id.desc()).offset(skip).limit(limit)
     return list(db.scalars(stmt).all())
 
 
@@ -34,14 +52,10 @@ def list_customers_page(
     skip: int = 0,
     limit: int = 50,
 ) -> dict:
-    conditions = [Customer.deleted_at.is_(None)]
-    if search:
-        phone_prefix = "".join(search.split())
-        if phone_prefix:
-            conditions.append(Customer.phone.like(f"{phone_prefix}%"))
-    total = db.scalar(select(func.count(Customer.id)).where(*conditions)) or 0
+    stmt = customer_query(search)
+    total = db.scalar(select(func.count()).select_from(stmt.subquery())) or 0
     items = db.scalars(
-        select(Customer).where(*conditions)
+        stmt
         .order_by(Customer.created_at.desc(), Customer.id.desc())
         .offset(skip).limit(limit)
     ).all()

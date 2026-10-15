@@ -5,11 +5,20 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import require_permission
 from app.database import get_db
-from app.schemas.report import SoldProductReportRow
+from app.schemas.report import GeneralReportRead, SoldProductReportRow
 from app.services import report_service
 
 
 router = APIRouter(prefix="/reports", tags=["reports"])
+
+
+@router.get("/summary", response_model=GeneralReportRead, dependencies=[Depends(require_permission("reports.view"))])
+def general_report(
+    from_date: date | None = None,
+    to_date: date | None = None,
+    db: Session = Depends(get_db),
+):
+    return report_service.general_report(db, from_date, to_date)
 
 
 @router.get(

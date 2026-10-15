@@ -6,15 +6,10 @@ import { api } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
 import { DateRangePicker } from "../components/DateRangePicker";
 import { EmptyState } from "../components/EmptyState";
-import type { DashboardTimePreset, Invoice } from "../types";
-import { money, numberText, todayInputValue, vietnamDateInputValue, shiftCalendarDate } from "../utils/format";
+import type { DashboardTimePreset, GeneralReport } from "../types";
+import { money, numberText, todayInputValue, shiftCalendarDate } from "../utils/format";
 
-interface ProductRevenue {
-  key: string;
-  name: string;
-  quantity: number;
-  revenue: number;
-}
+type ProductRevenue = GeneralReport["products"][number];
 
 const timePresets: Array<{ value: DashboardTimePreset; label: string }> = [
   { value: "today", label: "Hôm nay" },
@@ -31,7 +26,7 @@ export function ReportsPage() {
   const [appliedRange, setAppliedRange] = useState({ from: todayInputValue(), to: todayInputValue() });
   const [fromDate, setFromDate] = useState(todayInputValue());
   const [toDate, setToDate] = useState(todayInputValue());
-  const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [report, setReport] = useState<GeneralReport>({ summary: { revenue: "0", subtotal: "0", shipping: "0", discount: "0" }, products: [], days: [] });
   const [productFilter, setProductFilter] = useState("");
   const [error, setError] = useState("");
   const [timePreset, setTimePreset] = useState<DashboardTimePreset>("today");
@@ -46,10 +41,10 @@ export function ReportsPage() {
     }
     setLoading(true);
     const range = { from: fromDate, to: toDate };
-    void api.invoices.listAll({ exclude_cancelled: true, from_date: range.from || undefined, to_date: range.to || undefined })
+    void api.reports.summary({ from_date: range.from || undefined, to_date: range.to || undefined })
       .then((data) => {
         if (!active) return;
-        setInvoices(data);
+        setReport(data);
         setAppliedRange(range);
       })
       .catch((err) => {
@@ -82,41 +77,12 @@ export function ReportsPage() {
     return `/invoices?${params.toString()}`;
   }
 
-  const summary = useMemo(() => {
-    const revenue = invoices.reduce((sum, invoice) => sum + Number(invoice.total_amount), 0);
-    const subtotal = invoices.reduce((sum, invoice) => sum + Number(invoice.subtotal), 0);
-    const shipping = invoices.reduce((sum, invoice) => sum + chargeTotal(invoice, "shipping"), 0);
-    const discount = invoices.reduce((sum, invoice) => sum + Number(invoice.discount_amount), 0);
-    return { revenue, subtotal, shipping, discount };
-  }, [invoices]);
-
-  const byProduct = useMemo(() => {
-    const map = new Map<string, ProductRevenue>();
-    invoices.forEach((invoice) => {
-      invoice.items.forEach((item) => {
-        const key = item.product_code;
-        const current = map.get(key) ?? { key, name: item.product_name, quantity: 0, revenue: 0 };
-        current.quantity += Number(item.quantity);
-        current.revenue += Number(item.line_total);
-        map.set(key, current);
-      });
-    });
-    return Array.from(map.values()).sort((a, b) => b.revenue - a.revenue);
-  }, [invoices]);
+  const { summary, products: byProduct, days: byDay } = report;
 
   const filteredProducts = useMemo(() => {
     const keyword = normalizeProductName(productFilter.trim());
     return keyword ? byProduct.filter((item) => normalizeProductName(item.name).includes(keyword)) : byProduct;
   }, [byProduct, productFilter]);
-
-  const byDay = useMemo(() => {
-    const map = new Map<string, number>();
-    invoices.forEach((invoice) => {
-      const key = vietnamDateInputValue(invoice.sold_at);
-      map.set(key, (map.get(key) ?? 0) + Number(invoice.total_amount));
-    });
-    return Array.from(map.entries()).sort(([a], [b]) => a.localeCompare(b));
-  }, [invoices]);
 
   return (
     <div className="page-stack" aria-busy={loading}>
@@ -208,7 +174,7 @@ export function ReportsPage() {
               </tr>
             </thead>
             <tbody>
-              {byDay.map(([day, revenue]) => (
+              {byDay.map(({ day, revenue }) => (
                 <tr key={day}>
                   <td>{day.split("-").reverse().join("/")}</td>
                   <td className="numeric strong">{money(revenue)}</td>
@@ -225,12 +191,6 @@ export function ReportsPage() {
 
 function normalizeProductName(value: string) {
   return value.toLocaleLowerCase("vi-VN").normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/đ/g, "d");
-}
-
-function chargeTotal(invoice: Invoice, type: "shipping" | "packing" | "other") {
-  return invoice.extra_charges
-    .filter((charge) => charge.charge_type === type)
-    .reduce((sum, charge) => sum + Number(charge.amount), 0);
 }
 
 function ReportMetric({ label, value, icon: Icon, tone }: {

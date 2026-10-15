@@ -1,4 +1,5 @@
 import type {
+  GeneralReport,
   Customer,
   CustomerPayload,
   DashboardCustomerSummary,
@@ -274,6 +275,7 @@ export const api = {
       request<ExtraChargeSetting>(`/extra-charge-settings/${chargeType}`, { method: "PUT", body: JSON.stringify(payload) }),
   },
   reports: {
+    summary: (filters?: { from_date?: string; to_date?: string }) => request<GeneralReport>("/reports/summary", {}, filters),
     soldProducts: (filters?: { from_date?: string; to_date?: string }) =>
       request<SoldProductReportRow[]>("/reports/sold-products", {}, filters),
   },

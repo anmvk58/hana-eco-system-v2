@@ -10,9 +10,12 @@ from pathlib import Path
 from typing import Any
 
 from openpyxl import load_workbook
-from sqlalchemy import MetaData, Table, create_engine, insert, or_, select
+from sqlalchemy import MetaData, Table, create_engine, insert, inspect, or_, select
 from sqlalchemy.engine import URL, Engine
 from sqlalchemy.exc import IntegrityError, NoSuchTableError, SQLAlchemyError
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from app.customer_search import name_search_suffixes
 
 
 REQUIRED_EXCEL_COLUMNS = ("code", "name", "phone", "address")
@@ -306,6 +309,15 @@ def import_customers(
         try:
             with engine.begin() as connection:
                 connection.execute(insert(table), payloads)
+                if table.name == "customers" and inspect(connection).has_table("customer_name_search"):
+                    search_table = Table("customer_name_search", MetaData(), autoload_with=connection)
+                    for offset in range(0, len(payloads), 500):
+                        codes = [row["code"] for row in payloads[offset:offset + 500]]
+                        customers = connection.execute(select(table.c.id, table.c.name).where(table.c.code.in_(codes))).all()
+                        suffixes = [{"term": suffix, "customer_id": customer.id}
+                                 for customer in customers for suffix in name_search_suffixes(customer.name)]
+                        for start in range(0, len(suffixes), 1000):
+                            connection.execute(insert(search_table), suffixes[start:start + 1000])
         except IntegrityError as exc:
             raise ValueError(
                 "Không thể insert vì code hoặc phone đã tồn tại. "

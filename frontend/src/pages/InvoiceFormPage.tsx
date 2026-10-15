@@ -1,4 +1,3 @@
-import { TransferPaymentLookup } from "../components/TransferPaymentLookup";
 import { BadgeCheck, Edit2, LoaderCircle, Minus, Plus, RefreshCw, Save, Search, Settings, Trash2, X } from "lucide-react";
 import { CSSProperties, FormEvent, KeyboardEvent, memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -41,6 +40,12 @@ const defaultCharges: DraftCharge[] = [
   { charge_type: "other", name: "Phụ thu khác", amount: "0" },
 ];
 const quickProductSlotCount = 15;
+const normalizeCustomerSearch = (value: string) => value.trim().replace(/\s+/g, " ");
+const canSearchCustomer = (value: string) => {
+  const keyword = normalizeCustomerSearch(value);
+  const compact = keyword.replace(/\s/g, "");
+  return /^\d+$/.test(compact) ? compact.length >= 5 : keyword.length >= 2;
+};
 const normalizeProductSearch = (value: string) => value
   .normalize("NFD")
   .replace(/[\u0300-\u036f]/g, "")
@@ -166,6 +171,7 @@ export function InvoiceFormPage() {
   const [activeDraftId, setActiveDraftId] = useState(initialDraftCollectionRef.current.activeDraftId);
   const [nextDraftSequence, setNextDraftSequence] = useState(initialDraftCollectionRef.current.nextSequence);
   const [customers, setCustomers] = useState<Customer[]>([]);
+  const [customerResultsQuery, setCustomerResultsQuery] = useState("");
   const [products, setProducts] = useState<Product[]>([]);
   const invoice = drafts.find((draft) => draft.id === activeDraftId)?.editingInvoice ?? null;
   const editingId = invoice?.id ?? null;
@@ -405,15 +411,15 @@ export function InvoiceFormPage() {
 
   useEffect(() => {
     if (isEditing || !customerFocused || customerId) return;
-    const phonePrefix = customerSearch.replace(/\s+/g, "");
-    if (phonePrefix.length < 5) {
+    const keyword = normalizeCustomerSearch(customerSearch);
+    if (!canSearchCustomer(keyword)) {
       setCustomers([]);
       return;
     }
     let cancelled = false;
     const timer = window.setTimeout(() => {
-      void api.customers.list(phonePrefix, 0, 20)
-        .then((data) => { if (!cancelled) setCustomers(data); })
+      void api.customers.list(keyword, 0, 20)
+        .then((data) => { if (!cancelled) { setCustomers(data); setCustomerResultsQuery(keyword); } })
         .catch((err) => { if (!cancelled) setError(err instanceof Error ? err.message : "Không tìm được khách hàng"); });
     }, 300);
     return () => {
@@ -451,10 +457,9 @@ export function InvoiceFormPage() {
   const productMap = useMemo(() => new Map(products.map((product) => [product.id, product])), [products]);
 
   const filteredCustomers = useMemo(() => {
-    const keyword = customerSearch.replace(/\s+/g, "");
-    if (!keyword) return [];
-    return customers.filter((customer) => customer.phone?.startsWith(keyword));
-  }, [customerSearch, customers]);
+    if (normalizeCustomerSearch(customerSearch) !== customerResultsQuery) return [];
+    return customers;
+  }, [customerSearch, customerResultsQuery, customers]);
 
   const filteredProducts = useMemo(() => {
     const keyword = normalizeProductSearch(productSearch.trim());
@@ -716,7 +721,8 @@ export function InvoiceFormPage() {
 
   function openCreateCustomer() {
     const seed = customerSearch.trim();
-    setCustomerForm({ ...blankCustomerForm, code: seed, phone: seed });
+    const isPhone = /^\d+$/.test(seed.replace(/\s/g, ""));
+    setCustomerForm(isPhone ? { ...blankCustomerForm, code: seed, phone: seed } : { ...blankCustomerForm, name: seed });
     setCustomerFocused(false);
     setCustomerModalOpen(true);
   }
@@ -724,8 +730,8 @@ export function InvoiceFormPage() {
   function handleCustomerSearchKeyDown(event: KeyboardEvent<HTMLInputElement>) {
     if (event.key !== "Enter") return;
     event.preventDefault();
-    if (customerSearch.replace(/\s+/g, "").length < 5) {
-      setError("Vui lòng nhập ít nhất 5 ký tự số điện thoại để tìm kiếm");
+    if (!canSearchCustomer(customerSearch)) {
+      setError("Vui lòng nhập ít nhất 5 chữ số của SĐT hoặc 2 ký tự tên khách hàng để tìm kiếm");
       return;
     }
     const customer = filteredCustomers[0];
@@ -995,7 +1001,6 @@ export function InvoiceFormPage() {
 
   return (
     <>
-      <TransferPaymentLookup/>
       <nav className="sale-draft-tabs" aria-label="Các đơn đang nhập">
           <div className="sale-draft-tab-list" role="tablist">
             {drafts.map((draft) => (
@@ -1063,7 +1068,8 @@ export function InvoiceFormPage() {
                   />
                 </div>
                 {searchFocused && productSearch.trim() ? (
-                  <div className="product-suggestions">
+                  <div className="product-suggestions product-search-dropdown">
+                    <div className="product-search-results">
                     {suggestedProducts.map((product, index) => (
                       <div
                         aria-selected={index === highlightedProductIndex}
@@ -1111,14 +1117,13 @@ export function InvoiceFormPage() {
                       </div>
                     ))}
                     {suggestedProducts.length === 0 ? (
-                      <div className="product-search-empty">
-                        <div className="suggestion-empty">Không tìm thấy sản phẩm phù hợp</div>
-                        {hasPermission("products.create") ? (
+                      <div className="product-search-empty"><div className="suggestion-empty">Không tìm thấy sản phẩm phù hợp</div></div>
+                    ) : null}
+                    </div>
+                    {hasPermission("products.create") ? (
                           <button className="product-search-create" type="button" onClick={() => { setNewProductName(productSearch.trim()); setSearchFocused(false); }}>
                             <Plus size={17} />Thêm mới sản phẩm
                           </button>
-                        ) : null}
-                      </div>
                     ) : null}
                   </div>
                 ) : null}
@@ -1183,7 +1188,7 @@ export function InvoiceFormPage() {
                     data-1p-ignore="true"
                     data-lpignore="true"
                     disabled={isEditing}
-                    inputMode="tel"
+                    inputMode="text"
                     value={customerSearch}
                     onBlur={() => window.setTimeout(() => setCustomerFocused(false), 120)}
                     onChange={(event) => {
@@ -1202,7 +1207,7 @@ export function InvoiceFormPage() {
                       if (!isEditing && customerSearch) event.preventDefault();
                     }}
                     onKeyDown={handleCustomerSearchKeyDown}
-                    placeholder={isEditing ? "Không cho phép sửa khách hàng" : "Tìm khách bằng số điện thoại (ít nhất 5 số)"}
+                    placeholder={isEditing ? "Không cho phép sửa khách hàng" : "Nhập SĐT hoặc tên khách hàng"}
                   />
                   {selectedCustomer && hasPermission("customers.update") ? (
                     <button
@@ -1216,7 +1221,7 @@ export function InvoiceFormPage() {
                     </button>
                   ) : null}
                 </div>
-                {!isEditing && customerFocused && customerSearch.replace(/\s+/g, "").length >= 5 ? (
+                {!isEditing && customerFocused && canSearchCustomer(customerSearch) ? (
                   <div className="product-suggestions customer-suggestions">
                     {filteredCustomers.slice(0, 8).map((customer) => (
                       <button key={customer.id} type="button" onMouseDown={() => selectCustomer(customer)}>
@@ -1367,7 +1372,7 @@ export function InvoiceFormPage() {
       </form>
 
       {quickConfigSlot !== null ? (
-        <Modal title={`Chọn sản phẩm cho ô ${quickConfigSlot + 1}`} onClose={() => { if (!quickConfigSaving) setQuickConfigSlot(null); }}>
+        <Modal className="quick-product-picker-modal" title={`Chọn sản phẩm cho ô ${quickConfigSlot + 1}`} onClose={() => { if (!quickConfigSaving) setQuickConfigSlot(null); }}>
           <div className="quick-product-picker">
             <div className="line-search">
               <Search size={17} />
@@ -1381,7 +1386,7 @@ export function InvoiceFormPage() {
             <div className="quick-product-picker-list">
               {quickConfigCandidates.map((product) => (
                 <button type="button" key={product.id} disabled={quickConfigSaving} onClick={() => void assignQuickProduct(product)}>
-                  <span><strong>{product.code}</strong>{product.name}</span>
+                  <span><strong>{product.name}</strong><small>{product.code}</small></span>
                   <span>{money(product.sale_price)}</span>
                 </button>
               ))}

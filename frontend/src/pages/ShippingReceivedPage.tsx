@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { ApiError, api } from "../api/client";
 import { DateRangePicker } from "../components/DateRangePicker";
 import { EmptyState } from "../components/EmptyState";
+import { InvoiceReceipt } from "../components/InvoiceReceipt";
 import { Modal } from "../components/Modal";
 import { StatusBadge } from "../components/StatusBadge";
 import { ToastNotification } from "../components/ToastNotification";
@@ -21,6 +22,7 @@ export function ShippingReceivedPage() {
   const [deliveryFilter, setDeliveryFilter] = useState<DeliveryFilter>("all");
   const [deliveringId, setDeliveringId] = useState<number | null>(null);
   const [deliveryConfirmation, setDeliveryConfirmation] = useState<Invoice | null>(null);
+  const [receiptInvoiceId, setReceiptInvoiceId] = useState<number | null>(null);
   const [deliverySuccessId, setDeliverySuccessId] = useState<number | null>(null);
   const [toast, setToast] = useState<{ title: string; message: string; variant: "success" | "warning" | "error" } | null>(null);
   const [error, setError] = useState("");
@@ -41,6 +43,15 @@ export function ShippingReceivedPage() {
   useEffect(() => {
     void load(fromDate, toDate);
   }, [fromDate, toDate]);
+
+  useEffect(() => {
+    if (receiptInvoiceId === null) return;
+    function closeOnEscape(event: KeyboardEvent) {
+      if (event.key === "Escape") setReceiptInvoiceId(null);
+    }
+    document.addEventListener("keydown", closeOnEscape);
+    return () => document.removeEventListener("keydown", closeOnEscape);
+  }, [receiptInvoiceId]);
 
   function changeDateRange(from: string, to: string) {
     setFromDate(from);
@@ -90,6 +101,7 @@ export function ShippingReceivedPage() {
     if (deliveryFilter === "cancelled") return invoice.status === "cancelled";
     return true;
   });
+  const receiptInvoice = invoices.find((invoice) => invoice.id === receiptInvoiceId);
   const totalCollectionAmount = filteredInvoices.reduce(
     (sum, invoice) => sum + (invoice.is_paid_by_transfer ? 0 : Number(invoice.total_amount)),
     0,
@@ -129,7 +141,7 @@ export function ShippingReceivedPage() {
         <tbody>{filteredInvoices.map((invoice) => <tr key={invoice.id} className={deliverySuccessId === invoice.id ? "delivery-success" : ""}>
           <td>{invoice.customer?.name ?? "Khách lẻ"}<span className="table-subtext">{invoice.customer?.phone}</span></td>
           <td>{invoice.customer?.address || "-"}</td>
-          <td className="code-cell">{invoice.code}</td>
+          <td className="code-cell"><button className="shipping-invoice-preview-button" type="button" onClick={() => setReceiptInvoiceId(invoice.id)} aria-label={`Xem hóa đơn ${invoice.code}`}>{invoice.code}</button></td>
           <td>{utcDateTime(invoice.audited_at)}</td>
           <td><StatusBadge status={invoice.status}/></td>
           <td>{invoice.delivered_at
@@ -156,7 +168,7 @@ export function ShippingReceivedPage() {
         {filteredInvoices.map((invoice) => <article className={`shipping-order-card received-shipment-card ${invoice.status === "cancelled" ? "is-cancelled" : invoice.delivered_at ? "is-delivered" : "is-in-delivery"}${deliverySuccessId === invoice.id ? " delivery-success" : ""}`} key={invoice.id}>
           <header className="shipping-card-header">
             <div className="shipping-card-customer"><strong>{invoice.customer?.name ?? "Khách lẻ"}</strong><span>{invoice.customer?.phone || "Không có số điện thoại"}</span></div>
-            <span className="shipping-card-code">{invoice.code}</span>
+            <button className="shipping-card-code shipping-invoice-preview-button" type="button" onClick={() => setReceiptInvoiceId(invoice.id)} aria-label={`Xem hóa đơn ${invoice.code}`}>{invoice.code}</button>
           </header>
           <div className="shipping-received-meta">
             <span>Nhận lúc {utcDateTime(invoice.audited_at)}</span>
@@ -190,6 +202,11 @@ export function ShippingReceivedPage() {
       {!loading && !error && filteredInvoices.length === 0 ? <EmptyState title="Không có đơn phù hợp" description="Không có đơn nào khớp trạng thái và khoảng ngày đã chọn."/> : null}
       {loading ? <EmptyState title="Đang tải đơn đã nhận"/> : null}
     </section>
+    {receiptInvoice ? <Modal className="shipping-invoice-preview-modal" title={`Hóa đơn ${receiptInvoice.code}`} onClose={() => setReceiptInvoiceId(null)}>
+      <div className="shipping-invoice-preview-content">
+        <InvoiceReceipt invoice={receiptInvoice}/>
+      </div>
+    </Modal> : null}
     {deliveryConfirmation ? <Modal title="Xác nhận đã giao hàng" onClose={() => setDeliveryConfirmation(null)}>
       <div className="delivery-confirmation">
         <p>Bạn có chắc chắn muốn đánh dấu đơn <strong>{deliveryConfirmation.code}</strong> là đã giao?</p>

@@ -12,13 +12,32 @@ Startup migration `2026-10-11-invoice-sale-times-utc` converts legacy Vietnam-lo
 | --- | --- | --- |
 | id | integer | Primary key |
 | code | varchar(40) | Unique, indexed |
-| name | varchar(200) | Indexed |
+| name | varchar(200) | Indexed (`ix_customers_name`); startup repairs missing index |
 | phone | varchar(30) | Indexed |
 | address | varchar(500) | Nullable |
 | note | text | Nullable |
 | created_at | datetime | Required |
 | updated_at | datetime | Required |
 | deleted_at | datetime | Nullable, soft delete |
+
+## customer_name_search
+
+Derived search index; original customer records are unchanged. Each active customer contributes the unique suffixes of their Vietnamese-normalized name with at least two characters. A name substring becomes an indexable suffix-prefix lookup, followed by verification against the original name.
+
+| Column | Type | Notes |
+| --- | --- | --- |
+| term | varchar(600) | First part of composite primary key; allows Unicode normalization expansion |
+| customer_id | integer | FK customers.id, ON DELETE CASCADE; second primary-key part and separately indexed |
+
+ORM writes and the supplied XLSX customer importer maintain this table transactionally. Startup backfills it once using the `2026-10-16-customer-name-suffixes-v1` data-migration marker. Other direct SQL customer-name writes require explicit maintenance of this derived index.
+
+Invoice query indexes repaired at startup:
+
+- `ix_invoices_audit_handover (audit_label, deleted_at, audited_at, id)` for internal-handover/COD date ranges.
+- `ix_invoices_shipper_handover (assigned_shipper_id, audit_label, deleted_at, audited_at, id)` for a shipper's received orders.
+- `ix_invoices_audit_sale (audit_label, deleted_at, sold_at, id)` for audit/reconciliation sale-date filters.
+
+Existing standalone indexes are preserved. New installations do not create a standalone `delivered_at` index because current delivery operations locate invoices by primary key, and delivery time is otherwise displayed rather than used as a list range/order key.
 
 ## products
 
