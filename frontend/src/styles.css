@@ -938,6 +938,10 @@ textarea {
 .invoice-list-view-button:hover { background: #d9e9ff; border-color: #9ebfe8; }
 .invoice-list-edit-button { background: #e4f5f1; border-color: #addbd3; color: var(--teal-dark); }
 .invoice-list-edit-button:hover { background: #d5eee8; border-color: #84c8bc; }
+.invoice-list-actions-cell { vertical-align: middle; width: 1%; white-space: nowrap; }
+.invoice-list-actions { align-items: center; display: flex; flex-wrap: nowrap; gap: 6px; justify-content: flex-end; }
+.invoice-list-actions > * { flex: 0 0 auto; }
+.invoice-list-actions > .icon-button { height: 40px; min-height: 40px; padding: 0; width: 40px; }
 .invoice-list-table .invoice-code-column { padding-right: 0; }
 .invoice-list-table .invoice-revision-column { padding-left: 0; padding-right: 12px; text-align: center; white-space: nowrap; width: 0; }
 .invoice-revision-value { color: #c83d32; font-weight: 800; }
@@ -4549,6 +4553,12 @@ label {
 .external-batch-code-entry button { flex: 0 0 auto; }
 .field-error { color: #a43120; font-size: 12px; font-weight: 600; }
 .external-batches-page .table-panel { overflow-x: auto; }
+.external-batches-page > .shipping-toolbar { background: #fff; border: 1px solid #dfeae7; border-radius: 14px; gap: 16px; padding: 22px 24px; }
+.external-batches-page .toolbar-title { color: var(--ink); font-size: 18px; line-height: 1.4; margin: 0 0 6px; }
+.external-batches-page .shipping-toolbar-copy .field-hint { font-size: 13px; line-height: 1.6; }
+@media (max-width: 760px) {
+  .external-batches-page > .shipping-toolbar { padding: 18px 16px; }
+}
 
 /* Internal shipper COD collections */
 .internal-cod-page { gap: 16px; }
@@ -4694,7 +4704,77 @@ label {
 .internal-cod-session-note { background: #f6f9fa; border: 1px solid var(--line); border-radius: 9px; color: var(--muted); font-size: 13px; padding: 11px 13px; }
 .internal-cod-session-note strong { color: var(--ink); }
 
+/* Collection history: give the filters, summary and ledger a shared rhythm. */
+.internal-cod-history-page { gap: 20px; }
+.internal-cod-history-hero { padding: 22px 24px; }
+.internal-cod-history-hero .internal-cod-hero-copy p { line-height: 1.6; }
+.internal-cod-history-filter { flex: 0 0 auto; box-shadow: 0 2px 6px rgba(24, 55, 51, .04); }
+.internal-cod-history-filter > .icon-button { background: #e6f3f0; color: var(--teal-dark); }
+.internal-cod-history-overview article { gap: 6px 14px; min-height: 108px; padding: 20px; }
+.internal-cod-history-overview .detail-summary-icon { align-items: center; background: #e8f1ff; border-radius: 12px; color: #3568a7; display: inline-flex; height: 42px; justify-content: center; width: 42px; }
+.internal-cod-history-overview article:nth-child(2) .detail-summary-icon { background: #fff3df; color: #a16c18; }
+.internal-cod-history-overview article:nth-child(3) .detail-summary-icon { background: #f0ebfc; color: #7855aa; }
+.internal-cod-history-overview article.highlight .detail-summary-icon { background: #cdece4; color: var(--teal-dark); }
+.internal-cod-history-overview strong { font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.internal-cod-history-panel { border: 1px solid #d5e4e1; border-radius: 14px; box-shadow: 0 5px 18px rgba(24, 55, 51, .04); }
+.standard-panel-header,
+.internal-cod-history-heading,
+.internal-cod-section-heading { background: #fff; border-bottom: 1px solid #dfeae7; gap: 16px; padding: 22px 24px; }
+.standard-panel-header h2,
+.internal-cod-history-heading h2,
+.internal-cod-section-heading h2 { color: var(--ink); font-size: 18px; line-height: 1.4; margin: 0 0 6px; }
+.standard-panel-header span,
+.internal-cod-history-heading p,
+.internal-cod-section-heading p { font-size: 13px; line-height: 1.6; }
+.internal-cod-history-search { flex: 0 1 430px; min-width: 0; padding: 8px 12px; }
+.internal-cod-history-search input { flex: 1; font-size: 13px; width: 100%; }
+.internal-cod-history-search > span { font-size: 11px; padding: 6px 9px; white-space: nowrap; }
+:is(.internal-cod-history-panel .data-table, .internal-cod-debt-table, .order-reconciliation-table, .external-batches-table, .standard-list-table) th { background: #eff6f4; border-bottom: 1px solid #dfeae7; color: #506c65; font-size: 11px; padding: 14px 18px; white-space: nowrap; }
+.internal-cod-history-panel .data-table td { border-bottom-color: #edf2f0; padding: 18px; vertical-align: middle; }
+.internal-cod-history-panel .data-table tr:last-child td { border-bottom: 0; }
+.internal-cod-history-panel .data-table tbody tr:nth-child(even) { background: #fafcfb; }
+.internal-cod-history-panel .data-table tbody tr:hover { background: #f0f8f5; }
+:is(.internal-cod-history-panel .data-table, .internal-cod-debt-table, .order-reconciliation-table, .external-batches-table, .standard-list-table) th:first-child,
+.internal-cod-history-panel .data-table td:first-child { padding-left: 24px; }
+:is(.internal-cod-history-panel .data-table, .internal-cod-debt-table, .order-reconciliation-table, .external-batches-table, .standard-list-table) th:last-child,
+.internal-cod-history-panel .data-table td:last-child { padding-right: 24px; }
+.toolbar.standard-list-toolbar { border-color: #dfeae7; border-radius: 14px; gap: 16px; padding: 22px 24px; }
+.standard-list-table td { padding-left: 18px; padding-right: 18px; }
+.standard-list-table td:first-child { padding-left: 24px; }
+.standard-list-table td:last-child { padding-right: 24px; }
+.standard-list-table:is(.product-revenue-table, .daily-revenue-table) th { white-space: normal; }
+.invoice-list-table th.invoice-code-column { padding-right: 0; }
+.invoice-list-table th.invoice-revision-column { padding-left: 0; padding-right: 12px; }
+.internal-cod-session-link { background: #e9f5f1; border: 1px solid #cce5dd; border-radius: 7px; color: var(--teal-dark); cursor: pointer; font: inherit; font-weight: 700; padding: 7px 10px; white-space: nowrap; }
+.internal-cod-session-link:hover { background: #d9eee7; border-color: #91c8b8; }
+.internal-cod-history-time { color: #65766f; font-size: 13px; white-space: nowrap; }
+.internal-cod-history-count { background: #eef2f6; border-radius: 7px; color: #4f6275; display: inline-block; font-weight: 700; min-width: 32px; padding: 5px 8px; text-align: center; }
+.internal-cod-history-action-cell { text-align: right; white-space: nowrap; }
+.internal-cod-history-action-cell .secondary-button { background: #fff; border: 1px solid #cce0da; color: var(--teal-dark); gap: 6px; }
+.internal-cod-history-panel .empty-state { background: linear-gradient(180deg, #fff, #f8fbfa); padding: 48px 24px; }
+
+@media (max-width: 1100px) {
+  .internal-cod-history-hero { align-items: flex-start; flex-direction: column; gap: 16px; }
+  .internal-cod-history-overview { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
 @media (max-width: 760px) {
+  .internal-cod-history-page { gap: 14px; }
+  .toolbar.standard-list-toolbar { gap: 10px; padding: 18px 16px; }
+  .standard-panel-header { align-items: flex-start; }
+  .standard-panel-header,
+  .internal-cod-history-heading,
+  .internal-cod-section-heading { flex-direction: column; padding: 18px 16px; }
+  .internal-cod-history-search { flex: auto; }
+  .internal-cod-history-overview article { gap: 8px; grid-template-columns: minmax(0, 1fr); min-height: 0; padding: 16px; }
+  .internal-cod-history-overview .detail-summary-icon { grid-row: auto; height: 36px; width: 36px; }
+  .internal-cod-history-overview strong { font-size: 20px; }
+  .internal-cod-history-overview small { font-size: 12px; line-height: 1.5; }
+  .internal-cod-history-page .internal-cod-history-overview { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .internal-cod-history-filter { align-items: center; flex-direction: row; padding: 6px; }
+  .internal-cod-history-filter .date-range-picker { flex: 1; min-width: 0; }
+  .internal-cod-history-filter .date-range-trigger { font-size: 12px; padding: 8px; width: 100%; }
+  .internal-cod-history-page .internal-cod-history-filter > .icon-button { align-self: center; flex: 0 0 auto; }
   .internal-cod-overview { grid-template-columns: 1fr; }
   .internal-cod-overview article { min-height: 76px; }
   .internal-cod-hero { align-items: stretch; flex-direction: column; padding: 14px; }
@@ -4707,7 +4787,7 @@ label {
   .internal-cod-mobile-list { display: grid; gap: 10px; padding: 10px; }
   .internal-cod-history-heading { align-items: stretch; }
   .internal-cod-history-search { min-width: 0; width: 100%; }
-  .internal-cod-history-filter { align-items: stretch; flex-direction: column; width: 100%; }
+  .internal-cod-history-filter { align-items: center; flex-direction: row; width: 100%; }
   .internal-cod-history-filter .date-range-picker { width: 100%; }
   .internal-cod-history-filter > .icon-button { align-self: flex-end; }
   .modal-panel.internal-cod-collection-modal { max-height: calc(100dvh - 18px); width: calc(100vw - 18px); }
@@ -4795,11 +4875,11 @@ label {
 .order-reconciliation-tabs button.active { border-bottom-color: var(--teal); color: var(--teal-dark); }
 .order-reconciliation-tabs button strong { background: #dfe9e8; border-radius: 999px; font-size: 12px; min-width: 24px; padding: 2px 7px; text-align: center; }
 .order-reconciliation-tabs button.active strong { background: #d1eee8; }
-.order-reconciliation-toolbar { align-items: center; border-bottom: 1px solid var(--line); display: flex; gap: 12px; justify-content: space-between; padding: 12px; }
+.order-reconciliation-toolbar { align-items: center; background: #fff; border-bottom: 1px solid #dfeae7; display: flex; gap: 16px; justify-content: space-between; padding: 22px 24px; }
 .order-reconciliation-search { align-items: center; background: #f8fafb; border: 1px solid var(--line); border-radius: 9px; display: flex; flex: 1; gap: 8px; max-width: 650px; padding: 0 10px; }
 .order-reconciliation-search svg { color: var(--muted); flex: 0 0 auto; }
 .order-reconciliation-search input { background: transparent; border: 0; flex: 1; min-width: 100px; outline: 0; padding: 10px 0; }
-.order-reconciliation-search span { color: var(--muted); font-size: 12px; white-space: nowrap; }
+.order-reconciliation-search span { background: #e5f3f1; border-radius: 999px; color: var(--teal-dark); font-size: 11px; font-weight: 800; padding: 6px 9px; white-space: nowrap; }
 .order-reconciliation-filter { align-items: center; background: #f2f6f6; border-radius: 8px; display: flex; gap: 3px; padding: 3px; }
 .order-reconciliation-filter button { background: transparent; border: 0; border-radius: 6px; color: var(--muted); cursor: pointer; font-size: 12px; font-weight: 700; padding: 7px 10px; }
 .order-reconciliation-filter button.active { background: #fff; box-shadow: 0 1px 4px rgba(22, 48, 45, .12); color: var(--teal-dark); }
@@ -4810,7 +4890,7 @@ label {
 .order-reconciliation-table td { vertical-align: middle; }
 .order-reconciliation-table th.numeric, .order-reconciliation-table td.numeric { white-space: nowrap; }
 .order-reconciliation-table th:last-child, .order-reconciliation-table td:last-child { background: #fff; box-shadow: -7px 0 10px -10px rgba(20, 50, 46, .45); position: sticky; right: 0; z-index: 1; }
-.order-reconciliation-table th:last-child { background: #f3f7f7; z-index: 2; }
+.order-reconciliation-table th:last-child { background: #eff6f4; z-index: 2; }
 .order-reconciliation-table td > small { color: var(--muted); display: block; font-size: 11px; margin-top: 3px; }
 .order-reconciliation-table td > strong:not(.code-cell) { display: block; }
 .order-reconciliation-address { color: #536765; max-width: 230px; }
@@ -4909,7 +4989,7 @@ label {
   .order-reconciliation-tabs { overflow-x: auto; padding: 7px 7px 0; }
   .order-reconciliation-tabs button { flex: 0 0 auto; justify-content: center; min-width: 154px; padding: 9px 8px 10px; }
   .order-reconciliation-tabs button span { font-size: 12px; }
-  .order-reconciliation-toolbar { align-items: stretch; flex-direction: column; }
+  .order-reconciliation-toolbar { align-items: stretch; flex-direction: column; padding: 18px 16px; }
   .order-reconciliation-search { max-width: none; }
   .order-reconciliation-filter { display: grid; grid-template-columns: repeat(3, 1fr); }
   .order-reconciliation-shortcuts { justify-content: space-between; }

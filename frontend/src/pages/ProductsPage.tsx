@@ -58,7 +58,7 @@ export function ProductsPage() {
 
   return (
     <div className="page-stack">
-      <section className="toolbar">
+      <section className="toolbar standard-list-toolbar">
         <div className="search-box">
           <Search size={17} />
           <input
@@ -82,7 +82,7 @@ export function ProductsPage() {
       {error ? <div className="alert error">{error}</div> : null}
 
       <section className="table-panel">
-        <table className="data-table">
+        <table className="data-table standard-list-table">
           <thead>
             <tr>
               <th>Mã SP</th>

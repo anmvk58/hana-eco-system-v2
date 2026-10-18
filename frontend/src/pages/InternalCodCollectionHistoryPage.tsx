@@ -82,11 +82,22 @@ export function InternalCodCollectionHistoryPage() {
     <section className="table-panel internal-cod-history-panel">
       <header className="panel-heading internal-cod-history-heading">
         <div><h2>Danh sách phiên thu tiền</h2><p>Mỗi hóa đơn chỉ xuất hiện trong một phiên thu tiền.</p></div>
-        <label className="internal-cod-history-search"><Search size={17}/><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Tìm mã phiên, shipper, người thu..."/><span>{filteredSessions.length} kết quả</span></label>
+        <label className="internal-cod-history-search"><Search size={17}/><input aria-label="Tìm phiên thu tiền" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Tìm mã phiên, shipper, người thu..."/><span>{filteredSessions.length} kết quả</span></label>
       </header>
       <div className="internal-cod-history-table-wrap">
-        <table className="data-table"><thead><tr><th>Mã phiên</th><th>Thời điểm thu</th><th>Shipper</th><th>Người thu</th><th className="numeric">Số đơn</th><th className="numeric">Tổng tiền</th><th>Ghi chú</th><th></th></tr></thead>
-          <tbody>{filteredSessions.map((session) => <tr key={session.id}><td className="code-cell">{session.code}</td><td>{utcDateTime(session.collected_at)}</td><td><strong>{session.shipper_name}</strong></td><td>{session.collected_by_name || "—"}</td><td className="numeric">{session.invoice_count}</td><td className="numeric strong internal-cod-amount">{numberText(session.total_amount)}</td><td className="internal-cod-history-note">{session.note || "—"}</td><td className="row-actions"><button className="icon-button" onClick={() => void openSession(session)} aria-label={`Xem ${session.code}`} title="Xem chi tiết"><Eye size={16}/></button></td></tr>)}</tbody>
+        <table className="data-table"><thead><tr><th>Mã phiên</th><th>Thời điểm thu</th><th>Shipper</th><th>Người thu</th><th className="numeric">Số đơn</th><th className="numeric">Tổng tiền</th><th>Ghi chú</th><th className="numeric">Thao tác</th></tr></thead>
+          <tbody>{filteredSessions.map((session) => (
+            <tr key={session.id}>
+              <td className="code-cell"><button className="internal-cod-session-link" onClick={() => void openSession(session)}>{session.code}</button></td>
+              <td className="internal-cod-history-time">{utcDateTime(session.collected_at)}</td>
+              <td><strong>{session.shipper_name}</strong></td>
+              <td>{session.collected_by_name || "—"}</td>
+              <td className="numeric"><span className="internal-cod-history-count">{session.invoice_count}</span></td>
+              <td className="numeric strong internal-cod-amount">{numberText(session.total_amount)}</td>
+              <td className="internal-cod-history-note" title={session.note || undefined}>{session.note || "—"}</td>
+              <td className="internal-cod-history-action-cell"><button className="secondary-button compact-button" onClick={() => void openSession(session)} aria-label={`Xem ${session.code}`}><Eye size={16}/>Chi tiết</button></td>
+            </tr>
+          ))}</tbody>
         </table>
       </div>
       {!loading && sessions.length === 0 ? <EmptyState title="Chưa có phiên thu tiền" description="Không có phiên thu tiền trong khoảng ngày đã chọn."/> : null}

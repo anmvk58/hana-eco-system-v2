@@ -199,7 +199,7 @@ export function ExternalHandoverBatchesPage() {
     </section>
     {error ? <div className="alert error">{error}</div> : null}
     <section className="table-panel">
-      <table className="data-table"><thead><tr><th>Mã bảng kê</th><th>Thời điểm bàn giao</th><th>Người bàn giao</th><th>Số đơn</th><th>Hình thức ứng</th><th className="numeric">Tiền ship ứng</th><th className="numeric">Tiền ứng thực tế</th><th>Trạng thái</th><th></th></tr></thead>
+      <table className="data-table external-batches-table"><thead><tr><th>Mã bảng kê</th><th>Thời điểm bàn giao</th><th>Người bàn giao</th><th>Số đơn</th><th>Hình thức ứng</th><th className="numeric">Tiền ship ứng</th><th className="numeric">Tiền ứng thực tế</th><th>Trạng thái</th><th>Thao tác</th></tr></thead>
         <tbody>{batches.map((batch) => {
           const activeCount = batch.items.filter((item) => item.is_active).length;
           const actual = Number(batch.transfer_amount) + Number(batch.cash_amount);

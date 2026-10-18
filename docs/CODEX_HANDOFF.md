@@ -83,6 +83,16 @@ Only the Cloudflare Tunnel connector is public-facing. Frontend and API ports ar
 
 ## 4. Implemented and completed
 
+### COD collection history presentation (2026-10-16)
+
+- Invoice, customer, product, general-report and sold-product-report lists now share the same table-column header treatment through `standard-list-table`. Their list toolbars and report panel headings also share padded white styling; report headers retain wrapping and invoice code/revision spacing is preserved.
+
+- External handover batch lists also use the shared pale-teal table headers and padded white toolbar, with a labeled action column.
+
+- The same white padded section headings and pale-teal table column headers are shared with internal COD collection and all three order-reconciliation tables. Reconciliation search counts use the matching teal badge; mobile toolbars keep compact padding.
+
+- Collection history now has padded list headings and table cells, distinct summary icon colors, a highlighted COD total, and explicit session-detail buttons. Narrow screens use two-column summary cards and horizontally scrollable history tables. These styles are scoped to history; collection calculations and permissions are unchanged. Frontend production build passes; desktop and 390px layouts were checked in the local browser. The current local database has no collection sessions, so populated rows and the detail dialog still need visual verification with existing session data.
+
 ### Customer lookup, SQL reports, and settled-invoice protection (2026-10-16)
 
 - General reports now call `GET /api/reports/summary` with `reports.view`, rather than fetching all invoice pages. Four SQL queries return invoice totals, shipping charges, product revenue/quantity, and Vietnam-calendar daily revenue. Products retain historical code grouping and the latest invoice's name snapshot. Created/completed, soft-delete, date-boundary, Decimal, discount, and charge semantics are preserved; item/charge joins do not multiply invoice totals. The frontend preserves preset filters, instant product-name filtering, and links tied to the last successfully loaded date range.

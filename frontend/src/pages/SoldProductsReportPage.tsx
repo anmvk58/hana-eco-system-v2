@@ -54,7 +54,7 @@ export function SoldProductsReportPage() {
   }), { quantity: 0, revenue: 0 }), [filteredRows]);
 
   return <div className="page-stack">
-    <section className="toolbar">
+    <section className="toolbar standard-list-toolbar">
       <DateRangePicker from={fromDate} to={toDate} onChange={(from, to) => { setFromDate(from); setToDate(to); }} />
       <button className="secondary-button" type="button" disabled={loading} onClick={() => void loadReport()}>
         <Search size={17}/>{loading ? "Đang tải..." : "Xem báo cáo"}
@@ -62,10 +62,10 @@ export function SoldProductsReportPage() {
     </section>
     {error ? <div className="alert error">{error}</div> : null}
     <section className="table-panel">
-      <div className="panel-header"><div><h2>Hàng hóa bán được</h2><span>{filteredRows.length}{filter.trim() ? ` / ${rows.length}` : ""} sản phẩm trong khoảng thời gian đã chọn</span></div><PackageSearch size={22}/></div>
+      <div className="panel-header standard-panel-header"><div><h2>Hàng hóa bán được</h2><span>{filteredRows.length}{filter.trim() ? ` / ${rows.length}` : ""} sản phẩm trong khoảng thời gian đã chọn</span></div><PackageSearch size={22}/></div>
       <div className="sold-products-filter"><Search size={17}/><input aria-label="Lọc nhanh sản phẩm" placeholder="Lọc theo mã, tên hoặc đơn vị..." value={filter} onChange={(event) => setFilter(event.target.value)}/></div>
       <p className="sold-products-drilldown-hint">Ngày bán: {appliedRange.from || "Không giới hạn"} → {appliedRange.to || "Không giới hạn"}. {hasPermission("invoices.view") ? "Bấm tên sản phẩm để xem hóa đơn trong tab mới (không gồm hóa đơn đã hủy)." : "Bạn cần quyền xem hóa đơn để mở danh sách hóa đơn theo sản phẩm."}</p>
-      <table className="data-table">
+      <table className="data-table standard-list-table">
         <thead><tr><th>Mã SP</th><th>Tên SP</th><th>Đơn vị tính</th><th className="numeric">SL bán được</th><th className="numeric">Doanh thu bán được</th></tr></thead>
         <tbody>
           {filteredRows.map(row => <tr key={row.product_code}><td>{row.product_code}</td><td className="code-cell">{hasPermission("invoices.view") ? <Link className="sold-product-invoice-link" to={invoiceUrl(row)} target="_blank" rel="noopener noreferrer" title={`Xem hóa đơn có ${row.product_name} trong tab mới`}>{row.product_name}<ExternalLink size={14} aria-hidden="true" /></Link> : row.product_name}</td><td>{row.unit}</td><td className="numeric">{numberText(row.quantity_sold, 3)}</td><td className="numeric strong">{money(row.sales_revenue)}</td></tr>)}

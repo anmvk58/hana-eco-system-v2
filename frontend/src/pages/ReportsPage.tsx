@@ -110,7 +110,7 @@ export function ReportsPage() {
 
       <section className="dashboard-grid">
         <div className="table-panel">
-          <div className="panel-header">
+          <div className="panel-header standard-panel-header">
             <div>
               <h2>Doanh thu theo sản phẩm</h2>
               <span>Sắp xếp theo doanh thu giảm dần</span>
@@ -126,7 +126,7 @@ export function ReportsPage() {
               onChange={(event) => setProductFilter(event.target.value)}
             />
           </div>
-          <table className="data-table product-revenue-table">
+          <table className="data-table product-revenue-table standard-list-table">
             <colgroup>
               <col style={{ width: "50%" }} />
               <col style={{ width: "20%" }} />
@@ -160,13 +160,13 @@ export function ReportsPage() {
         </div>
 
         <div className="table-panel">
-          <div className="panel-header">
+          <div className="panel-header standard-panel-header">
             <div>
               <h2>Doanh thu theo ngày</h2>
               <span>Tính hóa đơn đã tạo và hoàn thành</span>
             </div>
           </div>
-          <table className="data-table daily-revenue-table">
+          <table className="data-table daily-revenue-table standard-list-table">
             <thead>
               <tr>
                 <th>Ngày</th>

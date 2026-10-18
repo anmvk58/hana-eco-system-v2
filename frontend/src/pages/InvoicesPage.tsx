@@ -235,7 +235,7 @@ export function InvoicesPage() {
 
   return (
     <div className="page-stack">
-      <section className="toolbar">
+      <section className="toolbar standard-list-toolbar">
         <div className="search-box invoice-search-box">
           <FileText size={17} aria-hidden="true" />
           <input
@@ -303,7 +303,7 @@ export function InvoicesPage() {
       {error ? <div className="alert error">{error}</div> : null}
 
       <section className="table-panel invoice-table-refresh" key={refreshVersion}>
-        <table className="data-table invoice-list-table">
+        <table className="data-table invoice-list-table standard-list-table">
           <thead>
             <tr>
               <th className="invoice-code-column">Mã hóa đơn</th>
@@ -347,7 +347,8 @@ export function InvoicesPage() {
                 <td className="numeric">{numberText(invoice.subtotal)}</td>
                 <td className="numeric">{numberText(invoice.total_extra_charges)}</td>
                 <td className="numeric strong">{numberText(invoice.total_amount)}</td>
-                <td className="row-actions">
+                <td className="invoice-list-actions-cell">
+                  <div className="invoice-list-actions">
                   <TransferPaymentButton invoice={invoice} variant="invoice-list" onChanged={async () => { await loadInvoices(); }}/>
                   <Link
                     className="invoice-list-action-button invoice-list-view-button"
@@ -372,6 +373,7 @@ export function InvoicesPage() {
                   {hasPermission("invoices.cancel") && invoice.status === "created" ? <button className="icon-button danger" type="button" onClick={() => openCancelModal(invoice)} aria-label="Hủy hóa đơn">
                     <XCircle size={16} />
                   </button> : null}
+                  </div>
                 </td>
               </tr>
             ))}
