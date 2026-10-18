@@ -84,6 +84,9 @@ a {
   font-weight: 800;
 }
 
+.brand-mark { flex-shrink: 0; overflow: hidden; }
+.brand-mark img { display: block; height: 100%; object-fit: contain; width: 100%; }
+
 .brand strong,
 .brand span {
   display: block;
@@ -397,14 +400,17 @@ select[multiple] { min-height: 120px; }
   min-width: 0;
 }
 
-.toolbar .invoice-customer-name-search {
-  flex: 1 1 220px;
+.toolbar .invoice-customer-name-search,
+.toolbar .invoice-customer-phone-search {
+  flex: 1 1 180px;
   min-width: 0;
 }
 
 @media (max-width: 640px) {
   .toolbar .invoice-search-box { flex: 1 1 calc(50% - 5px); }
-  .toolbar .invoice-customer-name-search { flex-basis: 100%; }
+  .toolbar .invoice-search-box:not(.invoice-customer-phone-search) { flex-basis: 100%; }
+  .toolbar .invoice-customer-name-search,
+  .toolbar .invoice-customer-phone-search { flex: 1 1 calc(50% - 5px); }
 }
 
 .invoice-filter-loading {
@@ -2506,9 +2512,8 @@ label {
 }
 
 .dashboard-revenue-overview-panel > .dashboard-period-filter {
-  border: 0;
-  border-bottom: 1px solid var(--line);
-  border-radius: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
   padding: 12px 16px;
 }
 
@@ -4654,16 +4659,20 @@ label {
 .internal-cod-modal-summary small { color: var(--muted); font-size: 12px; font-weight: 700; }
 .internal-cod-modal-summary strong { color: var(--ink); font-size: 21px; }
 .internal-cod-modal-summary article.highlight strong { color: var(--teal-dark); }
-.internal-cod-calculator { align-items: center; background: #fff; border: 1px solid #cfe4e1; border-radius: 10px; display: grid; gap: 7px 10px; grid-template-columns: minmax(220px, 1.2fr) minmax(135px, .8fr) minmax(220px, 1.2fr); padding: 9px 11px; }
-.internal-cod-calculator > label { display: grid; gap: 6px; margin: 0; }
-.internal-cod-calculator input { min-height: 36px; }
+.internal-cod-calculator { align-items: stretch; background: #fff; border: 1px solid #cfe4e1; border-radius: 10px; display: grid; gap: 7px 10px; grid-template-columns: minmax(220px, 1.2fr) minmax(135px, .8fr) minmax(220px, 1.2fr); padding: 9px 11px; }
+.internal-cod-calculator > label,
+.internal-cod-calculator-results article { align-content: start; background: #f6f9f9; border: 1px solid #e0e9e8; border-radius: 8px; display: grid; gap: 6px; grid-template-rows: auto 30px; margin: 0; min-height: 76px; min-width: 0; padding: 10px 12px; }
+.internal-cod-calculator > label > span { color: var(--muted); font-size: 11px; font-weight: 400; line-height: 16px; }
+.internal-cod-calculator > label:focus-within { border-color: var(--input-focus-border); box-shadow: var(--input-focus-shadow); }
+.internal-cod-calculator input { background: transparent; border: 0; border-radius: 0; box-shadow: none; color: var(--ink); font-size: 15px; font-weight: 700; height: 30px; min-height: 30px; min-width: 0; padding: 0; width: 100%; }
+.internal-cod-calculator input:focus { border: 0; box-shadow: none; outline: none; }
 .internal-cod-calculator > small { align-self: start; color: var(--muted); font-size: 10px; grid-column: 1 / -1; grid-row: 2; }
 .internal-cod-calculator-results { display: contents; }
-.internal-cod-calculator-results article { background: #f6f9f9; border: 1px solid #e0e9e8; border-radius: 8px; display: grid; gap: 3px; grid-column: 2; grid-row: 1; padding: 7px 9px; }
+.internal-cod-calculator-results article { grid-column: 2; grid-row: 1; }
 .internal-cod-calculator-results article.highlight { grid-column: 3; }
 .internal-cod-calculator-results article.highlight { background: #e8f7f4; border-color: #8accc1; }
-.internal-cod-calculator-results small { color: var(--muted); font-size: 11px; }
-.internal-cod-calculator-results strong { color: var(--ink); font-size: 15px; }
+.internal-cod-calculator-results small { color: var(--muted); font-size: 11px; line-height: 16px; }
+.internal-cod-calculator-results strong { align-items: center; color: var(--ink); display: flex; font-size: 15px; }
 .internal-cod-calculator-results .highlight strong { color: var(--teal-dark); }
 .internal-cod-calculator-error { color: #a33434; font-size: 12px; grid-column: 1 / -1; margin: 0; }
 @media (max-width: 760px) { .internal-cod-calculator-results { grid-template-columns: 1fr; } }
@@ -4678,14 +4687,17 @@ label {
 .internal-cod-invoice-list .data-table { min-width: 0; table-layout: fixed; width: 100%; }
 .internal-cod-invoice-list .data-table th:nth-child(1) { width: 17%; }
 .internal-cod-invoice-list .data-table th:nth-child(2) { width: 15%; }
-.internal-cod-invoice-list .data-table th:nth-child(3) { width: 42%; }
+.internal-cod-invoice-list .data-table th:nth-child(3) { width: 30%; }
 .internal-cod-invoice-list .data-table th:nth-child(4) { width: 15%; }
-.internal-cod-invoice-list .data-table th:nth-child(5) { width: 11%; }
+.internal-cod-invoice-list .data-table th:nth-child(5) { width: 12%; }
+.internal-cod-invoice-list .data-table th:nth-child(6) { width: 11%; }
 .internal-cod-invoice-list .data-table td { overflow-wrap: anywhere; vertical-align: top; white-space: normal; }
 .internal-cod-invoice-list .data-table th:nth-child(1),
 .internal-cod-invoice-list .data-table td:nth-child(1),
 .internal-cod-invoice-list .data-table th:nth-child(5),
-.internal-cod-invoice-list .data-table td:nth-child(5) { white-space: nowrap; }
+.internal-cod-invoice-list .data-table td:nth-child(5),
+.internal-cod-invoice-list .data-table th:nth-child(6),
+.internal-cod-invoice-list .data-table td:nth-child(6) { white-space: nowrap; }
 .internal-cod-invoice-address { color: #536765; line-height: 1.4; }
 .internal-cod-customer-cell { display: grid; gap: 3px; min-width: 0; }
 .internal-cod-customer-cell > strong { overflow-wrap: anywhere; }
@@ -4801,7 +4813,8 @@ label {
   .internal-cod-calculator > small { grid-column: 1 / -1; grid-row: auto; }
   .internal-cod-calculator-results article,
   .internal-cod-calculator-results article.highlight { grid-column: auto; grid-row: auto; }
-  .internal-cod-calculator-results small { font-size: 10px; }
+  .internal-cod-calculator > label > span,
+  .internal-cod-calculator-results small { font-size: 11px; }
   .internal-cod-calculator-results strong { font-size: 14px; }
   .internal-cod-invoice-list-heading { align-items: flex-start; flex-direction: column; }
   .internal-cod-invoice-list-heading > span:last-child { flex-wrap: wrap; }
@@ -4901,7 +4914,10 @@ label {
 .order-reconciliation-phone:focus-visible { border-radius: 3px; outline: 2px solid var(--teal); outline-offset: 2px; }
 .order-reconciliation-invoice-link { color: var(--teal); text-decoration: none; }
 .order-reconciliation-invoice-link:hover { color: var(--secondary); text-decoration: underline; }
-.order-reconciliation-actions { display: flex; gap: 6px; }
+.order-reconciliation-actions-cell { width: 1%; white-space: nowrap; }
+.order-reconciliation-actions { align-items: center; display: flex; flex-wrap: nowrap; gap: 6px; }
+.order-reconciliation-actions-cell .order-reconciliation-actions { justify-content: flex-end; }
+.order-reconciliation-actions > * { flex: 0 0 auto; }
 .payment-chip { align-items: center; border-radius: 999px; display: inline-flex; font-size: 12px; font-weight: 700; gap: 5px; padding: 5px 8px; white-space: nowrap; }
 .payment-chip.transfer { background: #eaf2ff; color: #245ba4; }
 .payment-chip.cash { background: #edf8ed; color: #267039; }
@@ -4934,9 +4950,10 @@ label {
 .order-reconciliation-external-invoices-table { min-width: 0; table-layout: fixed; width: 100%; }
 .order-reconciliation-external-invoices-table th:nth-child(1) { width: 15%; }
 .order-reconciliation-external-invoices-table th:nth-child(2) { width: 20%; }
-.order-reconciliation-external-invoices-table th:nth-child(3) { width: 37%; }
+.order-reconciliation-external-invoices-table th:nth-child(3) { width: 25%; }
 .order-reconciliation-external-invoices-table th:nth-child(4) { width: 16%; }
 .order-reconciliation-external-invoices-table th:nth-child(5) { width: 12%; }
+.order-reconciliation-external-invoices-table th:nth-child(6) { width: 12%; }
 .order-reconciliation-external-invoices-table td { overflow-wrap: anywhere; vertical-align: top; white-space: normal; }
 .order-reconciliation-external-invoices-table td:nth-child(3) { line-height: 1.4; }
 .order-reconciliation-external-invoices-table-wrap { max-height: 210px; overflow: auto; }
@@ -5306,6 +5323,7 @@ label {
 .transfer-payment-confirmation p { margin: 0; }
 .transfer-payment-confirmation label { display: grid; gap: 8px; }
 .transfer-payment-confirmation textarea { min-height: 80px; }
+.transfer-payment-confirmation .modal-actions { align-items: center; display: flex; flex-wrap: wrap; gap: 10px; justify-content: flex-end; }
 .transfer-payment-result { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 0; border-top: 1px solid #e2e8f0; }
 .secondary-button.transfer-payment-button { width: 34px; min-width: 34px; padding: 0; flex: 0 0 auto; gap: 0; justify-content: center; align-self: center; }
 .invoice-list-action-button.transfer-payment-button { flex: 0 0 auto; cursor: pointer; }

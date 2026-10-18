@@ -113,9 +113,9 @@ export function InvoicesPage() {
     selectedStatus: InvoiceStatusFilter,
     selectedFromDate: string,
     selectedToDate: string,
-    selectedInvoiceCode = invoiceCode,
-    selectedCustomerPhone = customerPhone,
-    selectedCustomerName = customerName,
+    selectedInvoiceCode = appliedInvoiceCode,
+    selectedCustomerPhone = appliedCustomerPhone,
+    selectedCustomerName = appliedCustomerName,
   ) {
     const normalizedInvoiceCode = normalizeInvoiceCodeSearch(selectedInvoiceCode);
     const nextSearchParams = new URLSearchParams();
@@ -134,10 +134,8 @@ export function InvoicesPage() {
     setStatus(selectedStatus);
     setFromDate(selectedFromDate);
     setToDate(selectedToDate);
-    setInvoiceCode(normalizedInvoiceCode);
     setAppliedInvoiceCode(normalizedInvoiceCode);
     setAppliedCustomerPhone(selectedCustomerPhone.trim());
-    setCustomerName(selectedCustomerName.trim());
     setAppliedCustomerName(selectedCustomerName.trim());
     setPage(1);
     setSearchParams(nextSearchParams, { replace: true });
@@ -163,14 +161,18 @@ export function InvoicesPage() {
         status,
         selectedFromDate,
         selectedToDate,
-        invoiceCode,
-        customerPhone,
+        appliedInvoiceCode,
+        appliedCustomerPhone,
+        appliedCustomerName,
       );
     }
   }
 
   function searchInvoices() {
-    applyFilters(status, fromDate, toDate, invoiceCode, customerPhone);
+    applyFilters(status, fromDate, toDate, invoiceCode, customerPhone, customerName);
+    setInvoiceCode("");
+    setCustomerName("");
+    setCustomerPhone("");
   }
 
   function changePage(nextPage: number) {
@@ -260,9 +262,10 @@ export function InvoicesPage() {
             aria-label="Tìm theo tên khách hàng"
           />
         </div>
-        <div className="search-box invoice-search-box">
+        <div className="search-box invoice-search-box invoice-customer-phone-search">
           <Phone size={17} aria-hidden="true" />
           <input
+            autoFocus
             value={customerPhone}
             onChange={(event) => setCustomerPhone(event.target.value)}
             maxLength={30}
@@ -313,7 +316,7 @@ export function InvoicesPage() {
               <th className="invoice-phone-column">Số điện thoại</th>
               <th className="invoice-address-column">Địa chỉ</th>
               <th>Trạng thái</th>
-              <th>Audit</th>
+              <th>Shipper</th>
               <th className="numeric">Tiền hàng</th>
               <th className="numeric">Thu khác</th>
               <th className="numeric">Tổng thanh toán</th>
@@ -343,7 +346,7 @@ export function InvoicesPage() {
                 <td>
                   <StatusBadge status={invoice.status} />
                 </td>
-                <td><AuditBadge label={invoice.audit_label} /></td>
+                <td>{invoice.audit_label ? <AuditBadge label={invoice.audit_label} /> : null}</td>
                 <td className="numeric">{numberText(invoice.subtotal)}</td>
                 <td className="numeric">{numberText(invoice.total_extra_charges)}</td>
                 <td className="numeric strong">{numberText(invoice.total_amount)}</td>

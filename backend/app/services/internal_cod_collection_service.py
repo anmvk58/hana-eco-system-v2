@@ -106,6 +106,7 @@ def list_shipper_summaries(db: Session, collection_date: date | None) -> list[di
                     "customer_address": invoice.customer.address if invoice.customer else None,
                     "handed_over_at": invoice.audited_at,
                     "total_amount": invoice.total_amount,
+                    "total_extra_charges": invoice.total_extra_charges,
                     "is_paid_by_transfer": False,
                     "is_cod_pending": True,
                 }
@@ -121,6 +122,7 @@ def list_shipper_summaries(db: Session, collection_date: date | None) -> list[di
                     "customer_address": invoice.customer.address if invoice.customer else None,
                     "handed_over_at": invoice.audited_at,
                     "total_amount": invoice.total_amount,
+                    "total_extra_charges": invoice.total_extra_charges,
                     "is_paid_by_transfer": invoice.is_paid_by_transfer,
                     "is_cod_pending": invoice.id in pending_ids,
                 }

@@ -26,6 +26,7 @@ import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
 import { matchPath, NavLink, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
+import brandLogo from "../assets/hana-brand.webp";
 import { usePageTitle } from "../hooks/usePageTitle";
 
 const navItems = [
@@ -153,10 +154,9 @@ export function Layout({ children }: { children: ReactNode }) {
     <div className={`app-shell${isSidebarCollapsed ? " sidebar-collapsed" : ""}${isLoggingOut ? " auth-logging-out" : ""}${isSalesPage ? " sales-shell" : ""}`}>
       <aside className={`sidebar${isMobileSidebarOpen ? " mobile-open" : ""}`}>
         <div className="brand">
-          <div className="brand-mark">H</div>
+          <div className="brand-mark"><img src={brandLogo} alt="Hana Farm" width={38} height={38} /></div>
           <div className="brand-copy">
             <strong>Hana POS</strong>
-            <span>MVP bán hàng</span>
           </div>
           <button
             className="sidebar-collapse-button"
@@ -172,7 +172,7 @@ export function Layout({ children }: { children: ReactNode }) {
           {navItems.filter((item) => item.permissions.every(hasPermission) && (!("shipperOnly" in item) || !item.shipperOnly || Boolean(currentUser?.shipper_id))).map((item) => {
             const Icon = item.icon;
             return (
-              <NavLink key={item.to} to={item.to} title={item.label} end={item.to === "/" || item.to === "/invoices" || item.to === "/reports"}>
+              <NavLink key={item.to} to={item.to} title={item.label} target={item.to === "/invoices" ? "_blank" : undefined} rel={item.to === "/invoices" ? "noopener noreferrer" : undefined} end={item.to === "/" || item.to === "/invoices" || item.to === "/reports"}>
                 <Icon size={18} />
                 <span>{item.label}</span>
               </NavLink>

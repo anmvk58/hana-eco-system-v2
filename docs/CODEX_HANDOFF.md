@@ -83,6 +83,22 @@ Only the Cloudflare Tunnel connector is public-facing. Frontend and API ports ar
 
 ## 4. Implemented and completed
 
+### Invoice list entry and filters (2026-10-18)
+
+- Searching (button or Enter) clears all three text inputs after capturing the submitted criteria. Applied criteria remain in state and the URL for pagination, refresh, and date/status filtering; changing those filters does not refill the cleared inputs.
+
+- The invoice navigation link opens a new browser context with `target="_blank"`. The invoice list autofocuses its phone filter on mount; customer-name and phone filters share equal flex widths, including a paired row on mobile beneath the invoice-code filter.
+
+### Internal and external collection invoice extra charges (2026-10-18)
+
+- External batch reconciliation modals also show each invoice's `total_extra_charges` in a separate column and mobile detail, using the existing invoice payload.
+
+- Internal COD summary invoice payloads expose the stored `total_extra_charges`. The collection modal shows this value in a separate “Thu khác” column and in mobile invoice cards, including transferred/already-collected orders. This is an informational breakdown of invoice totals; collection amounts and transactions are unchanged.
+
+### Collection confirmation keyboard shortcut (2026-10-18)
+
+- Retail/transfer invoice collection, external batch reconciliation, and internal COD collection modals opt into `Modal.submitOnEnter`. Enter submits the existing form through its enabled explicit submit button, including before an input has focus. Textareas retain newlines, focused buttons/links keep native keyboard behavior, note-settings editing is excluded, held/composing/modified Enter is ignored, and an overlaid transfer dialog blocks the underlying collection shortcut.
+
 ### COD collection history presentation (2026-10-16)
 
 - Invoice, customer, product, general-report and sold-product-report lists now share the same table-column header treatment through `standard-list-table`. Their list toolbars and report panel headings also share padded white styling; report headers retain wrapping and invoice code/revision spacing is preserved.
@@ -197,6 +213,8 @@ Only the Cloudflare Tunnel connector is public-facing. Frontend and API ports ar
 - On “Đơn đã nhận”, the assigned shipper can quickly filter received orders with full-width, color-coded controls for all, in-delivery, delivered, or cancelled states. Mobile card backgrounds also reflect state: pale yellow for in-delivery, pale green for delivered, and muted red for cancelled. Cards keep customer, phone, code, and address prominent while combining the compact payment/COD state and delivery/call actions into a single footer row. The call action opens the device dialer and is disabled when no number exists. Delivery completion requires a confirmation modal showing the invoice code, customer, delivery address, and payment total; successful confirmation has immediate animation and toast feedback.
 
 ### Dashboard and reports
+
+- Dashboard quick ranges replace the rolling seven-day option with the complete previous calendar month, shared by summary, product/customer rankings and order-status charts. General Reports retains its existing presets.
 
 - Clicking the `Tổng quan` navigation link while already on the Dashboard refreshes all four data requests (summary, products, customers, and order-status charts) through the router location key. Current filters remain selected, and each effect's cleanup ignores stale responses.
 

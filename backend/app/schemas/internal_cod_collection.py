@@ -23,6 +23,7 @@ class PendingInternalCodInvoiceRead(ORMBase):
     customer_address: str | None
     handed_over_at: datetime | None
     total_amount: Decimal
+    total_extra_charges: Decimal
     is_paid_by_transfer: bool
     is_cod_pending: bool
 

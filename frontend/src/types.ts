@@ -266,6 +266,7 @@ export interface PendingInternalCodInvoice {
   customer_address?: string | null;
   handed_over_at?: string | null;
   total_amount: string;
+  total_extra_charges: string;
   is_paid_by_transfer: boolean;
   is_cod_pending: boolean;
 }
@@ -399,7 +400,7 @@ export interface ExternalHandoverReconcilePayload {
   note?: string;
 }
 
-export type DashboardTimePreset = "today" | "yesterday" | "last7days" | "thisMonth" | "custom";
+export type DashboardTimePreset = "today" | "yesterday" | "last7days" | "thisMonth" | "lastMonth" | "custom";
 export type DashboardProductMetric = "revenue" | "quantity";
 
 export interface DashboardProductSummary {

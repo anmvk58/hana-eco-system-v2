@@ -17,22 +17,22 @@ import type {
 } from "../types";
 import { money, numberText, todayInputValue, dateOnly, shiftCalendarDate } from "../utils/format";
 
-type TimePreset = DashboardTimePreset;
-type RankingTimePreset = Exclude<DashboardTimePreset, "custom">;
+type TimePreset = Exclude<DashboardTimePreset, "last7days">;
+type RankingTimePreset = Exclude<TimePreset, "custom">;
 
 const timePresets: Array<{ value: TimePreset; label: string }> = [
   { value: "today", label: "Hôm nay" },
   { value: "yesterday", label: "Hôm qua" },
-  { value: "last7days", label: "7 ngày qua" },
   { value: "thisMonth", label: "Tháng này" },
+  { value: "lastMonth", label: "Tháng trước" },
   { value: "custom", label: "Khoảng ngày" },
 ];
 
 const rankingTimePresets: Array<{ value: RankingTimePreset; label: string }> = [
   { value: "today", label: "Hôm nay" },
   { value: "yesterday", label: "Hôm qua" },
-  { value: "last7days", label: "7 ngày qua" },
   { value: "thisMonth", label: "Tháng này" },
+  { value: "lastMonth", label: "Tháng trước" },
 ];
 
 const productMetricOptions: Array<{ value: DashboardProductMetric; label: string }> = [
@@ -44,14 +44,15 @@ const pieColors = ["#15947f", "#e7832e", "#376fd0", "#8d63c7", "#d7556b", "#49a4
 
 function previousDate(value: string) { return shiftCalendarDate(value, -1); }
 
-function shiftDate(value: string, days: number) { return shiftCalendarDate(value, days); }
-
 function rankingDateRange(preset: RankingTimePreset, today: string) {
   if (preset === "yesterday") {
     const yesterday = previousDate(today);
     return { fromDate: yesterday, toDate: yesterday };
   }
-  if (preset === "last7days") return { fromDate: shiftDate(today, -6), toDate: today };
+  if (preset === "lastMonth") {
+    const lastDay = previousDate(`${today.slice(0, 8)}01`);
+    return { fromDate: `${lastDay.slice(0, 8)}01`, toDate: lastDay };
+  }
   if (preset === "thisMonth") return { fromDate: `${today.slice(0, 8)}01`, toDate: today };
   return { fromDate: today, toDate: today };
 }
@@ -187,19 +188,10 @@ export function DashboardPage() {
 
   function selectPreset(preset: TimePreset) {
     setTimePreset(preset);
-    if (preset === "today") {
-      setFromDate(today);
-      setToDate(today);
-    } else if (preset === "yesterday") {
-      const yesterday = previousDate(today);
-      setFromDate(yesterday);
-      setToDate(yesterday);
-    } else if (preset === "last7days") {
-      setFromDate(shiftDate(today, -6));
-      setToDate(today);
-    } else if (preset === "thisMonth") {
-      setFromDate(`${today.slice(0, 8)}01`);
-      setToDate(today);
+    if (preset !== "custom") {
+      const range = rankingDateRange(preset, today);
+      setFromDate(range.fromDate);
+      setToDate(range.toDate);
     }
   }
 
