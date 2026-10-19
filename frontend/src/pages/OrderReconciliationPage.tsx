@@ -26,10 +26,11 @@ import { Modal } from "../components/Modal";
 import { PaymentNoteInput } from "../components/PaymentNoteInput";
 import { ToastNotification } from "../components/ToastNotification";
 import type { ExternalAdvanceMethod, ExternalHandoverReconciliationRow, Invoice, RetailInvoiceReconciliation } from "../types";
-import { money, todayInputValue, utcDateTime, dateTime } from "../utils/format";
+import { money, todayInputValue, utcDateTime, dateTime, shiftCalendarDate } from "../utils/format";
 
 type ReconciliationTab = "unaudited" | "retail" | "external";
 type RetailFilter = "pending" | "collected" | "all";
+type ReconciliationDatePreset = "today" | "yesterday" | "dayBeforeYesterday" | "custom";
 
 function searchableText(invoice: Invoice) {
   return [invoice.code, invoice.customer?.name, invoice.customer?.phone, invoice.customer?.address]
@@ -64,6 +65,13 @@ export function OrderReconciliationPage() {
   const initialToday = todayInputValue();
   const [fromDate, setFromDate] = useState(searchParams.get("from_date") ?? initialToday);
   const [toDate, setToDate] = useState(searchParams.get("to_date") ?? initialToday);
+  const [datePreset, setDatePreset] = useState<ReconciliationDatePreset>(() => {
+    if (fromDate !== toDate) return "custom";
+    if (fromDate === initialToday) return "today";
+    if (fromDate === shiftCalendarDate(initialToday, -1)) return "yesterday";
+    if (fromDate === shiftCalendarDate(initialToday, -2)) return "dayBeforeYesterday";
+    return "custom";
+  });
   const [tab, setTab] = useState<ReconciliationTab>("unaudited");
   const [retailFilter, setRetailFilter] = useState<RetailFilter>("pending");
   const [search, setSearch] = useState("");
@@ -135,6 +143,14 @@ export function OrderReconciliationPage() {
     if (selectedToDate) nextSearchParams.set("to_date", selectedToDate);
     setSearchParams(nextSearchParams, { replace: true });
     void load(selectedFromDate, selectedToDate);
+  }
+
+  function selectDatePreset(preset: ReconciliationDatePreset) {
+    setDatePreset(preset);
+    if (preset === "custom") return;
+    const offset = preset === "today" ? 0 : preset === "yesterday" ? -1 : -2;
+    const selectedDate = shiftCalendarDate(todayInputValue(), offset);
+    changeDateRange(selectedDate, selectedDate);
   }
 
   const normalizedSearch = search.trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/đ/g, "d").replace(/Đ/g, "D").toLocaleLowerCase("vi-VN");
@@ -265,7 +281,16 @@ export function OrderReconciliationPage() {
         <span className="order-reconciliation-hero-icon"><ClipboardCheck size={26}/></span>
         <span><h2>Kiểm kê đơn</h2><p>Theo dõi đơn chưa phân loại, tiền đơn đã audit và các phiên bàn giao Ship ngoài.</p></span>
       </div>
-      <div className="order-reconciliation-hero-actions"><DateRangePicker from={fromDate} to={toDate} onChange={changeDateRange}/><button className="secondary-button" type="button" disabled={loading || saving} onClick={() => void load(fromDate, toDate)}>
+      <div className="order-reconciliation-hero-actions">
+        <div className="dashboard-period-options" role="group" aria-label="Chọn nhanh thời gian kiểm kê">
+          {([
+            { value: "today", label: "Hôm nay" },
+            { value: "yesterday", label: "Hôm qua" },
+            { value: "dayBeforeYesterday", label: "Hôm kia" },
+            { value: "custom", label: "Khoảng thời gian" },
+          ] as const).map((preset) => <button key={preset.value} className={datePreset === preset.value ? "active" : ""} type="button" aria-pressed={datePreset === preset.value} disabled={loading || saving} onClick={() => selectDatePreset(preset.value)}>{preset.label}</button>)}
+        </div>
+        {datePreset === "custom" ? <DateRangePicker from={fromDate} to={toDate} onChange={changeDateRange}/> : null}<button className="secondary-button" type="button" disabled={loading || saving} onClick={() => void load(fromDate, toDate)}>
         <RefreshCw className={loading ? "loading-spinner" : ""} size={17}/>Làm mới
       </button></div>
     </section>

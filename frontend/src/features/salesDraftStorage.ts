@@ -38,6 +38,22 @@ export interface SaleDraftCollection {
   drafts: SaleDraft[];
 }
 
+export function resolveSaleDraftStorageUpdate(current: SaleDraftCollection, incoming: SaleDraftCollection) {
+  // Active selection belongs to each browser tab. Echoing another tab's selection
+  // would cause both workspaces to write back to storage indefinitely.
+  if (current.nextSequence === incoming.nextSequence && JSON.stringify(current.drafts) === JSON.stringify(incoming.drafts)) return null;
+  const draft = incoming.drafts.find((item) => item.id === current.activeDraftId)
+    ?? incoming.drafts.find((item) => item.id === incoming.activeDraftId)
+    ?? incoming.drafts[0];
+  const previousDraft = current.drafts.find((item) => item.id === current.activeDraftId);
+  return {
+    collection: { ...incoming, activeDraftId: draft.id },
+    draft,
+    activeContentChanged: JSON.stringify(previousDraft) !== JSON.stringify(draft),
+    activeDraftChanged: draft.id !== current.activeDraftId,
+  };
+}
+
 const storagePrefix = "hana-sale-drafts:v1";
 
 export function saleDraftStorageKey(userId: number) {

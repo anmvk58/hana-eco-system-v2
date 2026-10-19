@@ -14,6 +14,7 @@ import {
   createInvoiceEditDraft,
   createSaleDraftCollection,
   readSaleDraftCollection,
+  resolveSaleDraftStorageUpdate,
   saleDraftStorageKey,
   writeSaleDraftCollection,
   type SaleDraft,
@@ -239,7 +240,7 @@ export function InvoiceFormPage() {
   const [invoicePrintTwoCopies, setInvoicePrintTwoCopies] = useState(true);
   const [submitting, setSubmitting] = useState(false);
 
-  const applyDraft = useCallback((draft: SaleDraft) => {
+  const applyDraft = useCallback((draft: SaleDraft, closeCheckout = true) => {
     setCustomerId(draft.customerId);
     setCustomerSearch(draft.customerSearch);
     setSelectedCustomer(draft.selectedCustomer);
@@ -251,7 +252,7 @@ export function InvoiceFormPage() {
     setApplyShippingFee(draft.applyShippingFee);
     setIsPaidByTransfer(draft.isPaidByTransfer);
     setPrintTwoCopies(draft.printTwoCopies);
-    setCheckoutOpen(false);
+    if (closeCheckout) setCheckoutOpen(false);
     setProductSearch("");
     setError("");
   }, []);
@@ -333,13 +334,18 @@ export function InvoiceFormPage() {
       if (event.key !== storageKey || !event.newValue) return;
       const collection = readSaleDraftCollection(currentUser.id);
       if (!collection) return;
-      setDrafts(collection.drafts);
-      setNextDraftSequence(collection.nextSequence);
-      const draft = collection.drafts.find((item) => item.id === activeDraftId)
-        ?? collection.drafts.find((item) => item.id === collection.activeDraftId)
-        ?? collection.drafts[0];
-      setActiveDraftId(draft.id);
-      applyDraft(draft);
+      const workspace = workspaceRef.current;
+      const update = resolveSaleDraftStorageUpdate({
+        version: 1,
+        drafts: workspace.drafts,
+        activeDraftId: workspace.activeDraftId,
+        nextSequence: workspace.nextSequence,
+      }, collection);
+      if (!update) return;
+      setDrafts(update.collection.drafts);
+      setNextDraftSequence(update.collection.nextSequence);
+      setActiveDraftId(update.collection.activeDraftId);
+      if (update.activeContentChanged) applyDraft(update.draft, update.activeDraftChanged);
     };
     window.addEventListener("storage", handleStorage);
     return () => window.removeEventListener("storage", handleStorage);

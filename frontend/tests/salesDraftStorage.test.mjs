@@ -6,7 +6,7 @@ import ts from "typescript";
 // Exercise the actual TypeScript module without adding a test runtime dependency.
 const source = await readFile(new URL("../src/features/salesDraftStorage.ts", import.meta.url), "utf8");
 const { outputText } = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 } });
-const { createSaleDraft, createInvoiceEditDraft, readSaleDraftCollection, writeSaleDraftCollection, saleDraftStorageKey } = await import(`data:text/javascript;base64,${Buffer.from(outputText).toString("base64")}`);
+const { createSaleDraft, createInvoiceEditDraft, readSaleDraftCollection, writeSaleDraftCollection, saleDraftStorageKey, resolveSaleDraftStorageUpdate } = await import(`data:text/javascript;base64,${Buffer.from(outputText).toString("base64")}`);
 const charges = [{ charge_type: "shipping", name: "Phí ship", amount: "30000" }, { charge_type: "packing", name: "Phí đóng hàng", amount: "0" }];
 const invoice = {
   id: 42, code: "HD-261004-042", status: "created", sold_at: "2026-10-04T09:00:00", customer_id: 20,
@@ -82,4 +82,34 @@ test("removing a saved edit leaves other tabs and account storage intact", () =>
   assert.equal(readSaleDraftCollection(1).drafts.length, 1);
   assert.equal(readSaleDraftCollection(2).drafts[0].editingInvoice.id, 42);
   assert.notEqual(saleDraftStorageKey(1), saleDraftStorageKey(2));
+});
+
+test("browser tabs with different active selections do not echo storage updates", () => {
+  const sale = createSaleDraft(1, charges);
+  const edit = createInvoiceEditDraft(invoice, 2, charges);
+  const current = { version: 1, drafts: [sale, edit], activeDraftId: edit.id, nextSequence: 3 };
+  assert.equal(resolveSaleDraftStorageUpdate(current, { ...current, activeDraftId: sale.id }), null);
+  const incoming = structuredClone(current);
+  incoming.activeDraftId = sale.id;
+  incoming.drafts[0].note = "Đơn bán mới thay đổi";
+  const update = resolveSaleDraftStorageUpdate(current, incoming);
+  assert.equal(update.collection.activeDraftId, edit.id);
+  assert.equal(update.activeContentChanged, false);
+  assert.equal(resolveSaleDraftStorageUpdate(incoming, update.collection), null);
+});
+
+test("syncing active content preserves checkout; removing the active draft switches it", () => {
+  const sale = createSaleDraft(1, charges);
+  const edit = createInvoiceEditDraft(invoice, 2, charges);
+  const current = { version: 1, drafts: [sale, edit], activeDraftId: edit.id, nextSequence: 3 };
+  const incoming = structuredClone(current);
+  incoming.drafts[1].discount = "2000";
+  const update = resolveSaleDraftStorageUpdate(current, incoming);
+  assert.equal(update.activeContentChanged, true);
+  assert.equal(update.activeDraftChanged, false);
+  assert.equal(update.draft.discount, "2000");
+  const removed = resolveSaleDraftStorageUpdate(current, { ...current, drafts: [sale], activeDraftId: sale.id });
+  assert.equal(removed.activeContentChanged, true);
+  assert.equal(removed.activeDraftChanged, true);
+  assert.equal(removed.draft.id, sale.id);
 });

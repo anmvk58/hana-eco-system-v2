@@ -83,6 +83,17 @@ Only the Cloudflare Tunnel connector is public-facing. Frontend and API ports ar
 
 ## 4. Implemented and completed
 
+### Invoice checkout and cross-tab draft synchronization (2026-10-19)
+
+- Fixed the checkout overlay opening and then closing before confirmation when a sales tab and invoice-edit tab are open together. Storage updates previously called `applyDraft` unconditionally, closing checkout, and each browser tab wrote back its own active selection indefinitely. Incoming collections now ignore selection-only differences, retain each browser tab's active draft, and only reapply changed active content. Same-draft synchronization keeps checkout open; switching/removing the active draft still closes it.
+- Reproduced with local invoice `HD2610190001`, then verified its edit checkout stays open while another sales tab changes and restores a new-sale draft note. No invoice save was submitted. All 11 frontend tests (including cross-tab synchronization regressions) and the production build pass. Existing concurrent-edit/stale-draft limitations remain.
+
+### Reconciliation date presets (2026-10-18)
+
+- Internal COD collections also use Dashboard-style quick buttons for today, yesterday, the day before yesterday, and a custom single day (2026-10-19). The collection API and accounting stay scoped to one handover date.
+
+- Order reconciliation offers today, yesterday, the day before yesterday, and a custom date range. These choices use the Dashboard segmented-button styling with an active selection and a two-column mobile layout (updated 2026-10-19). Quick choices use Vietnam calendar dates and update the existing date-filter URL/API flow for all three tabs; the custom option displays the existing calendar picker. Existing URL date ranges initialize the matching preset.
+
 ### Invoice list entry and filters (2026-10-18)
 
 - Searching (button or Enter) clears all three text inputs after capturing the submitted criteria. Applied criteria remain in state and the URL for pagination, refresh, and date/status filtering; changing those filters does not refill the cleared inputs.

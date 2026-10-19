@@ -1,5 +1,5 @@
 import { TransferPaymentButton } from "../components/TransferPaymentButton";
-import { ArrowRight, Banknote, CalendarDays, CheckCircle2, CreditCard, History, LoaderCircle, PackageCheck, ReceiptText, RefreshCw, Truck, WalletCards } from "lucide-react";
+import { ArrowRight, Banknote, CheckCircle2, CreditCard, History, LoaderCircle, PackageCheck, ReceiptText, RefreshCw, Truck, WalletCards } from "lucide-react";
 import { FormEvent, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
@@ -9,7 +9,7 @@ import { Modal } from "../components/Modal";
 import { PaymentNoteInput } from "../components/PaymentNoteInput";
 import { ToastNotification } from "../components/ToastNotification";
 import type { InternalCodShipperSummary } from "../types";
-import { money, numberText, dateOnly, todayInputValue, utcDateTime } from "../utils/format";
+import { money, numberText, dateOnly, todayInputValue, utcDateTime, shiftCalendarDate } from "../utils/format";
 
 function evaluateAmountExpression(expression: string): number | null {
   const tokens = expression.match(/\d+(?:\.\d+)?|[()+\-*/]|\s+/g);
@@ -58,6 +58,7 @@ function evaluateAmountExpression(expression: string): number | null {
 export function InternalCodCollectionsPage() {
   const today = todayInputValue();
   const [collectionDate, setCollectionDate] = useState(today);
+  const [datePreset, setDatePreset] = useState<"today" | "yesterday" | "dayBeforeYesterday" | "custom">("today");
   const [summaries, setSummaries] = useState<InternalCodShipperSummary[]>([]);
   const [collecting, setCollecting] = useState<InternalCodShipperSummary | null>(null);
   const [amountExpression, setAmountExpression] = useState("");
@@ -109,6 +110,13 @@ export function InternalCodCollectionsPage() {
     if (!value) return;
     setCollectionDate(value);
     void load(value);
+  }
+
+  function selectDatePreset(preset: typeof datePreset) {
+    setDatePreset(preset);
+    if (preset === "custom") return;
+    const offset = preset === "today" ? 0 : preset === "yesterday" ? -1 : -2;
+    changeCollectionDate(shiftCalendarDate(todayInputValue(), offset));
   }
 
   function openCollection(summary: InternalCodShipperSummary) {
@@ -176,8 +184,15 @@ export function InternalCodCollectionsPage() {
     <section className="internal-cod-hero">
       <div className="internal-cod-hero-copy"><span className="internal-cod-hero-icon"><WalletCards size={25}/></span><span><h2>Thu tiền Ship Nội Bộ</h2><p>Đối soát số đơn đã bàn giao và COD đang treo cho shipper theo từng ngày.</p></span></div>
       <div className="internal-cod-filter-card">
-        <CalendarDays size={21}/>
-        <label className="internal-cod-day-filter"><span>Chọn một ngày bàn giao</span><input type="date" value={collectionDate} max={today} onInput={(event) => changeCollectionDate(event.currentTarget.value)}/></label>
+        <div className="dashboard-period-options" role="group" aria-label="Chọn nhanh ngày bàn giao">
+          {([
+            { value: "today", label: "Hôm nay" },
+            { value: "yesterday", label: "Hôm qua" },
+            { value: "dayBeforeYesterday", label: "Hôm kia" },
+            { value: "custom", label: "Chọn ngày" },
+          ] as const).map((preset) => <button key={preset.value} className={datePreset === preset.value ? "active" : ""} type="button" aria-pressed={datePreset === preset.value} disabled={loading || saving} onClick={() => selectDatePreset(preset.value)}>{preset.label}</button>)}
+        </div>
+        {datePreset === "custom" ? <label className="internal-cod-day-filter"><span>Chọn một ngày bàn giao</span><input type="date" value={collectionDate} max={today} disabled={loading || saving} onInput={(event) => changeCollectionDate(event.currentTarget.value)}/></label> : null}
         <button className="icon-button" disabled={loading || saving} onClick={() => void load()} aria-label="Làm mới công nợ" title="Làm mới"><RefreshCw className={loading ? "loading-spinner" : ""} size={18}/></button>
       </div>
     </section>
