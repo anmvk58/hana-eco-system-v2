@@ -98,7 +98,7 @@ Only the Cloudflare Tunnel connector is public-facing. Frontend and API ports ar
 
 - Searching (button or Enter) clears all three text inputs after capturing the submitted criteria. Applied criteria remain in state and the URL for pagination, refresh, and date/status filtering; changing those filters does not refill the cleared inputs.
 
-- The invoice navigation link opens a new browser context with `target="_blank"`. The invoice list autofocuses its phone filter on mount; customer-name and phone filters share equal flex widths, including a paired row on mobile beneath the invoice-code filter.
+- The invoice navigation link opens in the current browser tab (updated 2026-10-19). The invoice list autofocuses its phone filter on mount; customer-name and phone filters share equal flex widths, including a paired row on mobile beneath the invoice-code filter.
 
 ### Internal and external collection invoice extra charges (2026-10-18)
 

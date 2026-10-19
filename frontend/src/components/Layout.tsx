@@ -172,7 +172,7 @@ export function Layout({ children }: { children: ReactNode }) {
           {navItems.filter((item) => item.permissions.every(hasPermission) && (!("shipperOnly" in item) || !item.shipperOnly || Boolean(currentUser?.shipper_id))).map((item) => {
             const Icon = item.icon;
             return (
-              <NavLink key={item.to} to={item.to} title={item.label} target={item.to === "/invoices" ? "_blank" : undefined} rel={item.to === "/invoices" ? "noopener noreferrer" : undefined} end={item.to === "/" || item.to === "/invoices" || item.to === "/reports"}>
+              <NavLink key={item.to} to={item.to} title={item.label} end={item.to === "/" || item.to === "/invoices" || item.to === "/reports"}>
                 <Icon size={18} />
                 <span>{item.label}</span>
               </NavLink>
