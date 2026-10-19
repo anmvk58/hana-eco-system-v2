@@ -1,4 +1,6 @@
 import type {
+  Supplier, SupplierPayload, SupplierDebtEntry, SupplierDebtEntryPayload, SupplierDebtEntryPage,
+  SupplierDebtPayment, SupplierDebtPaymentPayload, SupplierDebtPage, SupplierDebtHistory,
   GeneralReport,
   Customer,
   CustomerPayload,
@@ -151,6 +153,17 @@ async function listAllProducts(search?: string) {
 }
 
 export const api = {
+  supplierDebts: {
+    suppliers: (from_date?: string, to_date?: string) => request<Supplier[]>("/supplier-debts/suppliers", {}, { from_date, to_date }),
+    saveSupplier: (payload: SupplierPayload, id?: number) => request<Supplier>(`/supplier-debts/suppliers${id ? `/${id}` : ""}`, { method: id ? "PUT" : "POST", body: JSON.stringify(payload) }),
+    entries: (supplier_id: number | undefined, state: string, page: number, from_date?: string, to_date?: string) => request<SupplierDebtEntryPage>("/supplier-debts/entries", {}, { supplier_id, state, page, from_date, to_date }),
+    saveEntry: (payload: SupplierDebtEntryPayload, entry?: SupplierDebtEntry) => request<SupplierDebtEntry>(`/supplier-debts/entries${entry ? `/${entry.id}` : ""}`, { method: entry ? "PUT" : "POST", body: JSON.stringify({ ...payload, ...(entry ? { expected_revision: entry.revision } : {}) }) }),
+    cancelEntry: (entry: SupplierDebtEntry, reason: string) => request<SupplierDebtEntry>(`/supplier-debts/entries/${entry.id}/cancel`, { method: "POST", body: JSON.stringify({ reason, expected_revision: entry.revision }) }),
+    payments: (supplier_id: number, page: number, from_date?: string, to_date?: string) => request<SupplierDebtPage<SupplierDebtPayment>>("/supplier-debts/payments", {}, { supplier_id, page, from_date, to_date }),
+    pay: (payload: SupplierDebtPaymentPayload) => request<SupplierDebtPayment>("/supplier-debts/payments", { method: "POST", body: JSON.stringify(payload) }),
+    undoPayment: (id: number, reason: string) => request<SupplierDebtPayment>(`/supplier-debts/payments/${id}/undo`, { method: "POST", body: JSON.stringify({ reason }) }),
+    history: (supplier_id: number, entry_id?: number, payment_id?: number) => request<SupplierDebtHistory[]>("/supplier-debts/history", {}, { supplier_id, entry_id, payment_id }),
+  },
   auth: {
     login: (username: string, password: string) => request<LoginResponse>("/auth/login", { method: "POST", body: JSON.stringify({ username, password }) }),
     me: () => request<User>("/auth/me"),

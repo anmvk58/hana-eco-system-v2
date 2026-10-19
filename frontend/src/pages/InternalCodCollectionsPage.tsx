@@ -4,6 +4,7 @@ import { FormEvent, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
 import { ApiError, api } from "../api/client";
+import { DateRangePicker } from "../components/DateRangePicker";
 import { EmptyState } from "../components/EmptyState";
 import { Modal } from "../components/Modal";
 import { PaymentNoteInput } from "../components/PaymentNoteInput";
@@ -192,7 +193,7 @@ export function InternalCodCollectionsPage() {
             { value: "custom", label: "Chọn ngày" },
           ] as const).map((preset) => <button key={preset.value} className={datePreset === preset.value ? "active" : ""} type="button" aria-pressed={datePreset === preset.value} disabled={loading || saving} onClick={() => selectDatePreset(preset.value)}>{preset.label}</button>)}
         </div>
-        {datePreset === "custom" ? <label className="internal-cod-day-filter"><span>Chọn một ngày bàn giao</span><input type="date" value={collectionDate} max={today} disabled={loading || saving} onInput={(event) => changeCollectionDate(event.currentTarget.value)}/></label> : null}
+        {datePreset === "custom" ? <div className="internal-cod-day-filter"><span>Chọn một ngày bàn giao</span><DateRangePicker mode="single" ariaLabel="Ngày bàn giao" from={collectionDate} to={collectionDate} max={today} disabled={loading || saving} onChange={(value) => changeCollectionDate(value)}/></div> : null}
         <button className="icon-button" disabled={loading || saving} onClick={() => void load()} aria-label="Làm mới công nợ" title="Làm mới"><RefreshCw className={loading ? "loading-spinner" : ""} size={18}/></button>
       </div>
     </section>

@@ -1,11 +1,12 @@
 import { TransferPaymentButton } from "../components/TransferPaymentButton";
-import { ChevronLeft, ChevronRight, FileText, LoaderCircle, Phone, Search, UserRound, XCircle } from "lucide-react";
+import { ChevronLeft, ChevronRight, FileText, ListFilter, LoaderCircle, Phone, Search, UserRound, XCircle } from "lucide-react";
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 
 import { api } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
 import { DateRangePicker } from "../components/DateRangePicker";
+import { FormSelect } from "../components/FormSelect";
 import { EmptyState } from "../components/EmptyState";
 import { Modal } from "../components/Modal";
 import { StatusBadge } from "../components/StatusBadge";
@@ -280,16 +281,13 @@ export function InvoicesPage() {
           <Search size={17} />
           Tìm kiếm
         </button>
-        <select
-          value={status}
-          onChange={(event) => applyFilters(event.target.value as InvoiceStatusFilter, fromDate, toDate)}
-        >
-          <option value="active">Đang hiệu lực</option>
-          <option value="all">Tất cả trạng thái</option>
-          <option value="created">Đã tạo</option>
-          <option value="completed">Hoàn thành</option>
-          <option value="cancelled">Đã hủy</option>
-        </select>
+        <FormSelect label="Trạng thái hóa đơn" hideLabel className="invoice-status-filter" icon={ListFilter} value={status} options={[
+          { value: "active", label: "Đang hiệu lực" },
+          { value: "all", label: "Tất cả trạng thái" },
+          { value: "created", label: "Đã tạo" },
+          { value: "completed", label: "Hoàn thành" },
+          { value: "cancelled", label: "Đã hủy" },
+        ]} onChange={(value) => applyFilters(value as InvoiceStatusFilter, fromDate, toDate)}/>
         <DateRangePicker from={fromDate} to={toDate} onChange={changeDateRange} />
         {loading ? <span className="invoice-filter-loading" role="status">
           <LoaderCircle className="loading-spinner" size={17} />
@@ -389,16 +387,10 @@ export function InvoicesPage() {
         <span className="pagination-summary">
           Hiển thị {firstIndex + 1}–{Math.min(firstIndex + pageSize, total)} trong {total} hóa đơn
         </span>
-        <label className="page-size-control">
+        <div className="page-size-control">
           <span>Số bản ghi / trang</span>
-          <select
-            value={pageSize}
-            onChange={(event) => changePageSize(Number(event.target.value))}
-            aria-label="Số bản ghi trên mỗi trang"
-          >
-            {PAGE_SIZE_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}
-          </select>
-        </label>
+          <FormSelect label="Số bản ghi trên mỗi trang" hideLabel className="invoice-page-size-filter" value={String(pageSize)} options={PAGE_SIZE_OPTIONS.map((option) => ({ value: String(option), label: String(option) }))} onChange={(value) => changePageSize(Number(value))}/>
+        </div>
         <div className="pagination-controls">
           <button
             type="button"

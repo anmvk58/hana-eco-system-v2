@@ -6,6 +6,20 @@ All `datetime` columns store UTC without a timezone suffix, including `invoices.
 
 Startup migration `2026-10-11-invoice-sale-times-utc` converts legacy Vietnam-local sale times and normalizes invoice history timestamps once. `data_migrations` stores its unique key and UTC `applied_at`. `time_normalization_backups` stores the migration key, record type, record ID and original JSON values, uniquely identified by that triple, for audit and explicit recovery. Business amounts, inventory, existing codes and update timestamps remain unchanged.
 
+## Standalone supplier payables
+
+These tables have no relation to products, invoices or inventory. Business dates (`entry_date`, `paid_on`) use `DATE`; audit timestamps use UTC `DATETIME`. Amounts are `NUMERIC(14,2)` and quantities `NUMERIC(14,3)`. Tables are created by the existing startup `create_all` workflow.
+
+| Table | Main fields and constraints |
+| --- | --- |
+| suppliers | PK `id`; unique `name` (200); nullable `phone`, `address`, `note`; `is_active`; creation/update timestamps. Deactivate instead of deleting referenced suppliers. |
+| supplier_debt_entries | PK `id`; FK `supplier_id`; `kind` (`purchase`, `increase`, `decrease`); `entry_date`, `description`, `note`; positive `amount`; `revision`; nullable FK `payment_id`; nullable `cancelled_at`; FK `created_by_user_id`; timestamps. Composite index `(supplier_id, cancelled_at, payment_id, entry_date)`. |
+| supplier_debt_items | PK `id`; indexed FK `entry_id`; free-text `name`; `quantity`, `unit_price`, `line_total`. No product FK. Each line is rounded half up to cents before summing the entry. |
+| supplier_debt_payments | PK `id`; indexed FK `supplier_id`; `supplier_name` snapshot; `paid_on`, `method` (`cash` or `transfer`), non-negative net `amount`, `note`; FK `created_by_user_id`; `cancelled_at`, `cancel_reason`; immutable JSON `entries_snapshot`; timestamps. |
+| supplier_debt_history | PK `id`; indexed FKs `supplier_id`, nullable `entry_id`, nullable `payment_id`; `action`; FK `actor_user_id`, `actor_name` snapshot; UTC `occurred_at`; JSON `details` with reason and before/after entry snapshots. |
+
+Entry codes (`PN-000001`, `DC-000002`) and payment codes (`TTNCC-000001`) are derived from primary keys. Pending balance sums positive purchase/increase amounts and negative decrease amounts where both `payment_id` and `cancelled_at` are null. Negative balances represent supplier credit. The supplier-list API also computes period balances/counts from an inclusive optional `entry_date` range without changing the all-date current balance. Entry lists use `entry_date` and payment lists use `paid_on` for their inclusive date filters; these are DATE comparisons, not timestamp conversions. The entry-list endpoint accepts an optional supplier ID; omitting it lists all suppliers. Its aggregate count/increase/decrease/pending fields cover the complete filtered result before pagination. Entry responses include the supplier name; this field defaults to null for older immutable payment snapshots. Selection settlement links whole entries to a payment; undo clears all its entry links and increments revisions while preserving immutable payment snapshots and history. All mutations serialize on the supplier row, followed by current entry/payment locks. Stale revisions, mixed suppliers, duplicate selections, net-amount mismatches and negative-net payments are rejected before commit. Zero-net offsets are supported.
+
 ## customers
 
 | Column | Type | Notes |

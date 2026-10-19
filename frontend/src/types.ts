@@ -470,3 +470,80 @@ export interface GeneralReport {
   products: Array<{ key: string; name: string; quantity: string; revenue: string }>;
   days: Array<{ day: string; revenue: string }>;
 }
+export interface SupplierPayload {
+  name: string;
+  phone: string | null;
+  address: string | null;
+  note: string | null;
+  is_active: boolean;
+}
+
+export interface Supplier extends SupplierPayload {
+  id: number;
+  outstanding_amount: string;
+  pending_count: number;
+  period_outstanding_amount: string;
+  period_pending_count: number;
+}
+
+export type SupplierDebtKind = "purchase" | "increase" | "decrease";
+export interface SupplierDebtItemPayload { name: string; quantity: string; unit_price: string }
+export interface SupplierDebtEntryPayload {
+  supplier_id: number;
+  kind: SupplierDebtKind;
+  entry_date: string;
+  description: string;
+  note: string | null;
+  amount?: string;
+  items: SupplierDebtItemPayload[];
+}
+export interface SupplierDebtEntry extends SupplierDebtEntryPayload {
+  supplier_name?: string | null;
+  id: number;
+  code: string;
+  amount: string;
+  signed_amount: string;
+  revision: number;
+  payment_id: number | null;
+  cancelled_at: string | null;
+  created_at: string;
+  items: (SupplierDebtItemPayload & { id: number; line_total: string })[];
+}
+export interface SupplierDebtPaymentPayload {
+  supplier_id: number;
+  entries: { id: number; revision: number }[];
+  expected_amount: string;
+  paid_on: string;
+  method: "cash" | "transfer";
+  note: string | null;
+}
+export interface SupplierDebtPayment {
+  id: number;
+  code: string;
+  supplier_id: number;
+  supplier_name: string;
+  paid_on: string;
+  method: "cash" | "transfer";
+  amount: string;
+  note: string | null;
+  created_by_name: string | null;
+  cancelled_at: string | null;
+  cancel_reason: string | null;
+  entries: SupplierDebtEntry[];
+  created_at: string;
+}
+export interface SupplierDebtPage<T> { items: T[]; total: number; page: number; page_size: number }
+export interface SupplierDebtEntryPage extends SupplierDebtPage<SupplierDebtEntry> {
+  total_increase: string;
+  total_decrease: string;
+  pending_amount: string;
+}
+export interface SupplierDebtHistory {
+  id: number;
+  entry_id: number | null;
+  payment_id: number | null;
+  action: string;
+  actor_name: string | null;
+  occurred_at: string;
+  details: { reason?: string };
+}

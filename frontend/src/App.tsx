@@ -2,6 +2,8 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import type { ReactNode } from "react";
 
 import { Layout } from "./components/Layout";
+import { SupplierDebtsPage } from "./pages/SupplierDebtsPage";
+import { SupplierDebtEntryPage } from "./pages/SupplierDebtEntryPage";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { AccessControlPage } from "./pages/AccessControlPage";
 import { ForbiddenPage } from "./pages/ForbiddenPage";
@@ -36,6 +38,9 @@ export default function App() {
       <Routes>
         <Route path="/" element={hasPermission("dashboard.view") ? <DashboardPage /> : hasPermission("shipping.claim") ? <Navigate to="/shipping/claim" replace /> : <Navigate to="/forbidden" replace />} />
         <Route path="/customers" element={protect("customers.view", <CustomersPage />)} />
+        <Route path="/supplier-debts" element={protect("supplier_debts.view", <SupplierDebtsPage key="suppliers" />)} />
+        <Route path="/supplier-debts/entries" element={protect("supplier_debts.view", <SupplierDebtsPage key="supplier-entries" entriesOnly />)} />
+        <Route path="/supplier-debts/new" element={protect(["supplier_debts.view", "supplier_debts.manage"], <SupplierDebtEntryPage />)} />
         <Route path="/products" element={protect("products.view", <ProductsPage />)} />
         <Route path="/invoices" element={protect("invoices.view", <InvoicesPage />)} />
         <Route path="/invoices/new" element={protect("invoices.create", <InvoiceFormPage />)} />

@@ -9,6 +9,9 @@ class PermissionDefinition:
 
 
 PERMISSIONS = [
+    PermissionDefinition("supplier_debts.view", "Xem công nợ nhà cung cấp", "Công nợ nhà cung cấp"),
+    PermissionDefinition("supplier_debts.manage", "Quản lý nhà cung cấp và phiếu công nợ", "Công nợ nhà cung cấp"),
+    PermissionDefinition("supplier_debts.pay", "Thanh toán và hoàn tác công nợ nhà cung cấp", "Công nợ nhà cung cấp"),
     PermissionDefinition("dashboard.view", "Xem tổng quan", "Tổng quan"),
     PermissionDefinition("customers.view", "Xem khách hàng", "Khách hàng"),
     PermissionDefinition("customers.create", "Thêm khách hàng", "Khách hàng"),

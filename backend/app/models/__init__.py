@@ -1,4 +1,5 @@
 from app.database import Base
+from app.models.supplier_debt import Supplier, SupplierDebtEntry, SupplierDebtItem, SupplierDebtPayment, SupplierDebtHistory
 from app.models.data_migration import DataMigration, TimeNormalizationBackup
 from app.models.payment_note_setting import PaymentNoteSetting
 from app.models.customer import Customer, CustomerNameSearch
@@ -14,6 +15,11 @@ from app.models.shipper import Shipper
 from app.models.user import AuthSession, Permission, Role, User, role_permissions, user_roles
 
 __all__ = [
+    "Supplier",
+    "SupplierDebtEntry",
+    "SupplierDebtItem",
+    "SupplierDebtPayment",
+    "SupplierDebtHistory",
     "Base",
     "PaymentNoteSetting",
     "Customer",

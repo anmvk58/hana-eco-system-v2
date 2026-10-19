@@ -37,6 +37,12 @@ const navItems = [
   { to: "/shipping/received", label: "Đơn đã nhận", icon: History, permissions: ["shipping.claim"], shipperOnly: true },
 ];
 
+const supplierDebtNavItems = [
+  { to: "/supplier-debts", label: "Nhà cung cấp", icon: Users, permissions: ["supplier_debts.view"] },
+  { to: "/supplier-debts/entries", label: "Danh sách phiếu", icon: History, permissions: ["supplier_debts.view"] },
+  { to: "/supplier-debts/new", label: "Nhập phiếu công nợ", icon: ClipboardList, permissions: ["supplier_debts.view", "supplier_debts.manage"] },
+];
+
 const catalogNavItems = [
   { to: "/customers", label: "Khách hàng", icon: Users, permissions: ["customers.view"] },
   { to: "/products", label: "Sản phẩm", icon: Boxes, permissions: ["products.view"] },
@@ -73,6 +79,7 @@ const shipperManagementNavItem = {
 
 const pageTitleItems = [
   ...navItems,
+  ...supplierDebtNavItems,
   ...catalogNavItems,
   ...reportNavItems,
   ...shipManagementNavItems,
@@ -87,6 +94,9 @@ const pageTitleItems = [
 const routeTitles: Record<string, string> = {
   "/": "Tổng quan bán hàng",
   "/customers": "Quản lý khách hàng",
+  "/supplier-debts": "Nhà cung cấp",
+  "/supplier-debts/entries": "Danh sách phiếu công nợ",
+  "/supplier-debts/new": "Nhập phiếu công nợ",
   "/products": "Quản lý sản phẩm",
   "/invoices": "Danh sách hóa đơn",
   "/invoices/new": "Tạo hóa đơn bán hàng",
@@ -116,6 +126,7 @@ export function Layout({ children }: { children: ReactNode }) {
     () => location.pathname === "/customers" || location.pathname === "/products",
   );
   const [isReportsOpen, setIsReportsOpen] = useState(() => location.pathname.startsWith("/reports"));
+  const [isSupplierDebtOpen, setIsSupplierDebtOpen] = useState(() => location.pathname.startsWith("/supplier-debts"));
   const [isShipManagementOpen, setIsShipManagementOpen] = useState(() => location.pathname.startsWith("/ship-management"));
   const [isCodManagementOpen, setIsCodManagementOpen] = useState(() => location.pathname.startsWith("/cod-management"));
   const [isAccessControlOpen, setIsAccessControlOpen] = useState(() => location.pathname === "/access-control" || location.pathname.startsWith("/account/"));
@@ -127,6 +138,7 @@ export function Layout({ children }: { children: ReactNode }) {
   const isSalesPage = /^\/invoices\/(?:new|\d+\/edit)\/?$/.test(location.pathname);
   const title = isSalesPage ? "Bán hàng" : routeTitles[location.pathname] ?? (location.pathname.startsWith("/invoices/") ? "Chi tiết hóa đơn" : "Hana POS");
   const visibleCatalogItems = catalogNavItems.filter((item) => item.permissions.every(hasPermission));
+  const visibleSupplierDebtItems = supplierDebtNavItems.filter((item) => item.permissions.every(hasPermission));
   const visibleReportItems = reportNavItems.filter((item) => item.permissions.every(hasPermission));
   const visibleShipManagementItems = shipManagementNavItems.filter((item) => item.permissions.every(hasPermission));
   const visibleCodManagementItems = codManagementNavItems.filter((item) => item.permissions.every(hasPermission));
@@ -139,6 +151,7 @@ export function Layout({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     setIsMobileSidebarOpen(false);
+    if (location.pathname.startsWith("/supplier-debts")) setIsSupplierDebtOpen(true);
   }, [location.pathname]);
 
   async function handleLogout() {
@@ -262,6 +275,33 @@ export function Layout({ children }: { children: ReactNode }) {
                 {visibleCodManagementItems.map((item) => {
                   const Icon = item.icon;
                   return <NavLink key={item.to} to={item.to} title={item.label}><Icon size={17}/><span>{item.label}</span></NavLink>;
+                })}
+              </div> : null}
+            </div>
+          ) : null}
+          {visibleSupplierDebtItems.length > 0 ? (
+            <div className="nav-group">
+              <button
+                className={`nav-group-toggle${location.pathname.startsWith("/supplier-debts") ? " active" : ""}`}
+                type="button"
+                aria-expanded={isSupplierDebtOpen}
+                aria-controls="supplier-debt-navigation"
+                title="Công nợ"
+                onClick={() => {
+                  if (isSidebarCollapsed) {
+                    setIsSidebarCollapsed(false);
+                    setIsSupplierDebtOpen(true);
+                    return;
+                  }
+                  setIsSupplierDebtOpen((open) => !open);
+                }}
+              >
+                <Banknote size={18}/><span>Công nợ</span><ChevronDown className={`nav-group-chevron${isSupplierDebtOpen ? " open" : ""}`} size={17}/>
+              </button>
+              {isSupplierDebtOpen ? <div className="nav-group-items" id="supplier-debt-navigation">
+                {visibleSupplierDebtItems.map((item) => {
+                  const Icon = item.icon;
+                  return <NavLink key={item.to} to={item.to} title={item.label} end><Icon size={17}/><span>{item.label}</span></NavLink>;
                 })}
               </div> : null}
             </div>

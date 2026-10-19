@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+from app.api.routers import supplier_debts
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import inspect, text
 
@@ -32,6 +33,7 @@ def create_app() -> FastAPI:
     )
 
     app.include_router(customers.router, prefix=settings.api_prefix)
+    app.include_router(supplier_debts.router, prefix=settings.api_prefix)
     app.include_router(product_categories.router, prefix=settings.api_prefix)
     app.include_router(products.router, prefix=settings.api_prefix)
     app.include_router(invoices.router, prefix=settings.api_prefix)
