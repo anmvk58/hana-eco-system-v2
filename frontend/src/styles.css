@@ -5554,3 +5554,7 @@ label {
 .invoice-page-size-filter { width: 84px; }
 .invoice-page-size-filter .form-select-trigger { height: 36px; }
 @media (max-width: 700px) { .invoice-status-filter { flex: 1 1 190px; } }
+
+.internal-cod-session-invoices { overflow: auto; }
+.internal-cod-session-invoices .data-table { min-width: 760px; }
+.internal-cod-session-expression { white-space: pre-wrap; overflow-wrap: anywhere; }

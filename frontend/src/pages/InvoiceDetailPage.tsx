@@ -9,6 +9,7 @@ import { InvoiceReceipt } from "../components/InvoiceReceipt";
 import { Modal } from "../components/Modal";
 import { StatusBadge } from "../components/StatusBadge";
 import { ToastNotification } from "../components/ToastNotification";
+import { TransferPaymentButton } from "../components/TransferPaymentButton";
 import { AuditBadge } from "../components/AuditBadge";
 import type { InvoiceAuditLabel } from "../types";
 import type { Invoice, InvoiceHistory } from "../types";
@@ -103,6 +104,12 @@ export function InvoiceDetailPage() {
           <StatusBadge status={invoice.status} />
           <AuditBadge label={invoice.audit_label} />
           {invoice.is_paid_by_transfer ? <span className="invoice-payment-badge"><BadgeCheck size={16}/>Đã thanh toán chuyển khoản</span> : null}
+          {!invoice.is_paid_by_transfer ? <TransferPaymentButton invoice={invoice} disabled={rollingBack || rollbackOpen} onChanged={async () => {
+            const [invoiceData, historyData] = await Promise.all([api.invoices.get(id), hasPermission("invoices.history") ? api.invoices.history(id) : Promise.resolve([])]);
+            setInvoice(invoiceData);
+            setHistory(historyData);
+            setError("");
+          }}/> : null}
           {hasPermission("invoices.update") && invoice.status === "created" ? <Link className="secondary-button link-button" to={`/invoices/${invoice.id}/edit`}>
             <Edit size={16} />
             Sửa

@@ -151,6 +151,7 @@ def serialize_session(session: InternalCodCollectionSession) -> dict:
         "collected_at": session.collected_at,
         "collected_by_name": session.collected_by_user.display_name if session.collected_by_user else None,
         "note": session.note,
+        "amount_expression": session.amount_expression,
         "items": session.items,
         "created_at": session.created_at,
         "updated_at": session.updated_at,
@@ -222,6 +223,7 @@ def create_session(
             total_amount=total_amount,
             collected_at=now,
             collected_by_user_id=current_user.id,
+            amount_expression=payload.amount_expression.strip() if payload.amount_expression and payload.amount_expression.strip() else None,
             note=payload.note.strip() if payload.note and payload.note.strip() else None,
         )
         db.add(session)
@@ -233,6 +235,8 @@ def create_session(
                 invoice_id=invoice.id,
                 invoice_code=invoice.code,
                 customer_name=invoice.customer.name if invoice.customer else None,
+                customer_address=invoice.customer.address if invoice.customer else None,
+                total_extra_charges=invoice.total_extra_charges,
                 cod_amount=invoice.total_amount,
                 handed_over_at=invoice.audited_at,
                 delivered_at=invoice.delivered_at,

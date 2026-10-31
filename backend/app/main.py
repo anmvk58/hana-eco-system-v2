@@ -270,6 +270,24 @@ def ensure_internal_cod_collection_columns() -> None:
         return
     item_columns = {column["name"] for column in inspector.get_columns("internal_cod_collection_items")}
     with engine.begin() as connection:
+        session_columns = {column["name"] for column in inspector.get_columns("internal_cod_collection_sessions")}
+        if "amount_expression" not in session_columns:
+            connection.execute(text("ALTER TABLE internal_cod_collection_sessions ADD COLUMN amount_expression TEXT NULL"))
+        if "customer_address" not in item_columns:
+            connection.execute(text("ALTER TABLE internal_cod_collection_items ADD COLUMN customer_address VARCHAR(500) NULL"))
+            connection.execute(text("""
+                UPDATE internal_cod_collection_items AS item
+                JOIN invoices AS invoice ON invoice.id = item.invoice_id
+                JOIN customers AS customer ON customer.id = invoice.customer_id
+                SET item.customer_address = customer.address
+            """))
+        if "total_extra_charges" not in item_columns:
+            connection.execute(text("ALTER TABLE internal_cod_collection_items ADD COLUMN total_extra_charges DECIMAL(14,2) NULL"))
+            connection.execute(text("""
+                UPDATE internal_cod_collection_items AS item
+                JOIN invoices AS invoice ON invoice.id = item.invoice_id
+                SET item.total_extra_charges = invoice.total_extra_charges
+            """))
         if "handed_over_at" not in item_columns:
             connection.execute(text("ALTER TABLE internal_cod_collection_items ADD COLUMN handed_over_at DATETIME NULL"))
         connection.execute(text("""

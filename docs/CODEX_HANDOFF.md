@@ -83,6 +83,18 @@ Only the Cloudflare Tunnel connector is public-facing. Frontend and API ports ar
 
 ## 4. Implemented and completed
 
+### COD collection history details (2026-10-31)
+
+- Session details show per-invoice address and extra charges plus the original optional reconciliation amount expression. New collections snapshot these values in the collection transaction; the expression remains informational and does not change COD totals. Startup adds nullable columns, backfilling old item addresses/extra charges once from current customer/invoice data (not guaranteed historical values). Old expressions cannot be recovered and are shown as unavailable. Deploy frontend and API together; restart API for compatibility DDL. The history invoice table scrolls horizontally on narrow screens and long expressions wrap.
+
+- Verification: 82 backend unit tests (including three snapshot/expression regressions), frontend production build and Python compilation pass. MySQL compatibility DDL has not been exercised against a live database in this change.
+
+### Quick transfer payment from shipping handover (2026-10-31)
+
+- The unaudited-order list on `/ship-management` reuses `TransferPaymentButton` for COD orders, including its permission checks, confirmation dialog, optional transaction note and existing transfer API. Button/dialog mouse and keyboard events do not select the order for handover. The transfer flow locks date changes, refresh and handover while open; after confirmation the queue reloads while retaining eligible selected orders and recalculating the COD handover total.
+
+- Invoice details also expose the shared quick-transfer button beside the status/payment actions. Successful confirmation reloads the invoice receipt, payment badge and permitted history. Existing cancelled-order, external-handover and permission restrictions remain enforced by the shared component and API. Frontend production build passes.
+
 ### Invoice list dropdown styling (2026-10-19)
 
 - Invoice status and records-per-page controls reuse `FormSelect`, matching the supplier-entry dropdowns with primary icons, rounded fields/popups, hover/selection states and keyboard navigation. Their existing filter, pagination and URL callbacks are preserved. Shared `FormSelect` supports visually hidden accessible labels and a 160px minimum popup width for compact controls.

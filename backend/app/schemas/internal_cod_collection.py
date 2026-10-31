@@ -12,6 +12,7 @@ class InternalCodCollectionCreate(ORMBase):
     collection_date: date
     invoice_ids: list[int] = Field(min_length=1, max_length=500)
     note: str | None = Field(default=None, max_length=500)
+    amount_expression: str | None = Field(default=None, max_length=2000)
 
 
 class PendingInternalCodInvoiceRead(ORMBase):
@@ -45,6 +46,8 @@ class InternalCodCollectionItemRead(ORMBase):
     invoice_id: int
     invoice_code: str
     customer_name: str | None
+    customer_address: str | None = None
+    total_extra_charges: Decimal | None = None
     cod_amount: Decimal
     handed_over_at: datetime | None
     delivered_at: datetime | None
@@ -60,6 +63,7 @@ class InternalCodCollectionSessionRead(ORMBase):
     collected_at: datetime
     collected_by_name: str | None
     note: str | None
+    amount_expression: str | None = None
     items: list[InternalCodCollectionItemRead]
     created_at: datetime
     updated_at: datetime

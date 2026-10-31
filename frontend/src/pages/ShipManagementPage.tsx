@@ -7,6 +7,7 @@ import { DateRangePicker } from "../components/DateRangePicker";
 import { EmptyState } from "../components/EmptyState";
 import { Modal } from "../components/Modal";
 import { ToastNotification } from "../components/ToastNotification";
+import { TransferPaymentButton } from "../components/TransferPaymentButton";
 import type { ExternalAdvanceMethod, Invoice, ShipHandoverPayload } from "../types";
 import { formatNumberInput, money, normalizeInvoiceCodeSearch, normalizeNumberInput, numberText, todayInputValue } from "../utils/format";
 
@@ -20,6 +21,7 @@ export function ShipManagementPage() {
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [transferBusy, setTransferBusy] = useState(false);
   const [handoverIds, setHandoverIds] = useState<number[]>([]);
   const [modalOpen, setModalOpen] = useState(false);
   const [kind, setKind] = useState<HandoverKind>("external_shipper");
@@ -33,12 +35,13 @@ export function ShipManagementPage() {
   const [error, setError] = useState("");
   const [toast, setToast] = useState<{ title: string; message: string; variant: "success" | "warning" | "error" } | null>(null);
 
-  async function load(from: string, to: string) {
+  async function load(from: string, to: string, preserveSelection = false) {
     setLoading(true);
     setError("");
     try {
-      setInvoices(await api.shipManagement.unauditedInvoices(from, to));
-      setSelectedIds([]);
+      const updatedInvoices = await api.shipManagement.unauditedInvoices(from, to);
+      setInvoices(updatedInvoices);
+      setSelectedIds((ids) => preserveSelection ? ids.filter((id) => updatedInvoices.some((invoice) => invoice.id === id)) : []);
       setInvoiceCode("");
       setQuickAddError("");
     } catch (err) {
@@ -208,8 +211,8 @@ export function ShipManagementPage() {
       <div className="shipping-toolbar-copy"><h2 className="toolbar-title"><Handshake size={20}/>Quản lý đơn ship</h2><span className="field-hint">Chọn các đơn chưa audit trong khoảng ngày đã chọn để đánh dấu Khách lẻ hoặc bàn giao cho Ship Ngoài.</span></div>
       <span className="toolbar-spacer"/>
       <div className="ship-management-controls">
-        <DateRangePicker from={fromDate} to={toDate} onChange={changeDateRange}/>
-        <button className="secondary-button ship-management-refresh" disabled={loading || submitting || !fromDate || !toDate} onClick={() => void load(fromDate, toDate)}><RefreshCw size={17}/>Làm mới</button>
+        <DateRangePicker from={fromDate} to={toDate} onChange={changeDateRange} disabled={transferBusy}/>
+        <button className="secondary-button ship-management-refresh" disabled={loading || submitting || transferBusy || !fromDate || !toDate} onClick={() => void load(fromDate, toDate)}><RefreshCw size={17}/>Làm mới</button>
       </div>
     </section>
     {error ? <div className="alert error">{error}</div> : null}
@@ -229,7 +232,7 @@ export function ShipManagementPage() {
           {availableInvoices.map((invoice) => <article key={invoice.id} className={`ship-management-order${handoverIds.includes(invoice.id) ? " handover-success" : ""}`} role="checkbox" aria-checked="false" tabIndex={0} onClick={() => toggle(invoice.id)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); toggle(invoice.id); } }}>
             <div className="ship-management-order-main"><strong>{invoice.customer?.name ?? "Khách lẻ"}</strong><span>{invoice.customer?.phone || "Không có số điện thoại"}</span><small>{invoice.customer?.address || "Chưa có địa chỉ"}</small></div>
             <Link className="ship-management-order-code" to={`/invoices/${invoice.id}`} state={{ returnTo: "/ship-management" }} onClick={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()} aria-label={`Xem chi tiết ${invoice.code}`}>{invoice.code}</Link>
-            <div className="ship-management-order-payment">{invoice.is_paid_by_transfer ? <span className="invoice-payment-badge"><CheckCircle2 size={14}/>Đã chuyển khoản</span> : <span className="invoice-cod-badge">COD</span>}<strong>{numberText(invoice.total_amount)}</strong></div>
+            <div className="ship-management-order-payment">{invoice.is_paid_by_transfer ? <span className="invoice-payment-badge"><CheckCircle2 size={14}/>Đã chuyển khoản</span> : <span className="invoice-cod-badge">COD</span>}<strong>{numberText(invoice.total_amount)}</strong>{!invoice.is_paid_by_transfer ? <span onClick={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()}><TransferPaymentButton invoice={invoice} disabled={loading || submitting || transferBusy} onBusyChange={setTransferBusy} onChanged={() => load(fromDate, toDate, true)}/></span> : null}</div>
             <button className="ship-management-move-button add" type="button" onClick={(event) => { event.stopPropagation(); toggle(invoice.id); }} aria-label={`Chọn ${invoice.code}`}><ArrowRight size={18}/></button>
           </article>)}
           {!loading && availableInvoices.length === 0 ? <EmptyState title={invoices.length === 0 ? "Không còn đơn chưa audit" : "Đã chọn toàn bộ đơn"} description={invoices.length === 0 ? "Không có đơn hợp lệ trong khoảng ngày đã chọn." : "Các đơn đã được chuyển sang danh sách chuẩn bị bàn giao."}/> : null}
@@ -245,7 +248,7 @@ export function ShipManagementPage() {
         <div className="ship-management-handover-footer">
           <div><span>Tổng số đơn</span><strong>{selectedInvoices.length}</strong></div>
           <div><span>Tổng hóa đơn</span><strong>{money(handoverInvoiceTotal)}</strong></div>
-          <button className="primary-button" disabled={selectedIds.length === 0 || submitting} onClick={openHandoverModal}><Handshake size={17}/>Bàn giao {selectedIds.length || ""} đơn</button>
+          <button className="primary-button" disabled={selectedIds.length === 0 || submitting || transferBusy} onClick={openHandoverModal}><Handshake size={17}/>Bàn giao {selectedIds.length || ""} đơn</button>
         </div>
         <div className="ship-management-order-list selected-orders">
           {selectedInvoices.map((invoice) => <article key={invoice.id} className="ship-management-order selected-order">
@@ -258,7 +261,7 @@ export function ShipManagementPage() {
         </div>
       </div>
     </section>
-    <div className="shipping-mobile-actions" aria-label="Thao tác bàn giao"><button className="secondary-button shipping-mobile-refresh" disabled={loading || submitting} onClick={() => void load(fromDate, toDate)} aria-label="Làm mới danh sách"><RefreshCw size={19}/></button><button className="primary-button shipping-mobile-claim" disabled={selectedIds.length === 0 || submitting} onClick={openHandoverModal}><Handshake size={18}/><span>{selectedIds.length > 0 ? `Bàn giao ${selectedIds.length} đơn` : "Chọn đơn để bàn giao"}</span></button></div>
+    <div className="shipping-mobile-actions" aria-label="Thao tác bàn giao"><button className="secondary-button shipping-mobile-refresh" disabled={loading || submitting || transferBusy} onClick={() => void load(fromDate, toDate)} aria-label="Làm mới danh sách"><RefreshCw size={19}/></button><button className="primary-button shipping-mobile-claim" disabled={selectedIds.length === 0 || submitting || transferBusy} onClick={openHandoverModal}><Handshake size={18}/><span>{selectedIds.length > 0 ? `Bàn giao ${selectedIds.length} đơn` : "Chọn đơn để bàn giao"}</span></button></div>
 
     {modalOpen ? <Modal title={`Bàn giao ${selectedIds.length} đơn`} onClose={() => !submitting && setModalOpen(false)}>
       <form className="form-grid ship-handover-form" onSubmit={(event) => void submitHandover(event)}>

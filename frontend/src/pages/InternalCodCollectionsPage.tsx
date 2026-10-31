@@ -144,6 +144,7 @@ export function InternalCodCollectionsPage() {
         collection_date: collectionDate,
         invoice_ids: collecting.pending_invoices.map((invoice) => invoice.id),
         note: note.trim() || undefined,
+        amount_expression: amountExpression.trim() || undefined,
       });
       setCollecting(null);
       setNote("");
@@ -251,7 +252,7 @@ export function InternalCodCollectionsPage() {
       <form className="page-stack internal-cod-collection-form" onSubmit={(event) => void submitCollection(event)}>
         <section className="internal-cod-modal-summary"><article><small>Ngày bàn giao</small><strong>{dateOnly(collectionDate)}</strong></article><article><small>Tổng số đơn</small><strong>{collecting.handed_over_invoice_count} đơn</strong></article><article><small>Đơn COD chờ thu</small><strong>{collecting.pending_invoice_count} đơn</strong></article><article className="highlight"><small>Số tiền phải nộp đủ</small><strong>{money(collecting.pending_cod_amount)}</strong></article></section>
         <section className="internal-cod-calculator">
-          <label htmlFor="internal-cod-amount-expression"><span>Biểu thức số tiền đối chiếu</span><input id="internal-cod-amount-expression" type="text" inputMode="decimal" value={amountExpression} onChange={(event) => setAmountExpression(event.target.value)} placeholder="Ví dụ: 13*30 + 60 + 40 - 50" aria-describedby="internal-cod-calculator-help" /></label>
+          <label htmlFor="internal-cod-amount-expression"><span>Biểu thức số tiền đối chiếu</span><input id="internal-cod-amount-expression" maxLength={2000} type="text" inputMode="decimal" value={amountExpression} onChange={(event) => setAmountExpression(event.target.value)} placeholder="Ví dụ: 13*30 + 60 + 40 - 50" aria-describedby="internal-cod-calculator-help" /></label>
           <small id="internal-cod-calculator-help">Hỗ trợ số, dấu + − × ÷ và ngoặc. Kết quả chỉ dùng để đối chiếu.</small>
           {amountExpression.trim() && expressionTotal === null ? <p className="internal-cod-calculator-error">Biểu thức chưa hợp lệ. Kiểm tra phép tính và dấu ngoặc.</p> : null}
           <div className="internal-cod-calculator-results"><article><small>Tổng biểu thức</small><strong>{expressionTotal === null ? "—" : money(expressionTotal)}</strong></article><article className="highlight"><small>Còn phải nộp (tiền COD − biểu thức)</small><strong>{remainingAmount === null ? "—" : money(remainingAmount)}</strong></article></div>

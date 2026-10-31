@@ -19,6 +19,7 @@ class InternalCodCollectionSession(Base, TimestampMixin):
     total_amount: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False)
     collected_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, index=True, nullable=False)
     collected_by_user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), index=True, nullable=True)
+    amount_expression: Mapped[str | None] = mapped_column(Text, nullable=True)
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     shipper = relationship("Shipper")
@@ -42,6 +43,8 @@ class InternalCodCollectionItem(Base):
     invoice_id: Mapped[int] = mapped_column(ForeignKey("invoices.id"), index=True, nullable=False)
     invoice_code: Mapped[str] = mapped_column(String(60), nullable=False)
     customer_name: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    customer_address: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    total_extra_charges: Mapped[Decimal | None] = mapped_column(Numeric(14, 2), nullable=True)
     cod_amount: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False)
     handed_over_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     delivered_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)

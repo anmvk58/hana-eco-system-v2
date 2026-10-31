@@ -284,6 +284,8 @@ export interface InternalCodShipperSummary {
 }
 
 export interface InternalCodCollectionItem {
+  customer_address?: string | null;
+  total_extra_charges?: string | null;
   id: number;
   invoice_id: number;
   invoice_code: string;
@@ -294,6 +296,7 @@ export interface InternalCodCollectionItem {
 }
 
 export interface InternalCodCollectionSession {
+  amount_expression?: string | null;
   id: number;
   code: string;
   shipper_id: number;
@@ -309,6 +312,7 @@ export interface InternalCodCollectionSession {
 }
 
 export interface InternalCodCollectionCreatePayload {
+  amount_expression?: string;
   shipper_id: number;
   collection_date: string;
   invoice_ids: number[];
