@@ -87,6 +87,8 @@ Only the Cloudflare Tunnel connector is public-facing. Frontend and API ports ar
 
 - Session details show per-invoice address and extra charges plus the original optional reconciliation amount expression. New collections snapshot these values in the collection transaction; the expression remains informational and does not change COD totals. Startup adds nullable columns, backfilling old item addresses/extra charges once from current customer/invoice data (not guaranteed historical values). Old expressions cannot be recovered and are shown as unavailable. Deploy frontend and API together; restart API for compatibility DDL. The history invoice table scrolls horizontally on narrow screens and long expressions wrap.
 
+- History session invoice lists are capped at 45dvh/480px with independent vertical/horizontal scrolling and sticky table headers. The detail body can also scroll on short screens so notes, expression and close controls remain reachable.
+
 - Verification: 82 backend unit tests (including three snapshot/expression regressions), frontend production build and Python compilation pass. MySQL compatibility DDL has not been exercised against a live database in this change.
 
 ### Quick transfer payment from shipping handover (2026-10-31)

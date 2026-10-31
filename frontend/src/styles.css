@@ -5555,6 +5555,10 @@ label {
 .invoice-page-size-filter .form-select-trigger { height: 36px; }
 @media (max-width: 700px) { .invoice-status-filter { flex: 1 1 190px; } }
 
-.internal-cod-session-invoices { overflow: auto; }
+.internal-cod-collection-modal:has(> .internal-cod-session-detail) > .modal-header { flex: 0 0 auto; }
+.modal-panel.internal-cod-collection-modal > .internal-cod-session-detail { display: flex; flex: 1 1 auto; flex-direction: column; min-height: 0; overflow-y: auto; }
+.internal-cod-session-detail > * { flex-shrink: 0; }
+.internal-cod-session-invoices { flex: 0 0 auto; max-height: min(45dvh, 480px); min-height: 0; overflow: auto; overscroll-behavior: contain; }
+.internal-cod-session-invoices .data-table th { background: #f7faf9; position: sticky; top: 0; z-index: 1; }
 .internal-cod-session-invoices .data-table { min-width: 760px; }
 .internal-cod-session-expression { white-space: pre-wrap; overflow-wrap: anywhere; }
