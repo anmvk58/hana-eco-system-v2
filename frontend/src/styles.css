@@ -5562,3 +5562,8 @@ label {
 .internal-cod-session-invoices .data-table th { background: #f7faf9; position: sticky; top: 0; z-index: 1; }
 .internal-cod-session-invoices .data-table { min-width: 760px; }
 .internal-cod-session-expression { white-space: pre-wrap; overflow-wrap: anywhere; }
+
+.invoice-list-print-button { cursor: pointer; min-width: 40px; padding: 0; }
+@media print {
+  .invoice-list-page > :not(.auto-print-receipts) { display: none !important; }
+}

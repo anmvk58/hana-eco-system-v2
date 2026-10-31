@@ -1,5 +1,4 @@
-import { TransferPaymentButton } from "../components/TransferPaymentButton";
-import { ChevronLeft, ChevronRight, FileText, ListFilter, LoaderCircle, Phone, Search, UserRound, XCircle } from "lucide-react";
+import { ChevronLeft, ChevronRight, FileText, ListFilter, LoaderCircle, Phone, Printer, Search, UserRound, XCircle } from "lucide-react";
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 
@@ -7,6 +6,7 @@ import { api } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
 import { DateRangePicker } from "../components/DateRangePicker";
 import { FormSelect } from "../components/FormSelect";
+import { InvoiceReceipt } from "../components/InvoiceReceipt";
 import { EmptyState } from "../components/EmptyState";
 import { Modal } from "../components/Modal";
 import { StatusBadge } from "../components/StatusBadge";
@@ -58,6 +58,34 @@ export function InvoicesPage() {
   const [cancelError, setCancelError] = useState("");
   const [cancelling, setCancelling] = useState(false);
   const loadRequestId = useRef(0);
+  const [invoiceToPrint, setInvoiceToPrint] = useState<Invoice | null>(null);
+  const printContainerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!invoiceToPrint) return;
+    let cancelled = false;
+    const finishPrinting = () => setInvoiceToPrint(null);
+    window.addEventListener("afterprint", finishPrinting);
+    async function prepareAndPrint() {
+      try {
+        const images = Array.from(printContainerRef.current?.querySelectorAll("img") ?? []);
+        await Promise.all(images.map((image) => image.decode()));
+        if (document.fonts?.ready) await document.fonts.ready;
+        await new Promise<void>((resolve) => window.requestAnimationFrame(() => resolve()));
+        await new Promise<void>((resolve) => window.requestAnimationFrame(() => resolve()));
+        if (!cancelled) window.print();
+      } catch {
+        if (cancelled) return;
+        setError("Không chuẩn bị được hóa đơn để in. Vui lòng thử lại.");
+        setInvoiceToPrint(null);
+      }
+    }
+    void prepareAndPrint();
+    return () => {
+      cancelled = true;
+      window.removeEventListener("afterprint", finishPrinting);
+    };
+  }, [invoiceToPrint]);
 
   async function loadInvoices(
     requestedPage = page,
@@ -237,7 +265,7 @@ export function InvoicesPage() {
   );
 
   return (
-    <div className="page-stack">
+    <div className="page-stack invoice-list-page">
       <section className="toolbar standard-list-toolbar">
         <div className="search-box invoice-search-box">
           <FileText size={17} aria-hidden="true" />
@@ -344,13 +372,13 @@ export function InvoicesPage() {
                 <td>
                   <StatusBadge status={invoice.status} />
                 </td>
-                <td>{invoice.audit_label ? <AuditBadge label={invoice.audit_label} /> : null}</td>
+                <td>{invoice.audit_label === "internal_shipper" && invoice.assigned_shipper ? <span className="audit-badge internal_shipper">{invoice.assigned_shipper.user.display_name}</span> : invoice.audit_label ? <AuditBadge label={invoice.audit_label} /> : null}</td>
                 <td className="numeric">{numberText(invoice.subtotal)}</td>
                 <td className="numeric">{numberText(invoice.total_extra_charges)}</td>
                 <td className="numeric strong">{numberText(invoice.total_amount)}</td>
                 <td className="invoice-list-actions-cell">
                   <div className="invoice-list-actions">
-                  <TransferPaymentButton invoice={invoice} variant="invoice-list" onChanged={async () => { await loadInvoices(); }}/>
+                  {hasPermission("invoices.print") ? <button className="invoice-list-action-button invoice-list-edit-button invoice-list-print-button" type="button" disabled={invoiceToPrint !== null} onClick={() => { setError(""); setInvoiceToPrint(invoice); }} aria-label={`In nhanh ${invoice.code} (1 liên)`} title="In nhanh hóa đơn (1 liên)"><Printer size={16}/></button> : null}
                   <Link
                     className="invoice-list-action-button invoice-list-view-button"
                     to={`/invoices/${invoice.id}`}
@@ -423,6 +451,8 @@ export function InvoicesPage() {
           </button>
         </div>
       </section> : null}
+
+      {invoiceToPrint ? <div className="auto-print-receipts" ref={printContainerRef}><InvoiceReceipt invoice={invoiceToPrint} className="auto-print-receipt"/></div> : null}
 
       {cancellingInvoice ? (
         <Modal title="Xác nhận hủy hóa đơn" className="invoice-cancel-modal" onClose={closeCancelModal}>

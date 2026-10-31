@@ -83,6 +83,10 @@ Only the Cloudflare Tunnel connector is public-facing. Frontend and API ports ar
 
 ## 4. Implemented and completed
 
+### Invoice list quick printing and shipper names (2026-10-31)
+
+- Invoice-list quick transfer actions are replaced with a print icon guarded by `invoices.print`. Clicking prepares one shared 80mm receipt from the full invoice data already returned by the list API, waits for the logo/fonts/rendering and opens the native print dialog. Print styles hide the list/filter/pagination content; afterprint cleans up the receipt. Internal-shipper invoices replace the audit badge text with the assigned shipper name, retaining the internal-shipper badge styling, reusing the existing eager-loaded API relationship.
+
 ### COD collection history details (2026-10-31)
 
 - Session details show per-invoice address and extra charges plus the original optional reconciliation amount expression. New collections snapshot these values in the collection transaction; the expression remains informational and does not change COD totals. Startup adds nullable columns, backfilling old item addresses/extra charges once from current customer/invoice data (not guaranteed historical values). Old expressions cannot be recovered and are shown as unavailable. Deploy frontend and API together; restart API for compatibility DDL. The history invoice table scrolls horizontally on narrow screens and long expressions wrap.
