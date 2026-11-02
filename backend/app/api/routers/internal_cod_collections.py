@@ -20,7 +20,7 @@ router = APIRouter(prefix="/internal-cod-collections", tags=["internal-cod-colle
 @router.get("/summary", response_model=list[InternalCodShipperSummaryRead])
 def list_shipper_summaries(
     collection_date: date | None = None,
-    _: User = Depends(require_permission("shipping.manage")),
+    _: User = Depends(require_permission("internal_cod_collections.manage")),
     db: Session = Depends(get_db),
 ):
     return internal_cod_collection_service.list_shipper_summaries(db, collection_date)
@@ -31,7 +31,7 @@ def list_sessions(
     from_date: date | None = None,
     to_date: date | None = None,
     shipper_id: int | None = None,
-    _: User = Depends(require_permission("shipping.manage")),
+    _: User = Depends(require_permission("internal_cod_collections.manage")),
     db: Session = Depends(get_db),
 ):
     return internal_cod_collection_service.list_sessions(db, from_date, to_date, shipper_id)
@@ -40,7 +40,7 @@ def list_sessions(
 @router.get("/sessions/{session_id}", response_model=InternalCodCollectionSessionRead)
 def get_session(
     session_id: int,
-    _: User = Depends(require_permission("shipping.manage")),
+    _: User = Depends(require_permission("internal_cod_collections.manage")),
     db: Session = Depends(get_db),
 ):
     return internal_cod_collection_service.get_session(db, session_id)
@@ -49,7 +49,7 @@ def get_session(
 @router.post("/sessions", response_model=InternalCodCollectionSessionRead, status_code=201)
 def create_session(
     payload: InternalCodCollectionCreate,
-    current_user: User = Depends(require_permission("shipping.manage")),
+    current_user: User = Depends(require_permission("internal_cod_collections.manage")),
     db: Session = Depends(get_db),
 ):
     return internal_cod_collection_service.create_session(db, payload, current_user)

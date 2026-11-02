@@ -11,7 +11,7 @@ from app.services.access_control_service import ensure_defaults as ensure_access
 from app.services.extra_charge_setting_service import ensure_default_extra_charge_settings
 from app.services.invoice_service import backfill_invoice_revisions
 from app.services.payment_note_setting_service import ensure_defaults as ensure_payment_note_defaults
-from app.api.routers import payment_note_settings
+from app.api.routers import ahamove, payment_note_settings
 from app.services.ship_management_service import ensure_legacy_external_handover_batches
 from app.services.time_migration_service import ensure_utc_sale_times
 from app.services.search_index_service import ensure_search_indexes
@@ -44,6 +44,7 @@ def create_app() -> FastAPI:
     app.include_router(shippers.router, prefix=settings.api_prefix)
     app.include_router(shipping.router, prefix=settings.api_prefix)
     app.include_router(ship_management.router, prefix=settings.api_prefix)
+    app.include_router(ahamove.router, prefix=settings.api_prefix)
     app.include_router(internal_cod_collections.router, prefix=settings.api_prefix)
     app.include_router(order_reconciliation.router, prefix=settings.api_prefix)
     app.include_router(payment_note_settings.router, prefix=settings.api_prefix)
@@ -63,6 +64,8 @@ def create_app() -> FastAPI:
         ensure_invoice_revision_column()
         ensure_invoice_external_handoff_columns()
         ensure_internal_cod_collection_columns()
+        ensure_external_handover_batch_note_column()
+        ensure_external_handover_batch_completion_columns()
         ensure_search_indexes(engine)
         ensure_utc_sale_times(engine)
         with SessionLocal() as db:
@@ -296,6 +299,32 @@ def ensure_internal_cod_collection_columns() -> None:
             SET collection_item.handed_over_at = invoice.audited_at
             WHERE collection_item.handed_over_at IS NULL
         """))
+
+
+def ensure_external_handover_batch_note_column() -> None:
+    inspector = inspect(engine)
+    if not inspector.has_table("external_handover_batches"):
+        return
+    columns = {column["name"] for column in inspector.get_columns("external_handover_batches")}
+    with engine.begin() as connection:
+        for name in ("note", "transfer_note", "cash_note"):
+            if name not in columns:
+                connection.execute(text(f"ALTER TABLE external_handover_batches ADD COLUMN {name} TEXT NULL"))
+
+
+def ensure_external_handover_batch_completion_columns() -> None:
+    inspector = inspect(engine)
+    if not inspector.has_table("external_handover_batches"):
+        return
+    columns = {column["name"] for column in inspector.get_columns("external_handover_batches")}
+    with engine.begin() as connection:
+        if "completed_at" not in columns:
+            connection.execute(text("ALTER TABLE external_handover_batches ADD COLUMN completed_at DATETIME NULL"))
+        if "completed_by_user_id" not in columns:
+            if engine.dialect.name == "mysql":
+                connection.execute(text("ALTER TABLE external_handover_batches ADD COLUMN completed_by_user_id INT NULL, ADD CONSTRAINT fk_external_batch_completed_by FOREIGN KEY (completed_by_user_id) REFERENCES users(id)"))
+            else:
+                connection.execute(text("ALTER TABLE external_handover_batches ADD COLUMN completed_by_user_id INT NULL"))
 
 
 app = create_app()

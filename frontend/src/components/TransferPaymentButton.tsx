@@ -63,7 +63,7 @@ export function TransferPaymentButton({ invoice, disabled = false, variant = "co
     } finally { setSaving(false); }
   }
   return <>
-    <button className={buttonClass} type="button" aria-label={`Đánh dấu ${invoice.code} đã chuyển khoản`} disabled={disabled || external || saving} title={external ? "Cần điều chỉnh bảng giao Ship Ngoài trước khi đổi thanh toán" : "Đánh dấu đã chuyển khoản — xác nhận shop đã nhận đủ tiền"} onClick={() => { setNote(""); setError(""); setSuccess(false); setOpen(true); onBusyChange?.(true); }}><CreditCard size={16} aria-hidden="true"/></button>
+    <button className={buttonClass} type="button" aria-label={`Đánh dấu ${invoice.code} đã chuyển khoản`} disabled={disabled || external || saving} title={external ? "Cần điều chỉnh bảng giao Ship Ngoài trước khi đổi thanh toán" : "Đánh dấu đã chuyển khoản — xác nhận shop đã nhận đủ tiền"} onClick={() => { setNote(""); setError(""); setSuccess(false); setOpen(true); onBusyChange?.(true); }}>{variant === "compact" ? "Chuyển khoản" : <CreditCard size={16} aria-hidden="true"/>}</button>
     {open ? createPortal(<Modal title={`Đánh dấu ${invoice.code} đã chuyển khoản?`} onClose={close}>
       <div className="transfer-payment-confirmation">
         <p>{invoice.customer?.name || invoice.customer_name || "Khách lẻ"} · <strong>{money(invoice.total_amount)}</strong></p>

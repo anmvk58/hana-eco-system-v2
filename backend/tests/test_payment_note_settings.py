@@ -43,10 +43,11 @@ class PaymentNoteSettingsTests(unittest.TestCase):
         self.assertEqual(self.client.put("/api/payment-note-settings", json={"notes": ["A", "B", "C"]}).status_code, 403)
 
     def test_defaults_accessible_to_each_collection_permission(self):
-        for code in ("shipping.manage", "order_reconciliation.manage"):
+        for code in ("shipping.manage", "order_reconciliation.manage", "internal_cod_collections.manage"):
             self.permit(code)
             response = self.client.get("/api/payment-note-settings")
             self.assertEqual(response.status_code, 200)
+            self.assertEqual(self.client.put("/api/payment-note-settings", json={"notes": service.DEFAULT_PAYMENT_NOTES}).status_code, 200)
             self.assertEqual(response.json()["notes"], ["VPB hộ kd", "Techcombank", "VCB An"])
 
     def test_shared_config_persists_and_startup_does_not_reset(self):

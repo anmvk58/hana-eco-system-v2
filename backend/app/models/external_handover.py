@@ -2,7 +2,7 @@ from app.services.time_service import utc_now
 from datetime import datetime
 from decimal import Decimal
 
-from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, Numeric, String, UniqueConstraint
+from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, Numeric, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -18,6 +18,11 @@ class ExternalHandoverBatch(Base, TimestampMixin):
     status: Mapped[ExternalHandoverBatchStatus] = mapped_column(
         Enum(ExternalHandoverBatchStatus), default=ExternalHandoverBatchStatus.active, index=True, nullable=False
     )
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    completed_by_user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    transfer_note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    cash_note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)
     handed_over_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, index=True, nullable=False)
     advance_method: Mapped[ExternalAdvanceMethod] = mapped_column(Enum(ExternalAdvanceMethod), nullable=False)
     transfer_amount: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=0, nullable=False)

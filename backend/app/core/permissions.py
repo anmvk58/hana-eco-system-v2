@@ -8,6 +8,10 @@ class PermissionDefinition:
     module: str
 
 
+SYSTEM_ADMIN_ROLE_NAME = "Quản trị hệ thống"
+INTERNAL_SHIPPER_ROLE_NAME = "Shipper nội bộ"
+
+
 PERMISSIONS = [
     PermissionDefinition("supplier_debts.view", "Xem công nợ nhà cung cấp", "Công nợ nhà cung cấp"),
     PermissionDefinition("supplier_debts.manage", "Quản lý nhà cung cấp và phiếu công nợ", "Công nợ nhà cung cấp"),
@@ -34,7 +38,9 @@ PERMISSIONS = [
     PermissionDefinition("invoices.print", "In hóa đơn", "Hóa đơn"),
     PermissionDefinition("invoices.audit", "Gán nhãn audit hóa đơn", "Hóa đơn"),
     PermissionDefinition("shipping.claim", "Nhận đơn ship trong ngày", "Giao hàng"),
+    PermissionDefinition("ahamove.manage", "Quản lý và bàn giao đơn AHAMOVE", "AHAMOVE"),
     PermissionDefinition("shipping.manage", "Quản lý và bàn giao đơn ship", "Giao hàng"),
+    PermissionDefinition("internal_cod_collections.manage", "Thu tiền Ship Nội Bộ và xem lịch sử thu COD", "Quản lý tiền COD"),
     PermissionDefinition("order_reconciliation.manage", "Kiểm kê đơn và thu tiền", "Quản lý tiền COD"),
     PermissionDefinition("shippers.view", "Xem shipper nội bộ", "Giao hàng"),
     PermissionDefinition("shippers.create", "Thêm shipper nội bộ", "Giao hàng"),

@@ -1,0 +1,3 @@
+.batch-handover-note { margin-top: 8px; padding: 9px 11px; border: 1px solid #cfe3db; border-radius: 8px; background: #f1f8f4; color: #365b4a; max-width: 100%; }
+.batch-handover-note > strong { font-size: 11px; color: var(--teal-dark); }
+.batch-handover-note > p { display: block; margin: 4px 0 0; font-size: 13px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; }

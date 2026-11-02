@@ -33,8 +33,14 @@ const navItems = [
   { to: "/", label: "Tổng quan", icon: Gauge, permissions: ["dashboard.view"] },
   { to: "/invoices/new", label: "Bán hàng", icon: ShoppingCart, permissions: ["invoices.create"] },
   { to: "/invoices", label: "Hóa đơn", icon: ClipboardList, permissions: ["invoices.view"] },
+  { to: "/ahamove", label: "AHAMOVE", icon: Truck, permissions: ["ahamove.manage"] },
   { to: "/shipping/claim", label: "Nhận đơn ship", icon: PackageCheck, permissions: ["shipping.claim"], shipperOnly: true },
   { to: "/shipping/received", label: "Đơn đã nhận", icon: History, permissions: ["shipping.claim"], shipperOnly: true },
+];
+
+const ahamoveNavItems = [
+  { to: "/ahamove", label: "Bàn giao đơn", icon: Handshake },
+  { to: "/ahamove/handed-over", label: "Đã bàn giao", icon: PackageCheck },
 ];
 
 const supplierDebtNavItems = [
@@ -61,8 +67,8 @@ const shipManagementNavItems = [
 
 const codManagementNavItems = [
   { to: "/cod-management/order-reconciliation", label: "Kiểm kê đơn", icon: ClipboardCheck, permissions: ["order_reconciliation.manage"] },
-  { to: "/cod-management/internal-collections", label: "Thu tiền Ship Nội Bộ", icon: Banknote, permissions: ["shipping.manage"] },
-  { to: "/cod-management/internal-collection-history", label: "Lịch sử thu tiền COD", icon: History, permissions: ["shipping.manage"] },
+  { to: "/cod-management/internal-collections", label: "Thu tiền Ship Nội Bộ", icon: Banknote, permissions: ["internal_cod_collections.manage"] },
+  { to: "/cod-management/internal-collection-history", label: "Lịch sử thu tiền COD", icon: History, permissions: ["internal_cod_collections.manage"] },
 ];
 
 const accessControlNavItems = [
@@ -78,7 +84,8 @@ const shipperManagementNavItem = {
 };
 
 const pageTitleItems = [
-  ...navItems,
+  ...navItems.filter(item => item.to !== "/ahamove"),
+  ...ahamoveNavItems,
   ...supplierDebtNavItems,
   ...catalogNavItems,
   ...reportNavItems,
@@ -107,6 +114,8 @@ const routeTitles: Record<string, string> = {
   "/shippers": "Quản lý shipper nội bộ",
   "/shipping/claim": "Nhận đơn ship",
   "/shipping/received": "Đơn đã nhận",
+  "/ahamove": "AHAMOVE · Bàn giao đơn",
+  "/ahamove/handed-over": "AHAMOVE · Đã bàn giao",
   "/ship-management": "Quản lý đơn ship",
   "/ship-management/internal-handover": "Bàn giao Ship Nội Bộ",
   "/cod-management/internal-collections": "Thu tiền Ship Nội Bộ",
@@ -125,6 +134,7 @@ export function Layout({ children }: { children: ReactNode }) {
   const [isCatalogOpen, setIsCatalogOpen] = useState(
     () => location.pathname === "/customers" || location.pathname === "/products",
   );
+  const [isAhamoveOpen, setIsAhamoveOpen] = useState(() => location.pathname.startsWith("/ahamove"));
   const [isReportsOpen, setIsReportsOpen] = useState(() => location.pathname.startsWith("/reports"));
   const [isSupplierDebtOpen, setIsSupplierDebtOpen] = useState(() => location.pathname.startsWith("/supplier-debts"));
   const [isShipManagementOpen, setIsShipManagementOpen] = useState(() => location.pathname.startsWith("/ship-management"));
@@ -151,6 +161,7 @@ export function Layout({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     setIsMobileSidebarOpen(false);
+    if (location.pathname.startsWith("/ahamove")) setIsAhamoveOpen(true);
     if (location.pathname.startsWith("/supplier-debts")) setIsSupplierDebtOpen(true);
   }, [location.pathname]);
 
@@ -183,6 +194,20 @@ export function Layout({ children }: { children: ReactNode }) {
         </div>
         <nav className="side-nav">
           {navItems.filter((item) => item.permissions.every(hasPermission) && (!("shipperOnly" in item) || !item.shipperOnly || Boolean(currentUser?.shipper_id))).map((item) => {
+            if (item.to === "/ahamove") return (
+              <div className="nav-group" key={item.to}>
+                <button className={`nav-group-toggle${location.pathname.startsWith("/ahamove") ? " active" : ""}`} type="button" aria-expanded={isAhamoveOpen} aria-controls="ahamove-navigation" title="AHAMOVE" onClick={() => {
+                  if (isSidebarCollapsed) { setIsSidebarCollapsed(false); setIsAhamoveOpen(true); return; }
+                  setIsAhamoveOpen(open => !open);
+                }}>
+                  <Truck size={18}/><span>AHAMOVE</span><ChevronDown className={`nav-group-chevron${isAhamoveOpen ? " open" : ""}`} size={17}/>
+                </button>
+                {isAhamoveOpen ? <div className="nav-group-items" id="ahamove-navigation">{ahamoveNavItems.map(child => {
+                  const ChildIcon = child.icon;
+                  return <NavLink key={child.to} to={child.to} title={child.label} end><ChildIcon size={17}/><span>{child.label}</span></NavLink>;
+                })}</div> : null}
+              </div>
+            );
             const Icon = item.icon;
             return (
               <NavLink key={item.to} to={item.to} title={item.label} end={item.to === "/" || item.to === "/invoices" || item.to === "/reports"}>

@@ -32,6 +32,7 @@ import type {
   LoginResponse,
   SoldProductReportRow,
   ShipHandoverPayload,
+  AhamoveHandoverPayload,
   InternalShipperHandoverPayload,
   InternalShipperAssignment,
   InternalCodCollectionCreatePayload,
@@ -195,6 +196,15 @@ export const api = {
     claimedInvoices: (fromDate?: string, toDate?: string) => request<Invoice[]>("/shipping/claimed-invoices", {}, { from_date: fromDate, to_date: toDate }),
     claim: (invoiceIds: number[]) => request<Invoice[]>("/shipping/claim", { method: "POST", body: JSON.stringify({ invoice_ids: invoiceIds }) }),
     markDelivered: (invoiceId: number) => request<Invoice>(`/shipping/invoices/${invoiceId}/delivered`, { method: "POST" }),
+  },
+  ahamove: {
+    completeBatch: (id: number, transferNote: string, cashNote: string, expectedNote: string | null) =>
+      request<ExternalHandoverBatch>(`/ahamove/external-handover-batches/${id}/complete`, { method: "POST", body: JSON.stringify({ transfer_note: transferNote, cash_note: cashNote, expected_note: expectedNote }) }),
+    externalBatches: (fromDate?: string, toDate?: string) =>
+      request<ExternalHandoverBatch[]>("/ahamove/external-handover-batches", {}, { from_date: fromDate, to_date: toDate }),
+    unauditedInvoices: (fromDate?: string, toDate?: string) =>
+      request<Invoice[]>("/ahamove/unaudited-invoices", {}, { from_date: fromDate, to_date: toDate }),
+    handover: (payload: AhamoveHandoverPayload) => request<Invoice[]>("/ahamove/handover", { method: "POST", body: JSON.stringify(payload) }),
   },
   shipManagement: {
     unauditedInvoices: (fromDate?: string, toDate?: string) =>

@@ -9,7 +9,7 @@ from app.services import payment_note_setting_service
 
 
 router = APIRouter(prefix="/payment-note-settings", tags=["payment-note-settings"])
-manage_payment_notes = require_any_permission("shipping.manage", "order_reconciliation.manage")
+manage_payment_notes = require_any_permission("shipping.manage", "order_reconciliation.manage", "internal_cod_collections.manage")
 
 
 @router.get("", response_model=PaymentNoteSettings)

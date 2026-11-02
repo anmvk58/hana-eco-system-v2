@@ -5337,14 +5337,11 @@ label {
 .transfer-payment-confirmation textarea { min-height: 80px; }
 .transfer-payment-confirmation .modal-actions { align-items: center; display: flex; flex-wrap: wrap; gap: 10px; justify-content: flex-end; }
 .transfer-payment-result { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 0; border-top: 1px solid #e2e8f0; }
-.secondary-button.transfer-payment-button { width: 34px; min-width: 34px; padding: 0; flex: 0 0 auto; gap: 0; justify-content: center; align-self: center; }
+.secondary-button.transfer-payment-button { background: var(--secondary); border: 1px solid var(--secondary); color: #fff; font-weight: 600; width: auto; min-width: 0; max-width: 100%; padding: 7px 10px; flex: 0 1 auto; gap: 0; justify-content: center; align-self: center; white-space: normal; text-align: center; }
+.secondary-button.transfer-payment-button:hover:not(:disabled) { filter: brightness(.92); }
 .invoice-list-action-button.transfer-payment-button { flex: 0 0 auto; cursor: pointer; }
 .external-invoice-payment-actions { display: inline-flex; align-items: center; gap: 6px; }
-.external-invoice-payment-actions .transfer-payment-button,
-.internal-cod-invoice-list .transfer-payment-button { background: var(--secondary); border-color: var(--secondary); color: #fff; }
-.external-invoice-payment-actions .transfer-payment-button:hover:not(:disabled),
-.internal-cod-invoice-list .transfer-payment-button:hover:not(:disabled) { filter: brightness(.92); }
-.order-reconciliation-card footer > .transfer-payment-button { width: 38px; min-width: 38px; min-height: 38px; flex: 0 0 auto; }
+.order-reconciliation-card footer > .transfer-payment-button { width: auto; min-width: 0; min-height: 38px; flex: 0 1 auto; }
 /* Standalone supplier debt ledger. */
 .supplier-toolbar { align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
 .supplier-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }

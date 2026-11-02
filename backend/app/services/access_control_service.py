@@ -4,7 +4,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
 from app.api.deps import permission_codes
-from app.core.permissions import ALL_PERMISSION_CODES, PERMISSIONS
+from app.core.permissions import ALL_PERMISSION_CODES, INTERNAL_SHIPPER_ROLE_NAME, PERMISSIONS, SYSTEM_ADMIN_ROLE_NAME
 from app.core.security import hash_password
 from app.models.user import AuthSession, Permission, Role, User
 from app.schemas.access_control import ResetPasswordPayload, RolePayload, UserPayload, UserUpdate
@@ -20,7 +20,6 @@ def role_query():
 
 def ensure_defaults(db: Session) -> None:
     existing = {item.code: item for item in db.scalars(select(Permission)).all()}
-    reconciliation_permission_was_missing = "order_reconciliation.manage" not in existing
     reset_password_permission_was_missing = "users.reset_password" not in existing
     for definition in PERMISSIONS:
         item = existing.get(definition.code)
@@ -33,15 +32,6 @@ def ensure_defaults(db: Session) -> None:
             existing[definition.code] = item
     db.flush()
 
-    if reconciliation_permission_was_missing:
-        legacy_shipping_roles = db.scalars(
-            role_query().where(Role.permissions.any(Permission.code == "shipping.manage"))
-        ).all()
-        reconciliation_permission = existing["order_reconciliation.manage"]
-        for role in legacy_shipping_roles:
-            if reconciliation_permission not in role.permissions:
-                role.permissions.append(reconciliation_permission)
-
     if reset_password_permission_was_missing:
         legacy_user_admin_roles = db.scalars(
             role_query().where(Role.permissions.any(Permission.code == "users.update"))
@@ -51,16 +41,17 @@ def ensure_defaults(db: Session) -> None:
             if reset_password_permission not in role.permissions:
                 role.permissions.append(reset_password_permission)
 
-    admin_role = db.scalar(role_query().where(Role.name == "Quản trị hệ thống"))
+    admin_role = db.scalar(role_query().where(Role.name == SYSTEM_ADMIN_ROLE_NAME))
     if not admin_role:
-        admin_role = Role(name="Quản trị hệ thống", description="Toàn quyền hệ thống", is_system=True)
+        admin_role = Role(name=SYSTEM_ADMIN_ROLE_NAME, description="Toàn quyền hệ thống", is_system=True)
         db.add(admin_role)
+    admin_role.is_system = True
     admin_role.permissions = list(existing.values())
 
-    shipper_role = db.scalar(role_query().where(Role.name == "Shipper nội bộ"))
+    shipper_role = db.scalar(role_query().where(Role.name == INTERNAL_SHIPPER_ROLE_NAME))
     if not shipper_role:
         shipper_role = Role(
-            name="Shipper nội bộ",
+            name=INTERNAL_SHIPPER_ROLE_NAME,
             description="Nhận các đơn giao hàng được tạo trong ngày",
             is_system=True,
         )
@@ -156,15 +147,15 @@ def resolve_roles(db: Session, role_ids: list[int]) -> list[Role]:
 
 def save_user(db: Session, payload: UserPayload | UserUpdate, user: User | None = None, current_user: User | None = None) -> User:
     user = user or User()
-    was_active_admin = bool(user.id and user.is_active and any(role.is_system for role in user.roles))
+    was_active_admin = bool(user.id and user.is_active and any(role.is_system and role.name == SYSTEM_ADMIN_ROLE_NAME for role in user.roles))
     changes = payload.model_dump(exclude_unset=True, exclude={"role_ids", "password"})
     if current_user and user.id == current_user.id and changes.get("is_active") is False:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Không thể tự khóa tài khoản đang sử dụng")
     next_roles = resolve_roles(db, payload.role_ids) if payload.role_ids is not None else list(user.roles)
-    remains_active_admin = changes.get("is_active", user.is_active) and any(role.is_system for role in next_roles)
+    remains_active_admin = changes.get("is_active", user.is_active) and any(role.is_system and role.name == SYSTEM_ADMIN_ROLE_NAME for role in next_roles)
     if was_active_admin and not remains_active_admin:
         active_admins = db.scalar(
-            select(func.count()).select_from(User).where(User.is_active.is_(True), User.roles.any(Role.is_system.is_(True)))
+            select(func.count()).select_from(User).where(User.is_active.is_(True), User.roles.any((Role.is_system.is_(True)) & (Role.name == SYSTEM_ADMIN_ROLE_NAME)))
         ) or 0
         if active_admins <= 1:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Phải giữ ít nhất một quản trị viên hoạt động")
@@ -190,9 +181,9 @@ def deactivate_user(db: Session, user_id: int, current_user: User) -> None:
     user = get_user(db, user_id)
     if user.id == current_user.id:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Không thể tự khóa tài khoản đang sử dụng")
-    if any(role.is_system for role in user.roles):
+    if any(role.is_system and role.name == SYSTEM_ADMIN_ROLE_NAME for role in user.roles):
         active_admins = db.scalar(
-            select(func.count()).select_from(User).where(User.is_active.is_(True), User.roles.any(Role.is_system.is_(True)))
+            select(func.count()).select_from(User).where(User.is_active.is_(True), User.roles.any((Role.is_system.is_(True)) & (Role.name == SYSTEM_ADMIN_ROLE_NAME)))
         ) or 0
         if active_admins <= 1:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Phải giữ ít nhất một quản trị viên hoạt động")

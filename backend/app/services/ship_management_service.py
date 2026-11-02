@@ -14,7 +14,8 @@ from app.models.invoice import Invoice
 from app.models.retail_invoice_collection import RetailInvoiceCollection
 from app.models.shipper import Shipper
 from app.models.user import User
-from app.schemas.external_handover import ExternalHandoverBatchUpdate
+from app.schemas.ahamove import AhamoveBatchComplete
+from app.schemas.external_handover import ExternalHandoverBatchNoteUpdate, ExternalHandoverBatchUpdate
 from app.schemas.invoice import ExternalHandoffCreate, InternalShipperHandover, InternalShipperRecall, InvoiceBulkAuditAssign
 from app.services import invoice_service
 from app.services.time_service import VIETNAM_TIMEZONE, vietnam_day_utc_bounds, vietnam_date_conditions, utc_to_vietnam
@@ -338,7 +339,10 @@ def batch_query():
 
 def serialize_batch(batch: ExternalHandoverBatch) -> dict:
     return {
-        "id": batch.id, "code": batch.code, "status": batch.status, "handed_over_at": batch.handed_over_at,
+        "id": batch.id, "code": batch.code, "note": batch.note, "status": batch.status,
+        "transfer_note": batch.transfer_note, "cash_note": batch.cash_note,
+        "handover_status": "completed" if batch.completed_at else "created",
+        "completed_at": batch.completed_at, "completed_by_user_id": batch.completed_by_user_id, "handed_over_at": batch.handed_over_at,
         "advance_method": batch.advance_method, "transfer_amount": batch.transfer_amount,
         "cash_amount": batch.cash_amount, "shipping_fee": batch.shipping_fee, "advance_amount": batch.advance_amount,
         "created_by_name": batch.created_by_user.display_name if batch.created_by_user else None,
@@ -351,10 +355,10 @@ def serialize_batch(batch: ExternalHandoverBatch) -> dict:
     }
 
 
-def list_batches(db: Session, from_date: date | None, to_date: date | None) -> list[dict]:
+def list_batches(db: Session, from_date: date | None, to_date: date | None, *, active_only: bool = False) -> list[dict]:
     if from_date and to_date and from_date > to_date:
         raise HTTPException(status_code=422, detail="Ngày bắt đầu không được sau ngày kết thúc")
-    conditions = []
+    conditions = [ExternalHandoverBatch.status == ExternalHandoverBatchStatus.active] if active_only else []
     conditions.extend(vietnam_date_conditions(ExternalHandoverBatch.handed_over_at, from_date, to_date))
     batches = db.scalars(
         batch_query().where(*conditions)
@@ -480,3 +484,42 @@ def ensure_legacy_external_handover_batches(db: Session) -> None:
             db.add(ExternalHandoverBatchItem(batch_id=batch.id, invoice_id=invoice.id, added_by_user_id=invoice.audited_by_user_id))
     if groups:
         db.commit()
+
+
+def update_batch_note(db: Session, batch_id: int, payload: ExternalHandoverBatchNoteUpdate, current_user: User) -> dict:
+    try:
+        batch = get_batch_model(db, batch_id, for_update=True)
+        if batch.status != ExternalHandoverBatchStatus.active:
+            raise HTTPException(status_code=409, detail="Tập bàn giao đã hủy, không thể sửa ghi chú")
+        if batch.reconciliation is not None:
+            raise HTTPException(status_code=409, detail="Tập bàn giao đã kiểm kê, không thể sửa ghi chú")
+        if batch.note != payload.expected_note:
+            raise HTTPException(status_code=409, detail="Ghi chú đã được thay đổi. Vui lòng đóng và mở lại để xem nội dung mới nhất")
+        batch.note = payload.note
+        batch.updated_by_user_id = current_user.id
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+    return get_batch(db, batch_id)
+
+
+def complete_batch(db: Session, batch_id: int, payload: AhamoveBatchComplete, current_user: User) -> dict:
+    try:
+        batch = get_batch_model(db, batch_id, for_update=True)
+        if batch.status != ExternalHandoverBatchStatus.active:
+            raise HTTPException(status_code=409, detail="Tập bàn giao đã hủy, không thể hoàn thành")
+        if batch.completed_at is not None:
+            raise HTTPException(status_code=409, detail="Tập bàn giao đã hoàn thành trước đó")
+        if batch.note != payload.expected_note:
+            raise HTTPException(status_code=409, detail="Ghi chú bàn giao đã thay đổi. Vui lòng tải lại danh sách trước khi hoàn thành")
+        batch.transfer_note = payload.transfer_note
+        batch.cash_note = payload.cash_note
+        batch.completed_at = utc_now()
+        batch.completed_by_user_id = current_user.id
+        batch.updated_by_user_id = current_user.id
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+    return get_batch(db, batch_id)

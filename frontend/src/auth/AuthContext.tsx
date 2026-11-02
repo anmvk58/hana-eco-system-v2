@@ -1,7 +1,7 @@
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 
-import { api } from "../api/client";
+import { ApiError, api } from "../api/client";
 import type { User } from "../types";
 
 interface AuthValue {
@@ -20,6 +20,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const refreshVersion = useRef(0);
 
   function clearSession() {
     localStorage.removeItem("hana-access-token");
@@ -28,16 +29,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setError("");
   }
 
-  async function refresh() {
+  async function refresh(background = false) {
+    const version = ++refreshVersion.current;
     const token = localStorage.getItem("hana-access-token");
     if (!token) { setCurrentUser(null); setLoading(false); return; }
-    setLoading(true); setError("");
+    if (!background) { setLoading(true); setError(""); }
     try {
       const user = await api.auth.me();
-      if (localStorage.getItem("hana-access-token") === token) setCurrentUser(user);
+      if (refreshVersion.current === version && localStorage.getItem("hana-access-token") === token) {
+        setCurrentUser(user);
+        setError("");
+      }
     }
-    catch { clearSession(); }
-    finally { setLoading(false); }
+    catch (err) {
+      if (refreshVersion.current === version && localStorage.getItem("hana-access-token") === token) {
+        if (err instanceof ApiError && err.status === 401) clearSession();
+        else if (!background) setError(err instanceof Error ? err.message : "Không tải được quyền truy cập");
+      }
+    }
+    finally { if (!background) setLoading(false); }
   }
 
   async function login(username: string, password: string) {
@@ -69,8 +79,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     void refresh();
     const expired = () => clearSession();
+    const syncPermissions = () => {
+      if (document.visibilityState === "visible") void refresh(true);
+    };
+    const syncSession = (event: StorageEvent) => {
+      if (event.key === "hana-access-token") void refresh();
+    };
     window.addEventListener("hana-auth-expired", expired);
-    return () => window.removeEventListener("hana-auth-expired", expired);
+    window.addEventListener("focus", syncPermissions);
+    document.addEventListener("visibilitychange", syncPermissions);
+    window.addEventListener("storage", syncSession);
+    const timer = window.setInterval(syncPermissions, 60_000);
+    return () => {
+      window.removeEventListener("hana-auth-expired", expired);
+      window.removeEventListener("focus", syncPermissions);
+      document.removeEventListener("visibilitychange", syncPermissions);
+      window.removeEventListener("storage", syncSession);
+      window.clearInterval(timer);
+    };
   }, []);
 
   const hasPermission = (code: string) => currentUser?.permissions.includes(code) ?? false;

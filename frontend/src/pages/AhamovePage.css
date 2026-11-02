@@ -1,0 +1,78 @@
+.ahamove-page { padding-bottom: 0; }
+.ahamove-page .ship-management-workspace {
+  align-items: start;
+  min-height: 0;
+}
+.ahamove-page .available-column,
+.ahamove-page .selected-column {
+  height: calc(100dvh - 210px);
+  min-height: 400px;
+}
+.ahamove-page .ship-management-handover-footer {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+  padding: 8px;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.ahamove-page .ship-management-handover-footer > div span { font-size: 12px; }
+.ahamove-page .ship-management-handover-footer > div strong {
+  font-size: clamp(12px, 1.2vw, 17px);
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+.ahamove-page .ship-management-handover-footer small { color: var(--muted); font-size: 11px; }
+.ahamove-page .selected-orders {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  margin: 12px;
+  flex: 1;
+  height: auto;
+  max-height: none;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+.ahamove-page .selected-orders .empty-state { min-height: 80px; }
+.ahamove-page .ahamove-handover-form {
+  flex: 0 0 auto;
+  padding: 12px;
+  margin: auto 0 0;
+  background: #fff;
+  border-top: 1px solid var(--line);
+  box-shadow: 0 -4px 18px rgba(21, 55, 51, .06);
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 10px;
+}
+.ahamove-page .ahamove-handover-form > .span-2 { grid-column: auto; }
+.ahamove-page .ahamove-form-fields {
+  border: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}
+.ahamove-page .handover-finance-card { padding: 0; border: 0; background: transparent; gap: 8px; }
+.ahamove-page .handover-calculation-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.ahamove-page .handover-money-input input { font-size: 18px; }
+.ahamove-page .handover-form-actions { margin: 0; padding: 0; border: 0; }
+.ahamove-page .handover-form-actions .primary-button {
+  width: 100%;
+  min-width: 0;
+  white-space: nowrap;
+  min-height: 46px;
+  font-size: 16px;
+}
+@media (max-width: 760px) {
+  .ahamove-page .available-column { height: 45dvh; min-height: 260px; }
+  .ahamove-page .selected-column { height: 70dvh; min-height: 400px; }
+  .ahamove-page .ahamove-handover-form { padding: 10px 8px; gap: 6px; }
+  .ahamove-page .handover-calculation-fields { gap: 6px; }
+  .ahamove-page .handover-calculation-fields label { font-size: 11px; }
+  .ahamove-page .handover-money-input input { font-size: 16px; padding-left: 6px; }
+  .ahamove-page .handover-form-actions .primary-button { font-size: 12px; padding: 8px; gap: 4px; }
+  .ahamove-page .ship-management-handover-footer > div strong { font-size: 13px; }
+}

@@ -239,6 +239,12 @@ export interface ExternalHandoffPayload {
   cash_amount: string;
 }
 
+export interface AhamoveHandoverPayload {
+  invoice_ids: number[];
+  audit_label: "external_shipper";
+  external_handoff: ExternalHandoffPayload;
+}
+
 export interface ShipHandoverPayload {
   invoice_ids: number[];
   audit_label: "retail" | "external_shipper";
@@ -354,6 +360,12 @@ export interface ExternalHandoverBatchItem {
 }
 
 export interface ExternalHandoverBatch {
+  transfer_note?: string | null;
+  cash_note?: string | null;
+  handover_status?: "created" | "completed";
+  completed_at?: string | null;
+  completed_by_user_id?: number | null;
+  note?: string | null;
   id: number;
   code: string;
   status: ExternalHandoverBatchStatus;

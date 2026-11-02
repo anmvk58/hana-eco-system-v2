@@ -19,6 +19,8 @@ import { SoldProductsReportPage } from "./pages/SoldProductsReportPage";
 import { ShippersPage } from "./pages/ShippersPage";
 import { ShippingClaimPage } from "./pages/ShippingClaimPage";
 import { ShippingReceivedPage } from "./pages/ShippingReceivedPage";
+import { AhamoveHandedOverPage } from "./pages/AhamoveHandedOverPage";
+import { AhamovePage } from "./pages/AhamovePage";
 import { ShipManagementPage } from "./pages/ShipManagementPage";
 import { InternalShipperHandoverPage } from "./pages/InternalShipperHandoverPage";
 import { InternalCodCollectionsPage } from "./pages/InternalCodCollectionsPage";
@@ -53,10 +55,12 @@ export default function App() {
         <Route path="/shippers" element={protect("shippers.view", <ShippersPage />)} />
         <Route path="/shipping/claim" element={protect("shipping.claim", <ShippingClaimPage />)} />
         <Route path="/shipping/received" element={protect("shipping.claim", <ShippingReceivedPage />)} />
+        <Route path="/ahamove/handed-over" element={protect("ahamove.manage", <AhamoveHandedOverPage />)} />
+        <Route path="/ahamove" element={protect("ahamove.manage", <AhamovePage />)} />
         <Route path="/ship-management" element={protect("shipping.manage", <ShipManagementPage />)} />
         <Route path="/ship-management/internal-handover" element={protect("shipping.manage", <InternalShipperHandoverPage />)} />
-        <Route path="/cod-management/internal-collections" element={protect("shipping.manage", <InternalCodCollectionsPage />)} />
-        <Route path="/cod-management/internal-collection-history" element={protect("shipping.manage", <InternalCodCollectionHistoryPage />)} />
+        <Route path="/cod-management/internal-collections" element={protect("internal_cod_collections.manage", <InternalCodCollectionsPage />)} />
+        <Route path="/cod-management/internal-collection-history" element={protect("internal_cod_collections.manage", <InternalCodCollectionHistoryPage />)} />
         <Route path="/cod-management/order-reconciliation" element={protect("order_reconciliation.manage", <OrderReconciliationPage />)} />
         <Route path="/ship-management/internal-cod-collections" element={<Navigate to="/cod-management/internal-collections" replace />} />
         <Route path="/ship-management/external-batches" element={protect("shipping.manage", <ExternalHandoverBatchesPage />)} />
