@@ -27,6 +27,7 @@ export function InvoicesPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const productCode = searchParams.get("product_code") ?? "";
   const productName = searchParams.get("product_name") ?? productCode;
+  const [withoutCustomer, setWithoutCustomer] = useState(searchParams.get("without_customer") === "true");
   const [invoices, setInvoices] = useState<InvoiceListItem[]>([]);
   const initialStatus = searchParams.get("status");
   const [status, setStatus] = useState<InvoiceStatusFilter>(
@@ -37,8 +38,8 @@ export function InvoicesPage() {
   const [fromDate, setFromDate] = useState(searchParams.get("from_date") ?? todayInputValue());
   const [toDate, setToDate] = useState(searchParams.get("to_date") ?? todayInputValue());
   const initialInvoiceCode = normalizeInvoiceCodeSearch(searchParams.get("code") ?? "");
-  const initialCustomerPhone = searchParams.get("customer_phone") ?? "";
-  const initialCustomerName = searchParams.get("customer_name") ?? "";
+  const initialCustomerPhone = withoutCustomer ? "" : searchParams.get("customer_phone") ?? "";
+  const initialCustomerName = withoutCustomer ? "" : searchParams.get("customer_name") ?? "";
   const [invoiceCode, setInvoiceCode] = useState(initialInvoiceCode);
   const [customerPhone, setCustomerPhone] = useState(initialCustomerPhone);
   const [customerName, setCustomerName] = useState(initialCustomerName);
@@ -96,6 +97,7 @@ export function InvoicesPage() {
     selectedInvoiceCode = appliedInvoiceCode,
     selectedCustomerPhone = appliedCustomerPhone,
     selectedCustomerName = appliedCustomerName,
+    selectedWithoutCustomer = withoutCustomer,
   ) {
     const normalizedInvoiceCode = normalizeInvoiceCodeSearch(selectedInvoiceCode);
     const requestId = ++loadRequestId.current;
@@ -107,8 +109,9 @@ export function InvoicesPage() {
           status: selectedStatus === "created" || selectedStatus === "completed" || selectedStatus === "cancelled" ? selectedStatus : undefined,
           exclude_cancelled: selectedStatus === "active" ? true : undefined,
           code: normalizedInvoiceCode || undefined,
-          customer_phone: selectedCustomerPhone.trim() || undefined,
-          customer_name: selectedCustomerName.trim() || undefined,
+          customer_phone: selectedWithoutCustomer ? undefined : selectedCustomerPhone.trim() || undefined,
+          customer_name: selectedWithoutCustomer ? undefined : selectedCustomerName.trim() || undefined,
+          without_customer: selectedWithoutCustomer || undefined,
           from_date: selectedFromDate || undefined,
           to_date: selectedToDate || undefined,
           page: requestedPage,
@@ -145,6 +148,7 @@ export function InvoicesPage() {
     selectedInvoiceCode = appliedInvoiceCode,
     selectedCustomerPhone = appliedCustomerPhone,
     selectedCustomerName = appliedCustomerName,
+    selectedWithoutCustomer = withoutCustomer,
   ) {
     const normalizedInvoiceCode = normalizeInvoiceCodeSearch(selectedInvoiceCode);
     const nextSearchParams = new URLSearchParams();
@@ -156,11 +160,13 @@ export function InvoicesPage() {
     if (selectedFromDate) nextSearchParams.set("from_date", selectedFromDate);
     if (selectedToDate) nextSearchParams.set("to_date", selectedToDate);
     if (normalizedInvoiceCode) nextSearchParams.set("code", normalizedInvoiceCode);
-    if (selectedCustomerPhone.trim()) nextSearchParams.set("customer_phone", selectedCustomerPhone.trim());
-    if (selectedCustomerName.trim()) nextSearchParams.set("customer_name", selectedCustomerName.trim());
+    if (selectedWithoutCustomer) nextSearchParams.set("without_customer", "true");
+    if (!selectedWithoutCustomer && selectedCustomerPhone.trim()) nextSearchParams.set("customer_phone", selectedCustomerPhone.trim());
+    if (!selectedWithoutCustomer && selectedCustomerName.trim()) nextSearchParams.set("customer_name", selectedCustomerName.trim());
     nextSearchParams.set("page", "1");
     nextSearchParams.set("page_size", String(pageSize));
     setStatus(selectedStatus);
+    setWithoutCustomer(selectedWithoutCustomer);
     setFromDate(selectedFromDate);
     setToDate(selectedToDate);
     setAppliedInvoiceCode(normalizedInvoiceCode);
@@ -177,6 +183,7 @@ export function InvoicesPage() {
       normalizedInvoiceCode,
       selectedCustomerPhone,
       selectedCustomerName,
+      selectedWithoutCustomer,
     );
   }
 
@@ -284,6 +291,7 @@ export function InvoicesPage() {
           <UserRound size={17} aria-hidden="true" />
           <input
             value={customerName}
+            disabled={withoutCustomer}
             onChange={(event) => setCustomerName(event.target.value)}
             maxLength={200}
             onKeyDown={(event) => { if (event.key === "Enter") searchInvoices(); }}
@@ -296,6 +304,7 @@ export function InvoicesPage() {
           <input
             autoFocus
             value={customerPhone}
+            disabled={withoutCustomer}
             onChange={(event) => setCustomerPhone(event.target.value)}
             maxLength={30}
             onKeyDown={(event) => {
@@ -309,6 +318,14 @@ export function InvoicesPage() {
           <Search size={17} />
           Tìm kiếm
         </button>
+        <label className={`invoice-walk-in-filter${withoutCustomer ? " active" : ""}`} title="Chỉ hiện hóa đơn không gắn khách hàng">
+          <input type="checkbox" checked={withoutCustomer} onChange={event => {
+            setCustomerName("");
+            setCustomerPhone("");
+            applyFilters(status, fromDate, toDate, appliedInvoiceCode, "", "", event.target.checked);
+          }}/>
+          Khách lẻ
+        </label>
         <FormSelect label="Trạng thái hóa đơn" hideLabel className="invoice-status-filter" icon={ListFilter} value={status} options={[
           { value: "active", label: "Đang hiệu lực" },
           { value: "all", label: "Tất cả trạng thái" },

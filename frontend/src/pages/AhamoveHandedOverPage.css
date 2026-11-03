@@ -4,8 +4,9 @@
 .ahamove-board-controls { display: flex; align-items: center; gap: 8px; margin-left: auto; }
 .ahamove-board-controls .secondary-button { white-space: nowrap; }
 .ahamove-board-summary { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.ahamove-board-toolbar > .ahamove-board-summary { margin-left: 16px; }
 .ahamove-board-summary > span { display: inline-flex; align-items: center; gap: 6px; padding: 7px 10px; border: 1px solid #d1e3df; background: #fff; border-radius: 9px; font-size: 13px; color: var(--teal-dark); }
-.ahamove-board-summary small { color: var(--muted); margin-left: auto; font-size: 12px; }
+.ahamove-board-hint { color: var(--muted); font-size: 12px; text-align: right; }
 .ahamove-batch-board { display: flex; align-items: stretch; gap: 16px; min-width: 0; overflow-x: auto; padding: 4px 2px 14px; height: calc(100dvh - 320px); min-height: 360px; overscroll-behavior-x: contain; }
 .ahamove-batch-column { display: flex; flex-direction: column; flex: 0 0 330px; min-width: 0; overflow: hidden; background: #e7efed; border: 1px solid #d0dfdb; border-radius: 14px; }
 .ahamove-batch-heading { padding: 14px; border-top: 4px solid var(--teal); background: #f5faf8; flex-shrink: 0; }
@@ -26,19 +27,22 @@
 .ahamove-batch-addresses li:last-child { border-bottom: 0; }
 .ahamove-batch-addresses li > svg { flex-shrink: 0; margin-top: 2px; color: var(--teal); }
 .ahamove-batch-addresses li > span { min-width: 0; }
+.ahamove-batch-footer { flex-shrink: 0; padding: 10px 14px; border-top: 1px solid #d0dfdb; background: #f5faf8; }
+.ahamove-batch-footer > button { width: 100%; justify-content: center; }
 @media (max-width: 760px) {
   .ahamove-board-toolbar { flex-direction: column; align-items: stretch; }
+  .ahamove-board-toolbar > .ahamove-board-summary { margin-left: 0; margin-top: 4px; }
   .ahamove-board-controls { display: grid; grid-template-columns: minmax(0, 1fr) auto; }
   .ahamove-board-controls .date-range-picker { min-width: 0; }
   .ahamove-batch-board { height: 65dvh; gap: 12px; }
   .ahamove-batch-column { flex-basis: min(330px, 86vw); }
-  .ahamove-board-summary small { width: 100%; margin-left: 0; }
+  .ahamove-board-hint { text-align: left; }
 }
 
 .ahamove-batch-note-preview { margin-top: 12px; }
 .ahamove-inline-completion { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 16px; row-gap: 8px; align-items: stretch; }
 .ahamove-payment-note-fields { display: grid; gap: 6px; min-width: 0; }
-.ahamove-payment-note-fields input { width: 100%; min-width: 0; min-height: 34px; padding: 7px 9px; font-size: 13px; }
+.ahamove-payment-note-fields input { width: 100%; min-width: 0; min-height: 34px; padding: 7px 9px; font-size: 16px; font-weight: 700; }
 .ahamove-payment-note-fields input[readonly] { background: #edf4ef; color: #365b4a; }
 .ahamove-inline-completion > .primary-button { align-self: start; height: 34px; min-height: 34px; padding: 7px 8px; gap: 4px; font-size: 12px; }
 .ahamove-completion-error { grid-column: 1 / -1; margin: 0; color: #a43120; font-size: 12px; overflow-wrap: anywhere; }

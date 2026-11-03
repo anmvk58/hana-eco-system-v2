@@ -11,3 +11,16 @@ dist/
 *.tsbuildinfo
 frontend/vite.config.js
 frontend/vite.config.d.ts
+# Android APK tooling is local-only; shared code remains web-only.
+/frontend/apk-local/
+/frontend/android/
+/frontend/capacitor.config.*
+/frontend/.env.android*
+/frontend/scripts/build-android.mjs
+/frontend/tests/android.test.cjs
+/docs/ANDROID.md
+*.apk
+*.aab
+*.jks
+*.keystore
+/artifacts/android/

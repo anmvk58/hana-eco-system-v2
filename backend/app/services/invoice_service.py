@@ -261,8 +261,11 @@ def list_invoices(
     page_size: int = 20,
     product_code: str | None = None,
     customer_name: str | None = None,
+    without_customer: bool = False,
 ) -> tuple[list[Invoice], int, int, int]:
     conditions = []
+    if without_customer:
+        conditions.append(Invoice.customer_id.is_(None))
     if product_code is not None:
         conditions.append(Invoice.items.any(InvoiceItem.product_code == product_code))
     if not include_deleted:

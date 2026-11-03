@@ -121,3 +121,20 @@ test('focusing either payment-note field selects all its text', () => {
   for (const field of fields) field.props.onFocus({ currentTarget: { select: () => selections++ } });
   assert.equal(selections, 2);
 });
+
+
+test('cancel action sits after the address list and locks reconciled or busy batches', () => {
+  function cancelButton(data, disabled = false) {
+    const html = renderToStaticMarkup(React.createElement(output.exports.AhamoveBatchColumn, {
+      batch: { ...batch, status: 'active', ...data }, disabled,
+      onCancel: async () => {}, onComplete: async () => {}, onMissingNote: () => {},
+    }));
+    assert(html.indexOf('ahamove-batch-footer') > html.indexOf('ahamove-batch-addresses'));
+    return html.match(/<footer[^>]*>(.*?)<\/footer>/s)[1];
+  }
+  assert(!buttonDisabled(cancelButton({ handover_status: 'created' })));
+  assert(!buttonDisabled(cancelButton({ handover_status: 'completed' })));
+  assert(buttonDisabled(cancelButton({ is_reconciled: true })));
+  assert(buttonDisabled(cancelButton({}, true)));
+  assert(buttonDisabled(cancelButton({ status: 'cancelled' })));
+});

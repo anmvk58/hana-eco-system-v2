@@ -65,6 +65,7 @@ type InvoiceListFilters = {
   code?: string;
   customer_phone?: string;
   customer_name?: string;
+  without_customer?: boolean;
   from_date?: string;
   to_date?: string;
   page?: number;
@@ -198,6 +199,8 @@ export const api = {
     markDelivered: (invoiceId: number) => request<Invoice>(`/shipping/invoices/${invoiceId}/delivered`, { method: "POST" }),
   },
   ahamove: {
+    cancelBatch: (id: number) =>
+      request<ExternalHandoverBatch>(`/ahamove/external-handover-batches/${id}/cancel`, { method: "POST" }),
     completeBatch: (id: number, transferNote: string, cashNote: string, expectedNote: string | null) =>
       request<ExternalHandoverBatch>(`/ahamove/external-handover-batches/${id}/complete`, { method: "POST", body: JSON.stringify({ transfer_note: transferNote, cash_note: cashNote, expected_note: expectedNote }) }),
     externalBatches: (fromDate?: string, toDate?: string) =>

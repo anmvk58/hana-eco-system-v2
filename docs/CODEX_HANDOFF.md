@@ -83,6 +83,28 @@ Only the Cloudflare Tunnel connector is public-facing. Frontend and API ports ar
 
 ## 4. Implemented and completed
 
+### Web-only shared repository and local APK isolation (2026-11-03)
+
+- Android tooling, native project, configuration, tests and dependencies are preserved only in ignored `frontend/apk-local/`; the existing APK remains in ignored `artifacts/android/`. The shared React app/package/lockfile contain no Capacitor imports or dependencies and retain normal web printing. Native-only docs/configuration are also excluded. Local packaging is not available in a fresh Git clone.
+- Shared Vite scripts explicitly use `vite.config.ts`, dependency discovery starts at `index.html`, and file watching excludes local packaging directories. This preserves the local Docker performance fix without shipping native build logic.
+- Local Android changes must stay within the ignored workspace. Web/business changes remain in the shared frontend/backend and are copied into the local APK workspace by its local build script when needed.
+
+### Invoice walk-in customer filter (2026-11-03)
+
+- The invoice toolbar includes a checkbox for walk-in invoices without a linked customer. It applies immediately, clears/disables name and phone search while checked, resets pagination, persists as `without_customer=true` in the URL and combines with date, lifecycle, invoice-code and product filters.
+- GET `/api/invoices` accepts `without_customer` and filters `customer_id IS NULL` before counting/pagination. This is independent of the retail audit label. Existing permissions and deletion rules remain unchanged. Deploy frontend/API together; no database migration.
+- Isolated SQLite API regressions cover null-customer filtering, pagination, dates/status/code, soft deletion and audit independence.
+
+### AHAMOVE batch recall action (2026-11-03)
+
+- Each handed-over column has a bottom cancel button with confirmation. Success removes the batch and updates counts; errors retain it. Mutations lock the board controls; reconciled batches cannot be cancelled. Completed but unreconciled batches can still be recalled.
+- POST `/api/ahamove/external-handover-batches/{id}/cancel` requires `ahamove.manage` and reuses the existing transactional cancellation service to deactivate memberships, clear external handover/audit fields and write invoice history. The original shipping endpoint/permission stays unchanged. Deploy API and frontend together; no schema change.
+- Regressions cover independent AHAMOVE permission, recall persistence, return to unaudited lists, totals/lifecycle preservation, duplicate/reconciled rejection and footer button availability.
+
+### AHAMOVE payment-note input readability (2026-11-03)
+
+- The handed-over board's transfer/cash note inputs use bold 16px text. Whole-number amounts receive comma thousands separators while typing or pasting (e.g. `1234567` → `1,234,567`), with caret restoration when editing within an amount. Free-text notes remain supported; formatted notes use the existing completion API.
+
 ### AHAMOVE quick status filters (2026-11-03)
 
 - The handed-over board defaults to “Tạo mới” and adds quick “Tất cả / Hoàn thành / Tạo mới” buttons with counts within the current date range. Filtering updates columns, order/batch summaries and empty states together; completing a batch removes it immediately from the default created view. Filters are locked during completion requests and the existing handover-day range remains in effect.

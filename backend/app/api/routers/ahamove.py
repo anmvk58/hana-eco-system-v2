@@ -15,6 +15,15 @@ from app.services import ship_management_service
 router = APIRouter(prefix="/ahamove", tags=["ahamove"])
 
 
+@router.post("/external-handover-batches/{batch_id}/cancel", response_model=ExternalHandoverBatchRead)
+def cancel_external_handover_batch(
+    batch_id: int,
+    current_user: User = Depends(require_permission("ahamove.manage")),
+    db: Session = Depends(get_db),
+):
+    return ship_management_service.cancel_batch(db, batch_id, current_user)
+
+
 @router.get("/unaudited-invoices", response_model=list[InvoiceRead])
 def list_unaudited_invoices(
     from_date: date | None = None,

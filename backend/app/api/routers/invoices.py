@@ -23,6 +23,7 @@ def list_invoices(
     code_filter: str | None = Query(default=None, alias="code", max_length=60),
     customer_phone: str | None = Query(default=None, max_length=30),
     customer_name: str | None = Query(default=None, max_length=200),
+    without_customer: bool = False,
     audit_label: InvoiceAuditLabel | None = None,
     unaudited: bool = False,
     from_date: date | None = Query(default=None),
@@ -49,6 +50,7 @@ def list_invoices(
         page_size,
         product_code=product_code,
         customer_name=customer_name,
+        without_customer=without_customer,
     )
     return InvoicePage(
         items=items,

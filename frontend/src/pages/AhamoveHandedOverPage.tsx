@@ -1,5 +1,5 @@
-import { CheckCircle2, Columns3, LoaderCircle, MapPin, PackageCheck, RefreshCw, Truck } from "lucide-react";
-import { type FormEvent, useEffect, useRef, useState } from "react";
+import { CheckCircle2, Columns3, LoaderCircle, MapPin, PackageCheck, RefreshCw, RotateCcw, Truck } from "lucide-react";
+import { type ChangeEvent, type FormEvent, useEffect, useRef, useState } from "react";
 
 import { api } from "../api/client";
 import { DateRangePicker } from "../components/DateRangePicker";
@@ -23,6 +23,29 @@ type CompletionProps = {
 };
 
 export function AhamoveBatchCompletionForm(props: CompletionProps) {
+  function changeNote(event: ChangeEvent<HTMLInputElement>, onChange: (value: string) => void) {
+    const input = event.currentTarget;
+    const value = input.value;
+    // These fields also accept free-text notes; only group whole-number amounts.
+    if (!/^\d[\d,]*$/.test(value)) {
+      onChange(value);
+      return;
+    }
+    const digits = value.replace(/,/g, "");
+    const formatted = digits.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+    const digitsBeforeCaret = value.slice(0, input.selectionStart ?? value.length).replace(/,/g, "").length;
+    let caret = 0;
+    let count = 0;
+    while (caret < formatted.length && count < digitsBeforeCaret) {
+      if (formatted[caret] !== ",") count += 1;
+      caret += 1;
+    }
+    onChange(formatted);
+    requestAnimationFrame(() => {
+      if (document.activeElement === input) input.setSelectionRange(caret, caret);
+    });
+  }
+
   function submit(event: FormEvent) {
     event.preventDefault();
     if (props.disabled || props.completed || props.saving) return;
@@ -34,15 +57,15 @@ export function AhamoveBatchCompletionForm(props: CompletionProps) {
   }
   return <form className="ahamove-inline-completion" onSubmit={submit}>
     <div className="ahamove-payment-note-fields">
-      <input type="text" placeholder="Chuyển khoản" aria-label="Ghi chú Chuyển khoản" autoComplete="off" maxLength={1000} value={props.transferNote} onFocus={event => event.currentTarget.select()} onChange={event => props.onTransferChange(event.target.value)} readOnly={props.completed} disabled={props.disabled}/>
-      <input type="text" placeholder="Tiền mặt" aria-label="Ghi chú Tiền mặt" autoComplete="off" maxLength={1000} value={props.cashNote} onFocus={event => event.currentTarget.select()} onChange={event => props.onCashChange(event.target.value)} readOnly={props.completed} disabled={props.disabled}/>
+      <input type="text" placeholder="Chuyển khoản" aria-label="Ghi chú Chuyển khoản" autoComplete="off" maxLength={1000} value={props.transferNote} onFocus={event => event.currentTarget.select()} onChange={event => changeNote(event, props.onTransferChange)} readOnly={props.completed} disabled={props.disabled}/>
+      <input type="text" placeholder="Tiền mặt" aria-label="Ghi chú Tiền mặt" autoComplete="off" maxLength={1000} value={props.cashNote} onFocus={event => event.currentTarget.select()} onChange={event => changeNote(event, props.onCashChange)} readOnly={props.completed} disabled={props.disabled}/>
     </div>
     <button className="primary-button" type="submit" disabled={props.disabled || props.completed || props.saving}>{props.saving ? <LoaderCircle size={15} className="loading-spinner"/> : <CheckCircle2 size={15}/>}Hoàn thành</button>
     {props.error ? <p className="ahamove-completion-error" role="alert">{props.error}</p> : null}
   </form>;
 }
 
-export function AhamoveBatchColumn({ batch, disabled = false, onComplete, onMissingNote }: { batch: ExternalHandoverBatch; disabled?: boolean; onMissingNote: () => void; onComplete: (batch: ExternalHandoverBatch, transferNote: string, cashNote: string) => Promise<void> }) {
+export function AhamoveBatchColumn({ batch, disabled = false, onComplete, onMissingNote, onCancel }: { batch: ExternalHandoverBatch; disabled?: boolean; onMissingNote: () => void; onCancel: (batch: ExternalHandoverBatch) => Promise<void>; onComplete: (batch: ExternalHandoverBatch, transferNote: string, cashNote: string) => Promise<void> }) {
   const items = batch.items.filter(item => item.is_active && !item.invoice.deleted_at);
   const [transferNote, setTransferNote] = useState(batch.transfer_note ?? (batch.handover_status === "completed" ? "" : numberText(batch.advance_amount)));
   const [cashNote, setCashNote] = useState(batch.cash_note || "");
@@ -71,6 +94,7 @@ export function AhamoveBatchColumn({ batch, disabled = false, onComplete, onMiss
     <div className="ahamove-batch-addresses" role="region" aria-label={`Địa chỉ giao hàng tập ${batch.code}`} tabIndex={0}>
       {items.length > 0 ? <ul>{items.map(({ id, invoice }) => <li key={id}><MapPin size={18} strokeWidth={2.5} aria-hidden="true"/><span>{invoice.customer?.address?.trim() || "Chưa có địa chỉ"}</span></li>)}</ul> : <EmptyState title="Không còn đơn trong tập" description="Các đơn đã được gỡ hoặc xóa khỏi danh sách."/>}
     </div>
+    <footer className="ahamove-batch-footer"><button type="button" className="secondary-button danger-button" disabled={disabled || saving || batch.is_reconciled || batch.status !== "active"} title={batch.is_reconciled ? "Tập đã kiểm kê và nhận tiền, không thể hủy" : "Hủy bàn giao và đưa các đơn về trạng thái chưa audit"} aria-label={`Hủy tập ${batch.code}`} onClick={() => void onCancel(batch)}><RotateCcw size={16}/>Hủy</button></footer>
   </section>;
 }
 
@@ -117,6 +141,20 @@ export function AhamoveHandedOverPage() {
     } finally { setSavingBatchId(null); }
   }
 
+  async function cancelBatch(batch: ExternalHandoverBatch) {
+    if (savingBatchId !== null || batch.is_reconciled || batch.status !== "active") return;
+    if (!window.confirm(`Hủy tập bàn giao ${batch.code}? Toàn bộ đơn trong tập sẽ quay về trạng thái chưa audit.`)) return;
+    setSavingBatchId(batch.id);
+    setError("");
+    try {
+      await api.ahamove.cancelBatch(batch.id);
+      setBatches(current => current.filter(item => item.id !== batch.id));
+      setToast({ title: "Đã hủy tập bàn giao", message: `Các đơn trong tập ${batch.code} đã quay về trạng thái chưa audit.`, variant: "success" });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Không hủy được tập bàn giao");
+    } finally { setSavingBatchId(null); }
+  }
+
   const visibleBatches = batches.filter(batch => statusFilter === "all" || (batch.handover_status || "created") === statusFilter);
   const orderCount = visibleBatches.reduce((sum, batch) => sum + batch.items.filter(item => item.is_active && !item.invoice.deleted_at).length, 0);
   return <div className="page-stack ahamove-handed-over-page">
@@ -124,11 +162,12 @@ export function AhamoveHandedOverPage() {
       <div className="ahamove-status-filters" role="group" aria-label="Lọc trạng thái tập bàn giao">
         {([{ value: "all", label: "Tất cả" }, { value: "completed", label: "Hoàn thành" }, { value: "created", label: "Tạo mới" }] as const).map(filter => <button key={filter.value} type="button" aria-pressed={statusFilter === filter.value} className={statusFilter === filter.value ? "active" : ""} disabled={savingBatchId !== null} onClick={() => setStatusFilter(filter.value)}>{filter.label}<span>{batches.filter(batch => filter.value === "all" || (batch.handover_status || "created") === filter.value).length}</span></button>)}
       </div>
+      <div className="ahamove-board-summary" aria-live="polite"><span><Columns3 size={15}/><strong>{visibleBatches.length}</strong> tập bàn giao</span><span><PackageCheck size={15}/><strong>{orderCount}</strong> đơn</span></div>
       <div className="ahamove-board-controls"><DateRangePicker disabled={savingBatchId !== null} from={fromDate} to={toDate} onChange={(from, to) => { setFromDate(from); setToDate(to); }}/><button className="secondary-button" disabled={savingBatchId !== null || loading || Boolean(fromDate) !== Boolean(toDate)} onClick={() => void load()}><RefreshCw size={16} className={loading ? "loading-spinner" : undefined}/>Làm mới</button></div>
     </section>
     {error ? <div role="alert" className="alert error">{error}</div> : null}
-    <div className="ahamove-board-summary" aria-live="polite"><span><Columns3 size={15}/><strong>{visibleBatches.length}</strong> tập bàn giao</span><span><PackageCheck size={15}/><strong>{orderCount}</strong> đơn</span><small>Kéo ngang để xem các tập · Cuộn trong mỗi cột để xem đơn</small></div>
-    {loading ? <EmptyState title="Đang tải các tập đơn đã bàn giao..."/> : visibleBatches.length === 0 ? <EmptyState title={statusFilter === "created" ? "Không có tập bàn giao Tạo mới" : statusFilter === "completed" ? "Chưa có tập bàn giao Hoàn thành" : "Chưa có tập đơn đã bàn giao"} description={error ? "Hãy thử làm mới danh sách." : "Không có tập bàn giao phù hợp với trạng thái và khoảng ngày đã chọn."}/> : <div className="ahamove-batch-board" role="region" aria-label="Các tập đơn đã bàn giao" tabIndex={0}>{visibleBatches.map(batch => <AhamoveBatchColumn key={`${batch.id}:${batch.completed_at || "created"}`} batch={batch} disabled={savingBatchId !== null} onComplete={completeBatch} onMissingNote={() => setToast({ title: "Chưa có ghi chú", message: "Vui lòng nhập ghi chú Chuyển khoản hoặc Tiền mặt", variant: "warning" })}/>)}</div>}
+    <small className="ahamove-board-hint">Kéo ngang để xem các tập · Cuộn trong mỗi cột để xem đơn</small>
+    {loading ? <EmptyState title="Đang tải các tập đơn đã bàn giao..."/> : visibleBatches.length === 0 ? <EmptyState title={statusFilter === "created" ? "Không có tập bàn giao Tạo mới" : statusFilter === "completed" ? "Chưa có tập bàn giao Hoàn thành" : "Chưa có tập đơn đã bàn giao"} description={error ? "Hãy thử làm mới danh sách." : "Không có tập bàn giao phù hợp với trạng thái và khoảng ngày đã chọn."}/> : <div className="ahamove-batch-board" role="region" aria-label="Các tập đơn đã bàn giao" tabIndex={0}>{visibleBatches.map(batch => <AhamoveBatchColumn key={`${batch.id}:${batch.completed_at || "created"}`} batch={batch} disabled={savingBatchId !== null} onComplete={completeBatch} onCancel={cancelBatch} onMissingNote={() => setToast({ title: "Chưa có ghi chú", message: "Vui lòng nhập ghi chú Chuyển khoản hoặc Tiền mặt", variant: "warning" })}/>)}</div>}
     {toast ? <ToastNotification {...toast} onClose={() => setToast(null)}/> : null}
   </div>;
 }

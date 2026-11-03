@@ -74,6 +74,24 @@ class InvoiceCustomerNameSearchTests(unittest.TestCase):
         self.assertEqual(result["items"][0]["customer"]["name"], "100% An")
         self.assertEqual(self.search(customer_name="_")["total"], 0)
 
+    def test_without_customer_filters_before_count_and_pagination_independently_of_audit(self):
+        from app.models.enums import InvoiceAuditLabel
+        self.db.add_all([
+            Invoice(code="WALK-IN", customer_id=None, audit_label=InvoiceAuditLabel.external_shipper, status=InvoiceStatus.created, sold_at=datetime(2026, 10, 4, 10)),
+            Invoice(code="WALK-IN-CANCELLED", customer_id=None, status=InvoiceStatus.cancelled, sold_at=datetime(2026, 10, 4, 10)),
+            Invoice(code="WALK-IN-DELETED", customer_id=None, status=InvoiceStatus.created, sold_at=datetime(2026, 10, 4, 10), deleted_at=datetime(2026, 10, 4, 11)),
+        ])
+        self.db.commit()
+        result = self.search(without_customer=True, exclude_cancelled=True, page_size=1, page=2)
+        self.assertEqual((result['total'], result['page'], result['total_pages']), (2, 2, 2))
+        self.assertTrue(all(row['customer'] is None for row in result['items']))
+        self.assertEqual(self.search(without_customer=True)['total'], 3)
+        result = self.search(without_customer=True, code="WALK-IN", from_date="2026-10-04", to_date="2026-10-04", status="created")
+        self.assertEqual(result['total'], 1)
+        self.assertEqual(result['items'][0]['code'], 'WALK-IN')
+        self.assertEqual(self.search(without_customer=True, from_date="2026-10-05")['total'], 0)
+        self.assertEqual(self.search(without_customer=True, customer_name="An")['total'], 0)
+
     def test_permissions_and_name_length(self):
         self.assertEqual(self.client.get("/api/invoices", params={"customer_name": "a" * 201}).status_code, 422)
         self.user.roles = []

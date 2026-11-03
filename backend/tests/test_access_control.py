@@ -340,6 +340,51 @@ class AccessControlTests(unittest.TestCase):
         row = self.client.get('/api/order-reconciliation/external-handover-batches', headers=self.headers).json()[0]
         self.assertEqual(row['reconciliation']['note'], 'Finance note')
 
+    def test_ahamove_cancel_restores_unaudited_orders_with_independent_permission(self):
+        batch_id = self.create_note_batch()
+        path = f'/api/ahamove/external-handover-batches/{batch_id}/cancel'
+        self.assertEqual(self.client.post(path, headers=self.headers).status_code, 403)
+        role = service.save_role(self.db, RolePayload(name='Recall AHAMOVE', permission_codes=['ahamove.manage']))
+        self.seller.roles = [role]
+        self.db.commit()
+        self.assertNotIn('shipping.manage', permission_codes(self.seller))
+        batch = self.db.get(ExternalHandoverBatch, batch_id)
+        invoice = batch.items[0].invoice
+        invoice_id, total, status = invoice.id, invoice.total_amount, invoice.status
+        history_count = len(self.db.scalars(select(InvoiceHistory)).all())
+        # Completed handovers may still be recalled before financial reconciliation.
+        self.assertEqual(self.client.post(path.replace('/cancel', '/complete'), headers=self.headers, json={'cash_note': '100,000', 'expected_note': None}).status_code, 200)
+        response = self.client.post(path, headers=self.headers)
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual(response.json()['status'], 'cancelled')
+        self.assertTrue(all(not item['is_active'] for item in response.json()['items']))
+        with Session(self.engine) as db:
+            restored = db.get(Invoice, invoice_id)
+            self.assertIsNone(restored.audit_label)
+            self.assertIsNone(restored.audited_at)
+            self.assertIsNone(restored.audited_by_user_id)
+            self.assertEqual(restored.total_amount, total)
+            self.assertEqual(restored.status, status)
+            self.assertEqual(len(db.scalars(select(InvoiceHistory)).all()), history_count + 1)
+        self.assertEqual(self.client.get('/api/ahamove/external-handover-batches', headers=self.headers).json(), [])
+        unaudited = self.client.get('/api/ahamove/unaudited-invoices', headers=self.headers).json()
+        self.assertIn(invoice_id, [row['id'] for row in unaudited])
+        self.assertEqual(self.client.post(path, headers=self.headers).status_code, 409)
+
+    def test_ahamove_cancel_rejects_financially_reconciled_batch(self):
+        batch_id = self.create_note_batch()
+        self.grant_note_permissions()
+        from app.services.order_reconciliation_service import reconcile_external_handover_batch
+        from app.schemas.order_reconciliation import ExternalHandoverReconcileCreate
+        reconcile_external_handover_batch(self.db, batch_id, ExternalHandoverReconcileCreate(note='Received'), self.admin)
+        response = self.client.post(f'/api/ahamove/external-handover-batches/{batch_id}/cancel', headers=self.headers)
+        self.assertEqual(response.status_code, 409)
+        self.db.expire_all()
+        batch = self.db.get(ExternalHandoverBatch, batch_id)
+        self.assertEqual(batch.status.value, 'active')
+        self.assertTrue(batch.items[0].is_active)
+        self.assertIsNotNone(batch.items[0].invoice.audit_label)
+
     def test_cancelled_batch_cannot_be_completed(self):
         batch_id = self.create_note_batch()
         self.grant_note_permissions()

@@ -22,7 +22,7 @@ type TransferInvoice = {
 export function TransferPaymentButton({ invoice, disabled = false, variant = "compact", externalBatchId, onBusyChange, onChanged }: {
   invoice: TransferInvoice;
   disabled?: boolean;
-  variant?: "compact" | "invoice-list";
+  variant?: "compact" | "invoice-list" | "icon";
   externalBatchId?: number;
   onBusyChange?: (busy: boolean) => void;
   onChanged: () => void | Promise<void>;
@@ -39,6 +39,7 @@ export function TransferPaymentButton({ invoice, disabled = false, variant = "co
   const external = invoice.audit_label === "external_shipper" && externalBatchId === undefined;
   const buttonClass = variant === "invoice-list"
     ? "invoice-list-action-button invoice-list-edit-button transfer-payment-button"
+    : variant === "icon" ? "icon-button transfer-payment-button"
     : "secondary-button compact-button transfer-payment-button";
   function close() {
     if (saving) return;
