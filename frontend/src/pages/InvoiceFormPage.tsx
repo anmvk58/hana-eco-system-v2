@@ -197,7 +197,24 @@ export function InvoiceFormPage() {
   const [discount, setDiscount] = useState(initialDraft.discount);
   const [applyShippingFee, setApplyShippingFee] = useState(initialDraft.applyShippingFee);
   const [isPaidByTransfer, setIsPaidByTransfer] = useState(initialDraft.isPaidByTransfer);
-  const [printTwoCopies, setPrintTwoCopies] = useState(initialDraft.printTwoCopies);
+  const [printTwoCopies, setPrintTwoCopies] = useState(() => {
+    try {
+      const saved = currentUser ? localStorage.getItem(`hana-print-two-copies:${currentUser.id}`) : null;
+      if (saved === "true" || saved === "false") return saved === "true";
+    } catch {
+      // Keep printing available when browser storage is unavailable.
+    }
+    return initialDraft.printTwoCopies;
+  });
+
+  function changePrintTwoCopies(checked: boolean) {
+    setPrintTwoCopies(checked);
+    try {
+      if (currentUser) localStorage.setItem(`hana-print-two-copies:${currentUser.id}`, String(checked));
+    } catch {
+      // The selection still applies for this session without browser storage.
+    }
+  }
   const [shippingSettingsOpen, setShippingSettingsOpen] = useState(false);
   useEffect(() => {
     if (!checkoutOpen) return;
@@ -251,7 +268,6 @@ export function InvoiceFormPage() {
     setDiscount(draft.discount);
     setApplyShippingFee(draft.applyShippingFee);
     setIsPaidByTransfer(draft.isPaidByTransfer);
-    setPrintTwoCopies(draft.printTwoCopies);
     if (closeCheckout) setCheckoutOpen(false);
     setProductSearch("");
     setError("");
@@ -1285,7 +1301,7 @@ export function InvoiceFormPage() {
           {!isEditing && hasPermission("invoices.print") ? (
             <section className="print-settings-section">
               <label className="print-copy-option">
-                <input checked={printTwoCopies} onChange={(event) => setPrintTwoCopies(event.target.checked)} type="checkbox" />
+                <input checked={printTwoCopies} onChange={(event) => changePrintTwoCopies(event.target.checked)} type="checkbox" />
                 <span>
                   <strong>In 2 liên</strong>
                   <small>Tạo hai trang hóa đơn giống nhau khi in</small>

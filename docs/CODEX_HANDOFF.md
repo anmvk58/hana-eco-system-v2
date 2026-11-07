@@ -83,6 +83,10 @@ Only the Cloudflare Tunnel connector is public-facing. Frontend and API ports ar
 
 ## 4. Implemented and completed
 
+### Persistent sales receipt copy preference (2026-11-07)
+
+- The sales screen remembers “In 2 liên” immediately in browser localStorage per user (`hana-print-two-copies:<userId>`). Unchecked prints one receipt; checked prints two. Switching drafts, completing an order, and reloading retain the preference. Existing active-draft settings provide the fallback when no preference is stored; unavailable storage retains the in-memory choice. Invoice-edit printing keeps its existing two-copy behavior.
+
 ### Web-only shared repository and local APK isolation (2026-11-03)
 
 - Android tooling, native project, configuration, tests and dependencies are preserved only in ignored `frontend/apk-local/`; the existing APK remains in ignored `artifacts/android/`. The shared React app/package/lockfile contain no Capacitor imports or dependencies and retain normal web printing. Native-only docs/configuration are also excluded. Local packaging is not available in a fresh Git clone.
