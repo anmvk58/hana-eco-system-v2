@@ -54,9 +54,14 @@ def ensure_payment_change_allowed(db: Session, invoice: Invoice, *, allow_extern
         raise HTTPException(status_code=409, detail="Đơn đã bàn giao Ship Ngoài. Cần điều chỉnh bảng giao và đối soát trước khi đổi thanh toán")
 
 
-def confirm_transfer(db: Session, invoice_id: int, payload: InvoiceTransferConfirm, current_user: User) -> Invoice:
+def confirm_transfer(
+    db: Session, invoice_id: int, payload: InvoiceTransferConfirm, current_user: User,
+    *, require_unaudited: bool = False,
+) -> Invoice:
     try:
         invoice = get_invoice(db, invoice_id, for_update=True)
+        if require_unaudited and invoice.audit_label is not None:
+            raise HTTPException(status_code=409, detail="Đơn đã được audit. Vui lòng tải lại danh sách đơn chưa audit")
         if invoice.status == InvoiceStatus.cancelled:
             raise HTTPException(status_code=409, detail="Không thể đổi thanh toán của đơn đã hủy")
         if invoice.is_paid_by_transfer:

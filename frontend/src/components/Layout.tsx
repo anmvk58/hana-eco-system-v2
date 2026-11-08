@@ -42,7 +42,7 @@ const navItems = [
 const ahamoveNavItems = [
   { to: "/ahamove", label: "Bàn giao đơn", icon: Handshake, permissions: ["ahamove.manage"] },
   { to: "/ahamove/handed-over", label: "Đã bàn giao", icon: PackageCheck, permissions: ["ahamove.manage"] },
-  { to: "/retail-orders", label: "Đơn khách lẻ", icon: Store, permissions: ["order_reconciliation.manage"] },
+  { to: "/retail-orders", label: "Đơn khách lẻ", icon: Store, permissions: ["retail_orders.manage"] },
 ];
 
 const supplierDebtNavItems = [

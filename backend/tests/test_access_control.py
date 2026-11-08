@@ -8,7 +8,7 @@ from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
 from app.api.deps import permission_codes
-from app.api.routers import access_control, ahamove, internal_cod_collections, order_reconciliation, ship_management
+from app.api.routers import access_control, ahamove, internal_cod_collections, invoices, order_reconciliation, ship_management
 from app.core.permissions import INTERNAL_SHIPPER_ROLE_NAME, SYSTEM_ADMIN_ROLE_NAME
 from app.core.security import hash_password
 from app.database import get_db
@@ -30,7 +30,7 @@ class AccessControlTests(unittest.TestCase):
         service.ensure_defaults(self.db)
         self.admin = self.db.scalar(select(User).where(User.username == 'admin'))
         app = FastAPI()
-        for router in (access_control.router, ahamove.router, internal_cod_collections.router, order_reconciliation.router, ship_management.router):
+        for router in (access_control.router, ahamove.router, internal_cod_collections.router, invoices.router, order_reconciliation.router, ship_management.router):
             app.include_router(router, prefix='/api')
         app.dependency_overrides[get_db] = lambda: self.db
         self.client = TestClient(app)
@@ -45,6 +45,67 @@ class AccessControlTests(unittest.TestCase):
 
     def me(self):
         return self.client.get('/api/auth/me', headers=self.headers).json()['permissions']
+
+    def grant_retail_orders(self):
+        role = service.save_role(self.db, RolePayload(name='Retail orders', permission_codes=['retail_orders.manage']))
+        service.save_user(self.db, UserUpdate(role_ids=[role.id]), self.seller, self.admin)
+        return role
+
+    def test_retail_orders_catalog_and_denial_without_permission(self):
+        permission = self.db.scalar(select(Permission).where(Permission.code == 'retail_orders.manage'))
+        self.assertEqual(permission.module, 'AHAMOVE')
+        self.assertIn('retail_orders.manage', permission_codes(self.admin))
+        self.assertNotIn('retail_orders.manage', permission_codes(self.seller))
+        path = '/api/order-reconciliation/unaudited-invoices'
+        self.assertEqual(self.client.get(path, headers=self.headers).status_code, 403)
+        self.assertEqual(self.client.get(path).status_code, 401)
+        for action, payload in [('mark-retail', {}), ('confirm-transfer', {'expected_total_amount': '100000'})]:
+            self.assertEqual(self.client.post(f'{path}/1/{action}', headers=self.headers, json=payload).status_code, 403)
+
+    def test_retail_orders_role_can_transfer_and_assign_without_other_permissions(self):
+        self.grant_retail_orders()
+        self.assertEqual(self.me(), ['retail_orders.manage'])
+        invoice = Invoice(code='HD-261108-001', subtotal=100000, total_amount=100000)
+        self.db.add(invoice); self.db.commit()
+        path = '/api/order-reconciliation/unaudited-invoices'
+        listed = self.client.get(path, headers=self.headers)
+        self.assertEqual(listed.status_code, 200)
+        self.assertEqual([row['id'] for row in listed.json()], [invoice.id])
+        response = self.client.post(f'{path}/{invoice.id}/confirm-transfer', headers=self.headers,
+                                    json={'expected_total_amount': '100000', 'expected_revision': invoice.revision, 'note': 'Da nhan tien'})
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertTrue(response.json()['is_paid_by_transfer'])
+        marked = self.client.post(f'{path}/{invoice.id}/mark-retail', headers=self.headers, json={'handover_note': '  Khach tu lay  '})
+        self.assertEqual(marked.status_code, 200, marked.text)
+        self.assertEqual(marked.json()['audit_label'], 'retail')
+        self.assertEqual(marked.json()['handover_note'], 'Khach tu lay')
+        self.assertEqual(len(self.db.scalars(select(InvoiceHistory).where(InvoiceHistory.invoice_id == invoice.id)).all()), 2)
+        for url in ['/api/order-reconciliation/retail-invoices', '/api/order-reconciliation/external-handover-batches',
+                    '/api/ahamove/unaudited-invoices', '/api/invoices', f'/api/invoices/{invoice.id}']:
+            self.assertEqual(self.client.get(url, headers=self.headers).status_code, 403, url)
+        self.assertEqual(self.client.post(f'/api/invoices/{invoice.id}/payment/transfer', headers=self.headers,
+                                         json={'expected_total_amount': '100000'}).status_code, 403)
+        self.assertEqual(self.client.post(f'/api/order-reconciliation/retail-invoices/{invoice.id}/collect',
+                                         headers=self.headers, json={}).status_code, 403)
+
+    def test_retail_transfer_rejects_audited_stale_and_cancelled_orders_and_revocation(self):
+        role = self.grant_retail_orders()
+        from app.models.enums import InvoiceAuditLabel, InvoiceStatus
+        invoice = Invoice(code='HD-261108-002', subtotal=100000, total_amount=100000)
+        self.db.add(invoice); self.db.commit()
+        path = f'/api/order-reconciliation/unaudited-invoices/{invoice.id}/confirm-transfer'
+        response = self.client.post(path, headers=self.headers, json={'expected_total_amount': '90000'})
+        self.assertEqual(response.status_code, 409)
+        invoice.audit_label = InvoiceAuditLabel.retail; self.db.commit()
+        self.assertEqual(self.client.post(path, headers=self.headers, json={'expected_total_amount': '100000'}).status_code, 409)
+        invoice.audit_label = None; invoice.status = InvoiceStatus.cancelled; self.db.commit()
+        self.assertEqual(self.client.post(path, headers=self.headers, json={'expected_total_amount': '100000'}).status_code, 409)
+        self.db.refresh(invoice)
+        self.assertFalse(invoice.is_paid_by_transfer)
+        self.assertEqual(self.db.scalars(select(InvoiceHistory).where(InvoiceHistory.invoice_id == invoice.id)).all(), [])
+        service.save_role(self.db, RolePayload(name='Retail orders', permission_codes=[]), role)
+        self.assertEqual(self.client.get('/api/order-reconciliation/unaudited-invoices', headers=self.headers).status_code, 403)
+        self.assertEqual(self.client.post(path, headers=self.headers, json={'expected_total_amount': '100000'}).status_code, 403)
 
     def test_startup_never_grants_cod_or_reconciliation_to_shipping_roles(self):
         self.assertEqual(permission_codes(self.seller), {'shipping.manage'})

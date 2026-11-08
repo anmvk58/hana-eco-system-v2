@@ -247,6 +247,8 @@ export const api = {
       request<InternalCodCollectionSession>("/internal-cod-collections/sessions", { method: "POST", body: JSON.stringify(payload) }),
   },
   orderReconciliation: {
+    confirmUnauditedTransfer: (id: number, expectedTotalAmount: string | number, expectedRevision?: number, note?: string) =>
+      request<Invoice>(`/order-reconciliation/unaudited-invoices/${id}/confirm-transfer`, { method: "POST", body: JSON.stringify({ expected_total_amount: expectedTotalAmount, expected_revision: expectedRevision, note }) }),
     unauditedInvoices: (fromDate?: string, toDate?: string) =>
       request<Invoice[]>("/order-reconciliation/unaudited-invoices", {}, { from_date: fromDate, to_date: toDate }),
     markRetail: (invoiceId: number, handoverNote?: string) =>

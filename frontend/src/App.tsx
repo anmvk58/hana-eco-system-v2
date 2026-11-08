@@ -38,7 +38,7 @@ export default function App() {
   return (
     <Layout>
       <Routes>
-        <Route path="/" element={hasPermission("dashboard.view") ? <DashboardPage /> : hasPermission("shipping.claim") ? <Navigate to="/shipping/claim" replace /> : <Navigate to="/forbidden" replace />} />
+        <Route path="/" element={hasPermission("dashboard.view") ? <DashboardPage /> : hasPermission("shipping.claim") ? <Navigate to="/shipping/claim" replace /> : hasPermission("retail_orders.manage") ? <Navigate to="/retail-orders" replace /> : <Navigate to="/forbidden" replace />} />
         <Route path="/customers" element={protect("customers.view", <CustomersPage />)} />
         <Route path="/supplier-debts" element={protect("supplier_debts.view", <SupplierDebtsPage key="suppliers" />)} />
         <Route path="/supplier-debts/entries" element={protect("supplier_debts.view", <SupplierDebtsPage key="supplier-entries" entriesOnly />)} />
@@ -57,7 +57,7 @@ export default function App() {
         <Route path="/shipping/received" element={protect("shipping.claim", <ShippingReceivedPage />)} />
         <Route path="/ahamove/handed-over" element={protect("ahamove.manage", <AhamoveHandedOverPage />)} />
         <Route path="/ahamove" element={protect("ahamove.manage", <AhamovePage />)} />
-        <Route path="/retail-orders" element={protect("order_reconciliation.manage", <OrderReconciliationPage key="retail-orders" retailOrdersOnly />)} />
+        <Route path="/retail-orders" element={protect("retail_orders.manage", <OrderReconciliationPage key="retail-orders" retailOrdersOnly />)} />
         <Route path="/ship-management" element={protect("shipping.manage", <ShipManagementPage />)} />
         <Route path="/ship-management/internal-handover" element={protect("shipping.manage", <InternalShipperHandoverPage />)} />
         <Route path="/cod-management/internal-collections" element={protect("internal_cod_collections.manage", <InternalCodCollectionsPage />)} />

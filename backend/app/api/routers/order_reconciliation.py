@@ -3,7 +3,7 @@ from datetime import date
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
-from app.api.deps import require_permission
+from app.api.deps import require_any_permission, require_permission
 from app.database import get_db
 from app.models.user import User
 from app.models.enums import InvoiceAuditLabel
@@ -25,7 +25,7 @@ router = APIRouter(prefix="/order-reconciliation", tags=["order-reconciliation"]
 def list_unaudited_invoices(
     from_date: date | None = Query(default=None),
     to_date: date | None = Query(default=None),
-    _: User = Depends(require_permission("order_reconciliation.manage")),
+    _: User = Depends(require_any_permission("order_reconciliation.manage", "retail_orders.manage")),
     db: Session = Depends(get_db),
 ):
     return order_reconciliation_service.list_unaudited_invoices(db, from_date, to_date)
@@ -45,13 +45,23 @@ def list_retail_invoices(
 def mark_invoice_as_retail(
     invoice_id: int,
     payload: RetailInvoiceMarkCreate | None = None,
-    current_user: User = Depends(require_permission("order_reconciliation.manage")),
+    current_user: User = Depends(require_any_permission("order_reconciliation.manage", "retail_orders.manage")),
     db: Session = Depends(get_db),
 ):
     return invoice_service.assign_audit_label(
         db, invoice_id, InvoiceAuditLabel.retail, current_user,
         handover_note=payload.handover_note if payload else None,
     )
+
+
+@router.post("/unaudited-invoices/{invoice_id}/confirm-transfer", response_model=InvoiceRead)
+def confirm_unaudited_transfer(
+    invoice_id: int,
+    payload: InvoiceTransferConfirm,
+    current_user: User = Depends(require_any_permission("retail_orders.manage", "order_reconciliation.manage")),
+    db: Session = Depends(get_db),
+):
+    return invoice_service.confirm_transfer(db, invoice_id, payload, current_user, require_unaudited=True)
 
 
 @router.post("/retail-invoices/{invoice_id}/collect", response_model=RetailInvoiceReconciliationRead)

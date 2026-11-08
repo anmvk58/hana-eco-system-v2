@@ -83,6 +83,12 @@ Only the Cloudflare Tunnel connector is public-facing. Frontend and API ports ar
 
 ## 4. Implemented and completed
 
+### Independent retail-orders permission under AHAMOVE (2026-11-08)
+
+- Added `retail_orders.manage` (“Quản lý Đơn khách lẻ (chuyển khoản và gán Khách lẻ)”) to the AHAMOVE permission group. The menu/route now require this independent permission; retail-only accounts land on `/retail-orders` after login. Existing reconciliation permission alone no longer grants this standalone menu. Administrators receive the new permission during normal startup synchronization; other roles must be explicitly granted it.
+- The shared unaudited-list/mark-retail endpoints allow either retail-orders or reconciliation permission. A scoped unaudited transfer endpoint reuses the transactional transfer service and checks the invoice is still unaudited under row lock before payment changes. Retail-only grants do not unlock reconciliation, collections, AHAMOVE handover, or general invoice editing/transfer.
+- Deploy frontend/backend together and restart API to synchronize the permission catalog; no schema migration. SQLite API regressions cover permission visibility, independent access, denial, mutations/history, stale/audited/cancelled rejection, and live revocation.
+
 ### Quick product rename from sales search (2026-11-08)
 
 - Search results add a pencil action immediately after the product name, alongside the existing quick price editing for users with `products.update`. The inline editor previews the auto-generated code, supports Enter/save and Escape/cancel, and retains inputs on errors. It reuses `productCodeFromName` from product creation: remove Vietnamese diacritics, replace whitespace with underscores, uppercase.
@@ -105,10 +111,10 @@ Only the Cloudflare Tunnel connector is public-facing. Frontend and API ports ar
 
 ### Standalone retail orders menu (2026-11-08)
 
-- Added “Đơn khách lẻ” as a child of AHAMOVE, at `/retail-orders`, protected by the existing `order_reconciliation.manage` permission used by the server endpoints.
+- Added “Đơn khách lẻ” as a child of AHAMOVE, at `/retail-orders`, protected by `retail_orders.manage` (introduced 2026-11-08).
 - Reuses the reconciliation unaudited list in a standalone mode: date presets/range, search, desktop/mobile layouts, transfer confirmation, and retail assignment with optional handover note. Only transfer and retail assignment row actions remain; reconciliation tabs, summaries, and shipping shortcuts are hidden. This view requests only unaudited invoices. Separate route keys reset page state when switching between it and reconciliation.
 - Invoice codes in the standalone retail list and the reconciliation “Đơn chưa audit” / “Khách lẻ & chuyển khoản” tabs open a read-only receipt modal on desktop/mobile, using the complete invoice snapshot already returned by the authorized list endpoints. Reuses the received-shipment receipt preview layout; no navigation or extra invoice-view permission is needed.
-- No new backend endpoint or permission; existing transactional mutations and API authorization apply. AHAMOVE shows only authorized children and remains accessible to users with retail/reconciliation permission alone; its group opens and highlights on the retail route.
+- Existing transactional mutations and API authorization apply. AHAMOVE shows only authorized children and remains accessible to users with retail-orders permission alone; its group opens and highlights on the retail route.
 
 ### Note before retail assignment in order reconciliation (2026-11-08)
 

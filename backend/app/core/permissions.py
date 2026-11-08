@@ -39,6 +39,7 @@ PERMISSIONS = [
     PermissionDefinition("invoices.audit", "Gán nhãn audit hóa đơn", "Hóa đơn"),
     PermissionDefinition("shipping.claim", "Nhận đơn ship trong ngày", "Giao hàng"),
     PermissionDefinition("ahamove.manage", "Quản lý và bàn giao đơn AHAMOVE", "AHAMOVE"),
+    PermissionDefinition("retail_orders.manage", "Quản lý Đơn khách lẻ (chuyển khoản và gán Khách lẻ)", "AHAMOVE"),
     PermissionDefinition("shipping.manage", "Quản lý và bàn giao đơn ship", "Giao hàng"),
     PermissionDefinition("internal_cod_collections.manage", "Thu tiền Ship Nội Bộ và xem lịch sử thu COD", "Quản lý tiền COD"),
     PermissionDefinition("order_reconciliation.manage", "Kiểm kê đơn và thu tiền", "Quản lý tiền COD"),

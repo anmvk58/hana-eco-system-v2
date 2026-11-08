@@ -19,11 +19,12 @@ type TransferInvoice = {
   is_cod_pending?: boolean;
 };
 
-export function TransferPaymentButton({ invoice, disabled = false, variant = "compact", externalBatchId, onBusyChange, onChanged }: {
+export function TransferPaymentButton({ invoice, disabled = false, variant = "compact", externalBatchId, unauditedOnly = false, onBusyChange, onChanged }: {
   invoice: TransferInvoice;
   disabled?: boolean;
   variant?: "compact" | "invoice-list" | "icon";
   externalBatchId?: number;
+  unauditedOnly?: boolean;
   onBusyChange?: (busy: boolean) => void;
   onChanged: () => void | Promise<void>;
 }) {
@@ -33,7 +34,10 @@ export function TransferPaymentButton({ invoice, disabled = false, variant = "co
   const [note, setNote] = useState("");
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
-  if (externalBatchId !== undefined ? !hasPermission("order_reconciliation.manage") : !hasPermission("invoices.update") && !hasPermission("order_reconciliation.manage")) return null;
+  const canConfirm = externalBatchId !== undefined ? hasPermission("order_reconciliation.manage")
+    : unauditedOnly ? hasPermission("retail_orders.manage") || hasPermission("order_reconciliation.manage")
+    : hasPermission("invoices.update") || hasPermission("order_reconciliation.manage");
+  if (!canConfirm) return null;
   if (invoice.is_paid_by_transfer) return <span className="payment-chip transfer"><CreditCard size={14}/>Đã chuyển khoản</span>;
   if (invoice.status === "cancelled") return null;
   const external = invoice.audit_label === "external_shipper" && externalBatchId === undefined;
@@ -52,6 +56,8 @@ export function TransferPaymentButton({ invoice, disabled = false, variant = "co
     try {
       if (externalBatchId !== undefined) {
         await api.orderReconciliation.confirmExternalTransfer(externalBatchId, invoice.id, invoice.total_amount, invoice.revision, note.trim() || undefined);
+      } else if (unauditedOnly) {
+        await api.orderReconciliation.confirmUnauditedTransfer(invoice.id, invoice.total_amount, invoice.revision, note.trim() || undefined);
       } else {
         await api.invoices.confirmTransfer(invoice.id, invoice.total_amount, invoice.revision, note.trim() || undefined);
       }
