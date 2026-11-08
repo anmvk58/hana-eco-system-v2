@@ -591,6 +591,7 @@ def assign_audit_label(
     invoice_id: int,
     audit_label: InvoiceAuditLabel,
     current_user: User,
+    handover_note: str | None = None,
 ) -> Invoice:
     if audit_label == InvoiceAuditLabel.internal_shipper:
         raise HTTPException(
@@ -607,6 +608,7 @@ def assign_audit_label(
     before_data = snapshot_invoice(invoice)
     try:
         invoice.audit_label = audit_label
+        invoice.handover_note = ((handover_note or "").strip() or None) if audit_label == InvoiceAuditLabel.retail else None
         invoice.assigned_shipper_id = None
         invoice.audited_at = utc_now()
         invoice.audited_by_user_id = current_user.id

@@ -14,6 +14,7 @@ import {
   PackageSearch,
   ShieldCheck,
   ShoppingCart,
+  Store,
   Users,
   Truck,
   PackageCheck,
@@ -39,8 +40,9 @@ const navItems = [
 ];
 
 const ahamoveNavItems = [
-  { to: "/ahamove", label: "Bàn giao đơn", icon: Handshake },
-  { to: "/ahamove/handed-over", label: "Đã bàn giao", icon: PackageCheck },
+  { to: "/ahamove", label: "Bàn giao đơn", icon: Handshake, permissions: ["ahamove.manage"] },
+  { to: "/ahamove/handed-over", label: "Đã bàn giao", icon: PackageCheck, permissions: ["ahamove.manage"] },
+  { to: "/retail-orders", label: "Đơn khách lẻ", icon: Store, permissions: ["order_reconciliation.manage"] },
 ];
 
 const supplierDebtNavItems = [
@@ -116,6 +118,7 @@ const routeTitles: Record<string, string> = {
   "/shipping/received": "Đơn đã nhận",
   "/ahamove": "AHAMOVE · Bàn giao đơn",
   "/ahamove/handed-over": "AHAMOVE · Đã bàn giao",
+  "/retail-orders": "Đơn khách lẻ",
   "/ship-management": "Quản lý đơn ship",
   "/ship-management/internal-handover": "Bàn giao Ship Nội Bộ",
   "/cod-management/internal-collections": "Thu tiền Ship Nội Bộ",
@@ -134,7 +137,8 @@ export function Layout({ children }: { children: ReactNode }) {
   const [isCatalogOpen, setIsCatalogOpen] = useState(
     () => location.pathname === "/customers" || location.pathname === "/products",
   );
-  const [isAhamoveOpen, setIsAhamoveOpen] = useState(() => location.pathname.startsWith("/ahamove"));
+  const isAhamoveRoute = location.pathname.startsWith("/ahamove") || location.pathname === "/retail-orders";
+  const [isAhamoveOpen, setIsAhamoveOpen] = useState(() => isAhamoveRoute);
   const [isReportsOpen, setIsReportsOpen] = useState(() => location.pathname.startsWith("/reports"));
   const [isSupplierDebtOpen, setIsSupplierDebtOpen] = useState(() => location.pathname.startsWith("/supplier-debts"));
   const [isShipManagementOpen, setIsShipManagementOpen] = useState(() => location.pathname.startsWith("/ship-management"));
@@ -147,6 +151,7 @@ export function Layout({ children }: { children: ReactNode }) {
   );
   const isSalesPage = /^\/invoices\/(?:new|\d+\/edit)\/?$/.test(location.pathname);
   const title = isSalesPage ? "Bán hàng" : routeTitles[location.pathname] ?? (location.pathname.startsWith("/invoices/") ? "Chi tiết hóa đơn" : "Hana POS");
+  const visibleAhamoveItems = ahamoveNavItems.filter((item) => item.permissions.every(hasPermission));
   const visibleCatalogItems = catalogNavItems.filter((item) => item.permissions.every(hasPermission));
   const visibleSupplierDebtItems = supplierDebtNavItems.filter((item) => item.permissions.every(hasPermission));
   const visibleReportItems = reportNavItems.filter((item) => item.permissions.every(hasPermission));
@@ -161,7 +166,7 @@ export function Layout({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     setIsMobileSidebarOpen(false);
-    if (location.pathname.startsWith("/ahamove")) setIsAhamoveOpen(true);
+    if (isAhamoveRoute) setIsAhamoveOpen(true);
     if (location.pathname.startsWith("/supplier-debts")) setIsSupplierDebtOpen(true);
   }, [location.pathname]);
 
@@ -193,16 +198,16 @@ export function Layout({ children }: { children: ReactNode }) {
           </button>
         </div>
         <nav className="side-nav">
-          {navItems.filter((item) => item.permissions.every(hasPermission) && (!("shipperOnly" in item) || !item.shipperOnly || Boolean(currentUser?.shipper_id))).map((item) => {
+          {navItems.filter((item) => (item.to === "/ahamove" ? visibleAhamoveItems.length > 0 : item.permissions.every(hasPermission)) && (!("shipperOnly" in item) || !item.shipperOnly || Boolean(currentUser?.shipper_id))).map((item) => {
             if (item.to === "/ahamove") return (
               <div className="nav-group" key={item.to}>
-                <button className={`nav-group-toggle${location.pathname.startsWith("/ahamove") ? " active" : ""}`} type="button" aria-expanded={isAhamoveOpen} aria-controls="ahamove-navigation" title="AHAMOVE" onClick={() => {
+                <button className={`nav-group-toggle${isAhamoveRoute ? " active" : ""}`} type="button" aria-expanded={isAhamoveOpen} aria-controls="ahamove-navigation" title="AHAMOVE" onClick={() => {
                   if (isSidebarCollapsed) { setIsSidebarCollapsed(false); setIsAhamoveOpen(true); return; }
                   setIsAhamoveOpen(open => !open);
                 }}>
                   <Truck size={18}/><span>AHAMOVE</span><ChevronDown className={`nav-group-chevron${isAhamoveOpen ? " open" : ""}`} size={17}/>
                 </button>
-                {isAhamoveOpen ? <div className="nav-group-items" id="ahamove-navigation">{ahamoveNavItems.map(child => {
+                {isAhamoveOpen ? <div className="nav-group-items" id="ahamove-navigation">{visibleAhamoveItems.map(child => {
                   const ChildIcon = child.icon;
                   return <NavLink key={child.to} to={child.to} title={child.label} end><ChildIcon size={17}/><span>{child.label}</span></NavLink>;
                 })}</div> : null}

@@ -9,6 +9,10 @@ from app.schemas.external_handover import ExternalHandoverBatchRead
 from app.models.enums import ExternalAdvanceMethod
 
 
+class RetailInvoiceMarkCreate(ORMBase):
+    handover_note: str | None = Field(default=None, max_length=500)
+
+
 class RetailInvoiceCollectCreate(ORMBase):
     note: str | None = Field(default=None, max_length=500)
 

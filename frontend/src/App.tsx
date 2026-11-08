@@ -57,11 +57,12 @@ export default function App() {
         <Route path="/shipping/received" element={protect("shipping.claim", <ShippingReceivedPage />)} />
         <Route path="/ahamove/handed-over" element={protect("ahamove.manage", <AhamoveHandedOverPage />)} />
         <Route path="/ahamove" element={protect("ahamove.manage", <AhamovePage />)} />
+        <Route path="/retail-orders" element={protect("order_reconciliation.manage", <OrderReconciliationPage key="retail-orders" retailOrdersOnly />)} />
         <Route path="/ship-management" element={protect("shipping.manage", <ShipManagementPage />)} />
         <Route path="/ship-management/internal-handover" element={protect("shipping.manage", <InternalShipperHandoverPage />)} />
         <Route path="/cod-management/internal-collections" element={protect("internal_cod_collections.manage", <InternalCodCollectionsPage />)} />
         <Route path="/cod-management/internal-collection-history" element={protect("internal_cod_collections.manage", <InternalCodCollectionHistoryPage />)} />
-        <Route path="/cod-management/order-reconciliation" element={protect("order_reconciliation.manage", <OrderReconciliationPage />)} />
+        <Route path="/cod-management/order-reconciliation" element={protect("order_reconciliation.manage", <OrderReconciliationPage key="order-reconciliation" />)} />
         <Route path="/ship-management/internal-cod-collections" element={<Navigate to="/cod-management/internal-collections" replace />} />
         <Route path="/ship-management/external-batches" element={protect("shipping.manage", <ExternalHandoverBatchesPage />)} />
         <Route path="/forbidden" element={<ForbiddenPage />} />

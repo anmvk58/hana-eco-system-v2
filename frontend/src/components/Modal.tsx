@@ -1,6 +1,8 @@
 import { X } from "lucide-react";
 import { useEffect, useRef, type ReactNode } from "react";
 
+const openModals: symbol[] = [];
+
 export function Modal({
   title,
   children,
@@ -15,6 +17,35 @@ export function Modal({
   submitOnEnter?: boolean;
 }) {
   const panelRef = useRef<HTMLElement>(null);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+
+  useEffect(() => {
+    const modalId = Symbol("modal");
+    const panel = panelRef.current;
+    const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    openModals.push(modalId);
+    // Move keyboard events off the opener, which may stop propagation.
+    // Preserve autofocus on inputs already focused inside the dialog.
+    if (panel && !panel.contains(document.activeElement)) panel.focus({ preventScroll: true });
+    function closeOnEscape(event: KeyboardEvent) {
+      if (event.key !== "Escape" || event.defaultPrevented || event.isComposing || event.repeat) return;
+      if (openModals[openModals.length - 1] !== modalId) return;
+      // Consume Escape even if the caller blocks closing while saving.
+      event.preventDefault();
+      event.stopPropagation();
+      onCloseRef.current();
+    }
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      const index = openModals.indexOf(modalId);
+      if (index !== -1) openModals.splice(index, 1);
+      document.removeEventListener("keydown", closeOnEscape);
+      if (previousFocus?.isConnected && (panel?.contains(document.activeElement) || document.activeElement === document.body)) {
+        previousFocus.focus({ preventScroll: true });
+      }
+    };
+  }, []);
 
   useEffect(() => {
     if (!submitOnEnter) return;
@@ -38,7 +69,7 @@ export function Modal({
 
   return (
     <div className="modal-backdrop" role="presentation">
-      <section ref={panelRef} className={`modal-panel${className ? ` ${className}` : ""}`} role="dialog" aria-modal="true" aria-label={title}>
+      <section ref={panelRef} tabIndex={-1} className={`modal-panel${className ? ` ${className}` : ""}`} role="dialog" aria-modal="true" aria-label={title}>
         <header className="modal-header">
           <h2>{title}</h2>
           <button className="icon-button" type="button" onClick={onClose} aria-label="Đóng">

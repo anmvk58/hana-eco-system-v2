@@ -7,7 +7,7 @@ import { api } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
 import { InvoiceReceipt } from "../components/InvoiceReceipt";
 import { Modal } from "../components/Modal";
-import { ProductModal } from "../components/ProductModal";
+import { ProductModal, productCodeFromName } from "../components/ProductModal";
 import { ToastNotification } from "../components/ToastNotification";
 import {
   createSaleDraft,
@@ -253,6 +253,11 @@ export function InvoiceFormPage() {
   const [quickPrice, setQuickPrice] = useState("");
   const [quickPriceError, setQuickPriceError] = useState("");
   const [quickPriceSaving, setQuickPriceSaving] = useState(false);
+  const [quickNameProduct, setQuickNameProduct] = useState<Product | null>(null);
+  const [quickName, setQuickName] = useState("");
+  const [quickNameError, setQuickNameError] = useState("");
+  const [quickNameSaving, setQuickNameSaving] = useState(false);
+  const quickNameSavingRef = useRef(false);
   const [invoiceToPrint, setInvoiceToPrint] = useState<Invoice | null>(null);
   const [invoicePrintTwoCopies, setInvoicePrintTwoCopies] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -579,6 +584,8 @@ export function InvoiceFormPage() {
   }, []);
 
   function openQuickPriceEdit(product: Product) {
+    if (quickNameSavingRef.current || quickPriceSaving) return;
+    setQuickNameProduct(null);
     setQuickPriceProduct(product);
     setQuickPrice(product.sale_price);
     setQuickPriceError("");
@@ -611,6 +618,55 @@ export function InvoiceFormPage() {
       setQuickPriceError(err instanceof Error ? err.message : "Không cập nhật được giá sản phẩm");
     } finally {
       setQuickPriceSaving(false);
+    }
+  }
+
+  function openQuickNameEdit(product: Product) {
+    if (quickNameSavingRef.current || quickPriceSaving) return;
+    setQuickPriceProduct(null);
+    setQuickNameProduct(product);
+    setQuickName(product.name);
+    setQuickNameError("");
+    setSearchFocused(true);
+  }
+
+  function closeQuickNameEdit() {
+    if (quickNameSavingRef.current) return;
+    setQuickNameProduct(null);
+    setQuickNameError("");
+    window.requestAnimationFrame(() => productSearchRef.current?.focus({ preventScroll: true }));
+  }
+
+  async function saveQuickName() {
+    if (!quickNameProduct || quickNameSavingRef.current) return;
+    const name = quickName.trim().replace(/\s+/g, " ");
+    const code = productCodeFromName(name);
+    if (!name || name.length > 240) {
+      setQuickNameError("Vui lòng nhập tên sản phẩm từ 1 đến 240 ký tự.");
+      return;
+    }
+    if (!code || code.length > 40) {
+      setQuickNameError("Mã tự tạo tối đa 40 ký tự. Vui lòng rút gọn tên sản phẩm.");
+      return;
+    }
+    quickNameSavingRef.current = true;
+    setQuickNameSaving(true);
+    setQuickNameError("");
+    try {
+      const updated = await api.products.update(quickNameProduct.id, { name, code });
+      setProducts((currentProducts) => currentProducts.map((product) => product.id === updated.id ? updated : product));
+      setQuickNameProduct(null);
+      setProductSearch(updated.code);
+      setHighlightedProductIndex(0);
+      setToastTitle("Cập nhật tên sản phẩm thành công");
+      setToastMessage(`${updated.name} · Mã sản phẩm: ${updated.code}`);
+      window.requestAnimationFrame(() => productSearchRef.current?.focus({ preventScroll: true }));
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Không cập nhật được tên sản phẩm";
+      setQuickNameError(message === "Product code already exists" ? "Mã sản phẩm đã tồn tại. Vui lòng nhập tên khác." : message);
+    } finally {
+      quickNameSavingRef.current = false;
+      setQuickNameSaving(false);
     }
   }
 
@@ -948,7 +1004,7 @@ export function InvoiceFormPage() {
       }));
       finishActiveDraft();
       if (hasPermission("invoices.print")) {
-        setInvoicePrintTwoCopies(isEditing ? true : printTwoCopies);
+        setInvoicePrintTwoCopies(printTwoCopies);
         setInvoiceToPrint(saved);
       } else {
         setToastTitle(isEditing ? "Cập nhật hóa đơn thành công" : "Tạo hóa đơn thành công");
@@ -1099,13 +1155,25 @@ export function InvoiceFormPage() {
                         key={product.id}
                         onMouseEnter={() => setHighlightedProductIndex(index)}
                       >
-                        <button className="product-suggestion-select" disabled={quickPriceProduct?.id === product.id} onMouseDown={(event) => { event.preventDefault(); addProductToInvoice(product); }} type="button">
+                        {quickNameProduct?.id === product.id ? <div className="product-suggestion-name-editor">
+                          <label><span>Tên sản phẩm</span><input autoFocus maxLength={240} disabled={quickNameSaving} value={quickName} onFocus={(event) => event.currentTarget.select()} onChange={(event) => { setQuickName(event.target.value); setQuickNameError(""); }} onKeyDown={(event) => {
+                            if (event.key === "Enter") { event.preventDefault(); event.stopPropagation(); void saveQuickName(); }
+                            if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); closeQuickNameEdit(); }
+                          }}/></label>
+                          <span className="field-hint">Mã sản phẩm: <strong>{productCodeFromName(quickName) || "—"}</strong></span>
+                          {quickNameError ? <small role="alert">{quickNameError}</small> : null}
+                          <div><button className="secondary-button compact-button" type="button" disabled={quickNameSaving} onClick={closeQuickNameEdit}>Hủy</button><button className="primary-button compact-button" type="button" disabled={quickNameSaving} onClick={() => void saveQuickName()}>{quickNameSaving ? <LoaderCircle className="loading-spinner" size={15}/> : <Save size={15}/>}Lưu tên</button></div>
+                        </div> : <>
+                        <div className="product-suggestion-select" onMouseDown={(event) => event.preventDefault()} onClick={() => { if (quickPriceProduct?.id !== product.id) addProductToInvoice(product); }}>
                           <span className="product-suggestion-identity">
                             <span className="product-suggestion-code">{product.code}</span>
-                            <span className="product-suggestion-name">{product.name}</span>
+                            <span className="product-suggestion-name-row">
+                              <button className="product-suggestion-name-select product-suggestion-name" type="button" disabled={quickPriceProduct?.id === product.id} aria-label={`Thêm ${product.code} - ${product.name} vào hóa đơn`}>{product.name}</button>
+                              {hasPermission("products.update") && quickPriceProduct?.id !== product.id ? <button className="product-suggestion-name-edit" type="button" disabled={quickNameSaving || quickPriceSaving} aria-label={`Sửa tên ${product.name}`} title="Sửa nhanh tên sản phẩm và tự đổi mã" onMouseDown={(event) => { event.preventDefault(); event.stopPropagation(); }} onClick={(event) => { event.stopPropagation(); openQuickNameEdit(product); }}><Edit2 size={15}/></button> : null}
+                            </span>
                           </span>
                           {quickPriceProduct?.id !== product.id ? <span className="product-suggestion-price">{numberText(product.sale_price)}</span> : null}
-                        </button>
+                        </div>
                         {quickPriceProduct?.id === product.id ? (
                           <span className="product-suggestion-price-editor">
                             <input
@@ -1136,6 +1204,7 @@ export function InvoiceFormPage() {
                             <Edit2 size={16} />
                           </button>
                         ) : null}
+                        </>}
                       </div>
                     ))}
                     {suggestedProducts.length === 0 ? (
@@ -1298,7 +1367,7 @@ export function InvoiceFormPage() {
         }}>
           <div className="pos-checkout-header"><h2>{isEditing ? `Sửa ${invoice?.code}` : "Thanh toán hóa đơn"}</h2><button autoFocus className="icon-button" type="button" aria-label="Đóng thanh toán" disabled={submitting} onClick={() => setCheckoutOpen(false)}><X size={20} /></button></div>
           <div className="pos-checkout-scroll">
-          {!isEditing && hasPermission("invoices.print") ? (
+          {hasPermission("invoices.print") ? (
             <section className="print-settings-section">
               <label className="print-copy-option">
                 <input checked={printTwoCopies} onChange={(event) => changePrintTwoCopies(event.target.checked)} type="checkbox" />

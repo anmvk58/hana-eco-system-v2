@@ -23,6 +23,7 @@ import { ApiError, api } from "../api/client";
 import { EmptyState } from "../components/EmptyState";
 import { DateRangePicker } from "../components/DateRangePicker";
 import { Modal } from "../components/Modal";
+import { InvoiceReceipt } from "../components/InvoiceReceipt";
 import { BatchHandoverNote } from "../components/BatchHandoverNote";
 import { handoverNoteText } from "../utils/handover";
 import { PaymentNoteInput } from "../components/PaymentNoteInput";
@@ -62,7 +63,7 @@ function advanceMethodText(method: ExternalAdvanceMethod) {
   return "Kết hợp";
 }
 
-export function OrderReconciliationPage() {
+export function OrderReconciliationPage({ retailOrdersOnly = false }: { retailOrdersOnly?: boolean }) {
   const [searchParams, setSearchParams] = useSearchParams();
   const initialToday = todayInputValue();
   const [fromDate, setFromDate] = useState(searchParams.get("from_date") ?? initialToday);
@@ -83,6 +84,10 @@ export function OrderReconciliationPage() {
   const [collecting, setCollecting] = useState<RetailInvoiceReconciliation | null>(null);
   const [reconcilingBatch, setReconcilingBatch] = useState<ExternalHandoverReconciliationRow | null>(null);
   const [markingRetailId, setMarkingRetailId] = useState<number | null>(null);
+  const [retailInvoice, setRetailInvoice] = useState<Invoice | null>(null);
+  const [retailNote, setRetailNote] = useState("");
+  const [retailError, setRetailError] = useState("");
+  const [receiptInvoiceId, setReceiptInvoiceId] = useState<number | null>(null);
   const [note, setNote] = useState("");
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -117,6 +122,10 @@ export function OrderReconciliationPage() {
     setLoading(true);
     setError("");
     try {
+      if (retailOrdersOnly) {
+        setUnaudited(await api.orderReconciliation.unauditedInvoices(selectedFromDate || undefined, selectedToDate || undefined));
+        return;
+      }
       const [nextUnaudited, nextRetail, nextExternal] = await Promise.all([
         api.orderReconciliation.unauditedInvoices(selectedFromDate || undefined, selectedToDate || undefined),
         api.orderReconciliation.retailInvoices(selectedFromDate || undefined, selectedToDate || undefined),
@@ -190,17 +199,30 @@ export function OrderReconciliationPage() {
     [externalRows, retailFilter, normalizedSearch],
   );
 
-  async function markRetail(invoice: Invoice) {
+  function openRetail(invoice: Invoice) {
+    setRetailInvoice(invoice);
+    setRetailNote("");
+    setRetailError("");
+  }
+
+  async function markRetail(event: FormEvent) {
+    event.preventDefault();
+    if (!retailInvoice || markingRetailId !== null) return;
+    const invoice = retailInvoice;
     setMarkingRetailId(invoice.id);
-    setError("");
+    setSaving(true);
+    setRetailError("");
     try {
-      await api.orderReconciliation.markRetail(invoice.id);
+      await api.orderReconciliation.markRetail(invoice.id, retailNote.trim() || undefined);
+      setRetailInvoice(null);
+      setRetailNote("");
       setToast(`Đã gán ${invoice.code} vào nhóm Khách lẻ.`);
       await load(fromDate, toDate);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Không thể gán nhãn Khách lẻ");
+      setRetailError(err instanceof Error ? err.message : "Không thể gán nhãn Khách lẻ");
     } finally {
       setMarkingRetailId(null);
+      setSaving(false);
     }
   }
 
@@ -276,12 +298,15 @@ export function OrderReconciliationPage() {
   }
 
   const currentRows = tab === "unaudited" ? visibleUnaudited.length : tab === "retail" ? visibleRetail.length : visibleExternal.length;
+  const receiptInvoice = tab === "retail"
+    ? retailRows.find((row) => row.invoice.id === receiptInvoiceId)?.invoice
+    : unaudited.find((invoice) => invoice.id === receiptInvoiceId);
 
   return <div className="page-stack order-reconciliation-page">
     <section className="order-reconciliation-hero">
       <div className="order-reconciliation-hero-copy">
         <span className="order-reconciliation-hero-icon"><ClipboardCheck size={26}/></span>
-        <span><h2>Kiểm kê đơn</h2><p>Theo dõi đơn chưa phân loại, tiền đơn đã audit và các phiên bàn giao Ship ngoài.</p></span>
+        <span><h2>{retailOrdersOnly ? "Đơn khách lẻ" : "Kiểm kê đơn"}</h2><p>{retailOrdersOnly ? "Chọn đơn chưa audit để xác nhận chuyển khoản hoặc gán Khách lẻ." : "Theo dõi đơn chưa phân loại, tiền đơn đã audit và các phiên bàn giao Ship ngoài."}</p></span>
       </div>
       <div className="order-reconciliation-hero-actions">
         <div className="dashboard-period-options" role="group" aria-label="Chọn nhanh thời gian kiểm kê">
@@ -299,15 +324,15 @@ export function OrderReconciliationPage() {
 
     {error ? <div className="alert error">{error}</div> : null}
 
-    <section className="order-reconciliation-overview">
+    {!retailOrdersOnly ? <section className="order-reconciliation-overview">
       <article><span><PackageSearch size={20}/></span><small>Chưa audit</small><strong>{unaudited.length} đơn</strong></article>
       <article><span><Clock3 size={20}/></span><small>Khách lẻ / CK chờ kiểm kê</small><strong>{pendingRetailCount} đơn</strong></article>
       <article><span><CheckCircle2 size={20}/></span><small>Khách lẻ / CK đã kiểm kê</small><strong>{collectedRetailCount} đơn</strong></article>
       <article><span><Truck size={20}/></span><small>Phiên Ship ngoài chờ kiểm kê</small><strong>{pendingExternalCount} phiên</strong></article>
-    </section>
+    </section> : null}
 
     <section className="order-reconciliation-workspace">
-      <div className="order-reconciliation-tabs" role="tablist" aria-label="Loại kiểm kê">
+      {!retailOrdersOnly ? <div className="order-reconciliation-tabs" role="tablist" aria-label="Loại kiểm kê">
         <button className={tab === "unaudited" ? "active" : ""} type="button" role="tab" aria-selected={tab === "unaudited"} onClick={() => { setTab("unaudited"); setSearch(""); }}>
           <PackageSearch size={18}/><span>Đơn chưa audit</span><strong>{unaudited.length}</strong>
         </button>
@@ -317,7 +342,7 @@ export function OrderReconciliationPage() {
         <button className={tab === "external" ? "active" : ""} type="button" role="tab" aria-selected={tab === "external"} onClick={() => { setTab("external"); setSearch(""); }}>
           <Truck size={18}/><span>Kiểm kê Ship ngoài</span><strong>{pendingExternalCount}</strong>
         </button>
-      </div>
+      </div> : null}
 
       <div className="order-reconciliation-toolbar">
         <label className="order-reconciliation-search"><Search size={18}/><input type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder={tab === "external" ? "Tìm mã phiên, người bàn giao hoặc phương thức..." : "Tìm mã hóa đơn, khách hàng, SĐT hoặc địa chỉ..."}/><span>{currentRows} kết quả</span></label>
@@ -325,16 +350,16 @@ export function OrderReconciliationPage() {
           <button className={retailFilter === "pending" ? "active" : ""} type="button" onClick={() => setRetailFilter("pending")}>Chờ kiểm kê ({tab === "retail" ? pendingRetailCount : pendingExternalCount})</button>
           <button className={retailFilter === "collected" ? "active" : ""} type="button" onClick={() => setRetailFilter("collected")}>Đã kiểm kê ({tab === "retail" ? collectedRetailCount : reconciledExternalCount})</button>
           <button className={retailFilter === "all" ? "active" : ""} type="button" onClick={() => setRetailFilter("all")}>Tất cả</button>
-        </div> : <div className="order-reconciliation-shortcuts"><Link to="/ship-management/internal-handover"><Truck size={16}/>Bàn giao ship nội bộ</Link><Link to="/ship-management"><ArrowRight size={16}/>Bàn giao khác</Link></div>}
+        </div> : !retailOrdersOnly ? <div className="order-reconciliation-shortcuts"><Link to="/ship-management/internal-handover"><Truck size={16}/>Bàn giao ship nội bộ</Link><Link to="/ship-management"><ArrowRight size={16}/>Bàn giao khác</Link></div> : null}
       </div>
 
       {tab === "unaudited" ? <>
-        <div className="order-reconciliation-table-wrap"><table className="data-table order-reconciliation-table"><thead><tr><th>Hóa đơn</th><th>Khách hàng</th><th>Địa chỉ</th><th>Ngày bán</th><th className="numeric">Tổng tiền</th><th>Thao tác</th></tr></thead><tbody>{visibleUnaudited.map((invoice) => <tr key={invoice.id}><td><strong className="code-cell">{invoice.code}</strong><small>{invoice.is_paid_by_transfer ? "Đã chuyển khoản" : "Thu tiền khi giao"}</small></td><td><strong>{customerName(invoice)}</strong><small>{invoice.customer?.phone || "Không có SĐT"}</small></td><td className="order-reconciliation-address">{invoice.customer?.address || "—"}</td><td>{dateTime(invoice.sold_at)}</td><td className="numeric strong">{money(invoice.total_amount)}</td><td><div className="order-reconciliation-actions"><TransferPaymentButton invoice={invoice} disabled={loading || saving} onChanged={async () => { await load(); }}/><button className="primary-button compact-button" type="button" disabled={markingRetailId !== null} onClick={() => void markRetail(invoice)}>{markingRetailId === invoice.id ? <LoaderCircle className="loading-spinner" size={15}/> : <Store size={15}/>}Gán Khách lẻ</button><Link className="secondary-button compact-button" to="/ship-management/internal-handover"><Truck size={15}/>Ship nội bộ</Link></div></td></tr>)}</tbody></table></div>
-        <div className="order-reconciliation-mobile-list">{visibleUnaudited.map((invoice) => <article className="order-reconciliation-card" key={invoice.id}><header><span><strong>{invoice.code}</strong><small>{dateTime(invoice.sold_at)}</small></span><b>{money(invoice.total_amount)}</b></header><div><h3>{customerName(invoice)}</h3><p>{invoice.customer?.phone || "Không có SĐT"}</p><p>{invoice.customer?.address || "Không có địa chỉ"}</p></div><footer><TransferPaymentButton invoice={invoice} disabled={loading || saving} onChanged={async () => { await load(); }}/><button className="primary-button" disabled={markingRetailId !== null} onClick={() => void markRetail(invoice)}><Store size={16}/>Gán Khách lẻ</button><Link className="secondary-button" to="/ship-management/internal-handover"><Truck size={16}/>Ship nội bộ</Link></footer></article>)}</div>
+        <div className="order-reconciliation-table-wrap"><table className="data-table order-reconciliation-table"><thead><tr><th>Hóa đơn</th><th>Khách hàng</th><th>Địa chỉ</th><th>Ngày bán</th><th className="numeric">Tổng tiền</th><th>Thao tác</th></tr></thead><tbody>{visibleUnaudited.map((invoice) => <tr key={invoice.id}><td><button className="code-cell shipping-invoice-preview-button" type="button" onClick={() => setReceiptInvoiceId(invoice.id)} aria-label={`Xem hóa đơn ${invoice.code}`}>{invoice.code}</button><small>{invoice.is_paid_by_transfer ? "Đã chuyển khoản" : "Thu tiền khi giao"}</small></td><td><strong>{customerName(invoice)}</strong><small>{invoice.customer?.phone || "Không có SĐT"}</small></td><td className="order-reconciliation-address">{invoice.customer?.address || "—"}</td><td>{dateTime(invoice.sold_at)}</td><td className="numeric strong">{money(invoice.total_amount)}</td><td><div className="order-reconciliation-actions"><TransferPaymentButton invoice={invoice} disabled={loading || saving} onChanged={async () => { await load(); }}/><button className="primary-button compact-button" type="button" disabled={markingRetailId !== null} onClick={() => openRetail(invoice)}>{markingRetailId === invoice.id ? <LoaderCircle className="loading-spinner" size={15}/> : <Store size={15}/>}Gán Khách lẻ</button>{!retailOrdersOnly ? <Link className="secondary-button compact-button" to="/ship-management/internal-handover"><Truck size={15}/>Ship nội bộ</Link> : null}</div></td></tr>)}</tbody></table></div>
+        <div className="order-reconciliation-mobile-list">{visibleUnaudited.map((invoice) => <article className="order-reconciliation-card" key={invoice.id}><header><span><button className="code-cell shipping-invoice-preview-button" type="button" onClick={() => setReceiptInvoiceId(invoice.id)} aria-label={`Xem hóa đơn ${invoice.code}`}>{invoice.code}</button><small>{dateTime(invoice.sold_at)}</small></span><b>{money(invoice.total_amount)}</b></header><div><h3>{customerName(invoice)}</h3><p>{invoice.customer?.phone || "Không có SĐT"}</p><p>{invoice.customer?.address || "Không có địa chỉ"}</p></div><footer><TransferPaymentButton invoice={invoice} disabled={loading || saving} onChanged={async () => { await load(); }}/><button className="primary-button" disabled={markingRetailId !== null} onClick={() => openRetail(invoice)}><Store size={16}/>Gán Khách lẻ</button>{!retailOrdersOnly ? <Link className="secondary-button" to="/ship-management/internal-handover"><Truck size={16}/>Ship nội bộ</Link> : null}</footer></article>)}</div>
         {!loading && visibleUnaudited.length === 0 ? <EmptyState title={search ? "Không tìm thấy đơn phù hợp" : "Không còn đơn chưa audit"} description={search ? "Hãy thử mã hóa đơn, tên, SĐT hoặc địa chỉ khác." : "Tất cả đơn hiện tại đã được phân loại."}/> : null}
       </> : tab === "retail" ? <>
-        <div className="order-reconciliation-table-wrap"><table className="data-table order-reconciliation-table retail"><thead><tr><th>Hóa đơn</th><th>Khách hàng</th><th>Địa chỉ</th><th>Phân loại</th><th>Thanh toán</th><th>Ghi chú</th><th className="numeric">Số tiền</th><th>Trạng thái kiểm kê</th><th></th></tr></thead><tbody>{visibleRetail.map((row) => <tr key={row.invoice.id}><td><Link className="code-cell order-reconciliation-invoice-link" to={`/invoices/${row.invoice.id}`} target="_blank" rel="noopener noreferrer">{row.invoice.code}</Link></td><td><strong>{customerName(row.invoice)}</strong>{row.invoice.customer?.phone ? <button className="order-reconciliation-phone" type="button" onClick={() => void copyPhone(row.invoice.customer?.phone)} title="Bấm để sao chép số điện thoại">{row.invoice.customer.phone}</button> : <small>Không có SĐT</small>}</td><td className="order-reconciliation-address">{row.invoice.customer?.address || "—"}</td><td><span className={`audit-source-chip ${row.invoice.audit_label || "unaudited"}`}>{auditLabelText(row.invoice)}</span></td><td>{row.invoice.is_paid_by_transfer ? <span className="payment-chip transfer"><CreditCard size={14}/>Chuyển khoản</span> : <span className="payment-chip cash"><Banknote size={14}/>Tiền mặt</span>}</td><td className="order-reconciliation-handover-note">{row.invoice.handover_note || "—"}</td><td className="numeric strong">{money(row.invoice.total_amount)}</td><td>{row.collection ? <span className="reconciliation-collected"><CheckCircle2 size={15}/><span><strong>Đã kiểm kê</strong><small>{utcDateTime(row.collection.collected_at)} · {row.collection.collected_by_name || "Hệ thống"}</small></span></span> : <span className="status-badge pending">Chờ kiểm kê</span>}</td><td className="order-reconciliation-actions-cell"><div className="order-reconciliation-actions"><TransferPaymentButton invoice={row.invoice} disabled={Boolean(row.collection) || loading || saving} onChanged={async () => { await load(); }}/>{row.collection ? <button className="secondary-button compact-button" disabled><CheckCircle2 size={15}/>Đã kiểm kê</button> : <button className="primary-button compact-button" onClick={() => openCollection(row)}><Banknote size={15}/>Đánh dấu đã thu</button>}</div></td></tr>)}</tbody></table></div>
-        <div className="order-reconciliation-mobile-list">{visibleRetail.map((row) => <article className={`order-reconciliation-card${row.collection ? " collected" : ""}`} key={row.invoice.id}><header><span><Link className="code-cell order-reconciliation-invoice-link" to={`/invoices/${row.invoice.id}`} target="_blank" rel="noopener noreferrer">{row.invoice.code}</Link></span><b>{money(row.invoice.total_amount)}</b></header><div><h3>{customerName(row.invoice)}</h3>{row.invoice.customer?.phone ? <button className="order-reconciliation-phone" type="button" onClick={() => void copyPhone(row.invoice.customer?.phone)} title="Bấm để sao chép số điện thoại">{row.invoice.customer.phone}</button> : <p>Không có SĐT</p>}<p>{row.invoice.customer?.address || "Không có địa chỉ"}</p><div className="order-reconciliation-card-tags"><span className={`audit-source-chip ${row.invoice.audit_label || "unaudited"}`}>{auditLabelText(row.invoice)}</span>{row.invoice.is_paid_by_transfer ? <span className="payment-chip transfer"><CreditCard size={14}/>Chuyển khoản</span> : <span className="payment-chip cash"><Banknote size={14}/>Tiền mặt</span>}</div>{row.invoice.handover_note ? <p className="order-reconciliation-handover-note">Ghi chú: {row.invoice.handover_note}</p> : null}{row.collection ? <p className="collected-note"><CheckCircle2 size={15}/>Đã kiểm kê {utcDateTime(row.collection.collected_at)}</p> : null}</div><footer><TransferPaymentButton invoice={row.invoice} disabled={Boolean(row.collection) || loading || saving} onChanged={async () => { await load(); }}/>{row.collection ? <button className="secondary-button" disabled><CheckCircle2 size={16}/>Đã kiểm kê</button> : <button className="primary-button" onClick={() => openCollection(row)}><Banknote size={16}/>Đánh dấu đã thu</button>}</footer></article>)}</div>
+        <div className="order-reconciliation-table-wrap"><table className="data-table order-reconciliation-table retail"><thead><tr><th>Hóa đơn</th><th>Khách hàng</th><th>Địa chỉ</th><th>Phân loại</th><th>Thanh toán</th><th>Ghi chú</th><th className="numeric">Số tiền</th><th>Trạng thái kiểm kê</th><th></th></tr></thead><tbody>{visibleRetail.map((row) => <tr key={row.invoice.id}><td><button className="code-cell shipping-invoice-preview-button" type="button" onClick={() => setReceiptInvoiceId(row.invoice.id)} aria-label={`Xem hóa đơn ${row.invoice.code}`}>{row.invoice.code}</button></td><td><strong>{customerName(row.invoice)}</strong>{row.invoice.customer?.phone ? <button className="order-reconciliation-phone" type="button" onClick={() => void copyPhone(row.invoice.customer?.phone)} title="Bấm để sao chép số điện thoại">{row.invoice.customer.phone}</button> : <small>Không có SĐT</small>}</td><td className="order-reconciliation-address">{row.invoice.customer?.address || "—"}</td><td><span className={`audit-source-chip ${row.invoice.audit_label || "unaudited"}`}>{auditLabelText(row.invoice)}</span></td><td>{row.invoice.is_paid_by_transfer ? <span className="payment-chip transfer"><CreditCard size={14}/>Chuyển khoản</span> : <span className="payment-chip cash"><Banknote size={14}/>Tiền mặt</span>}</td><td className="order-reconciliation-handover-note">{row.invoice.handover_note || "—"}</td><td className="numeric strong">{money(row.invoice.total_amount)}</td><td>{row.collection ? <span className="reconciliation-collected"><CheckCircle2 size={15}/><span><strong>Đã kiểm kê</strong><small>{utcDateTime(row.collection.collected_at)} · {row.collection.collected_by_name || "Hệ thống"}</small></span></span> : <span className="status-badge pending">Chờ kiểm kê</span>}</td><td className="order-reconciliation-actions-cell"><div className="order-reconciliation-actions"><TransferPaymentButton invoice={row.invoice} disabled={Boolean(row.collection) || loading || saving} onChanged={async () => { await load(); }}/>{row.collection ? <button className="secondary-button compact-button" disabled><CheckCircle2 size={15}/>Đã kiểm kê</button> : <button className="primary-button compact-button" onClick={() => openCollection(row)}><Banknote size={15}/>Đánh dấu đã thu</button>}</div></td></tr>)}</tbody></table></div>
+        <div className="order-reconciliation-mobile-list">{visibleRetail.map((row) => <article className={`order-reconciliation-card${row.collection ? " collected" : ""}`} key={row.invoice.id}><header><span><button className="code-cell shipping-invoice-preview-button" type="button" onClick={() => setReceiptInvoiceId(row.invoice.id)} aria-label={`Xem hóa đơn ${row.invoice.code}`}>{row.invoice.code}</button></span><b>{money(row.invoice.total_amount)}</b></header><div><h3>{customerName(row.invoice)}</h3>{row.invoice.customer?.phone ? <button className="order-reconciliation-phone" type="button" onClick={() => void copyPhone(row.invoice.customer?.phone)} title="Bấm để sao chép số điện thoại">{row.invoice.customer.phone}</button> : <p>Không có SĐT</p>}<p>{row.invoice.customer?.address || "Không có địa chỉ"}</p><div className="order-reconciliation-card-tags"><span className={`audit-source-chip ${row.invoice.audit_label || "unaudited"}`}>{auditLabelText(row.invoice)}</span>{row.invoice.is_paid_by_transfer ? <span className="payment-chip transfer"><CreditCard size={14}/>Chuyển khoản</span> : <span className="payment-chip cash"><Banknote size={14}/>Tiền mặt</span>}</div>{row.invoice.handover_note ? <p className="order-reconciliation-handover-note">Ghi chú: {row.invoice.handover_note}</p> : null}{row.collection ? <p className="collected-note"><CheckCircle2 size={15}/>Đã kiểm kê {utcDateTime(row.collection.collected_at)}</p> : null}</div><footer><TransferPaymentButton invoice={row.invoice} disabled={Boolean(row.collection) || loading || saving} onChanged={async () => { await load(); }}/>{row.collection ? <button className="secondary-button" disabled><CheckCircle2 size={16}/>Đã kiểm kê</button> : <button className="primary-button" onClick={() => openCollection(row)}><Banknote size={16}/>Đánh dấu đã thu</button>}</footer></article>)}</div>
         {!loading && visibleRetail.length === 0 ? <EmptyState title="Không có đơn phù hợp" description={retailFilter === "pending" ? "Không còn đơn Khách lẻ hoặc đơn chuyển khoản đã audit nào chờ kiểm kê." : "Thử đổi trạng thái lọc hoặc từ khóa tìm kiếm."}/> : null}
       </> : <>
         <div className="order-reconciliation-table-wrap"><table className="data-table order-reconciliation-table external"><thead><tr><th>Phiên bàn giao</th><th>Ngày bàn giao</th><th>Người bàn giao</th><th>Ghi chú bàn giao</th><th className="numeric">Số đơn</th><th>Phương thức</th><th className="numeric">Tiền phải nhận</th><th className="numeric">Thực tế đã nhận</th><th>Trạng thái kiểm kê</th><th></th></tr></thead><tbody>{visibleExternal.map((row) => {
@@ -351,6 +376,17 @@ export function OrderReconciliationPage() {
       </>}
       {loading && currentRows === 0 ? <EmptyState title="Đang tải dữ liệu kiểm kê"/> : null}
     </section>
+
+    {receiptInvoice ? <Modal className="shipping-invoice-preview-modal" title={`Hóa đơn ${receiptInvoice.code}`} onClose={() => setReceiptInvoiceId(null)}>
+      <div className="shipping-invoice-preview-content"><InvoiceReceipt invoice={receiptInvoice}/></div>
+    </Modal> : null}
+
+    {retailInvoice ? <Modal title="Gán Khách lẻ" submitOnEnter className="order-reconciliation-modal retail-collection" onClose={() => !saving && setRetailInvoice(null)}><form className="page-stack" onSubmit={(event) => void markRetail(event)}>
+      <div className="order-reconciliation-confirm-summary"><span className="order-reconciliation-customer-icon"><Store size={21}/></span><div><small>Hóa đơn</small><strong>{retailInvoice.code}</strong><p>{customerName(retailInvoice)} · {retailInvoice.customer?.phone || "Không có SĐT"}</p></div><b>{money(retailInvoice.total_amount)}</b></div>
+      {retailError ? <div className="alert error" role="alert">{retailError}</div> : null}
+      <label><span>Ghi chú bàn giao (không bắt buộc)</span><textarea autoFocus rows={3} maxLength={500} disabled={saving} value={retailNote} onChange={(event) => setRetailNote(event.target.value)} placeholder="Ví dụ: Khách tự lấy, thu tiền tại quầy"/></label>
+      <div className="form-actions"><button className="secondary-button" type="button" disabled={saving} onClick={() => setRetailInvoice(null)}>Hủy</button><button className="primary-button" type="submit" disabled={saving}>{saving ? <LoaderCircle className="loading-spinner" size={17}/> : <Store size={17}/>}Lưu Khách lẻ</button></div>
+    </form></Modal> : null}
 
     {collecting ? <Modal title="Xác nhận thu tiền đơn Khách lẻ" submitOnEnter className="order-reconciliation-modal retail-collection" onClose={() => !saving && setCollecting(null)}><form className="page-stack" onSubmit={(event) => void submitCollection(event)}>
       <div className="order-reconciliation-confirm-summary"><span className="order-reconciliation-customer-icon"><UserRound size={21}/></span><div><small>Hóa đơn</small><strong>{collecting.invoice.code}</strong><p>{customerName(collecting.invoice)} · {collecting.invoice.customer?.phone || "Không có SĐT"}</p></div><b>{money(collecting.invoice.total_amount)}</b></div>

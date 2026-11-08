@@ -249,8 +249,10 @@ export const api = {
   orderReconciliation: {
     unauditedInvoices: (fromDate?: string, toDate?: string) =>
       request<Invoice[]>("/order-reconciliation/unaudited-invoices", {}, { from_date: fromDate, to_date: toDate }),
-    markRetail: (invoiceId: number) =>
-      request<Invoice>(`/order-reconciliation/unaudited-invoices/${invoiceId}/mark-retail`, { method: "POST" }),
+    markRetail: (invoiceId: number, handoverNote?: string) =>
+      request<Invoice>(`/order-reconciliation/unaudited-invoices/${invoiceId}/mark-retail`, {
+        method: "POST", body: JSON.stringify({ handover_note: handoverNote }),
+      }),
     retailInvoices: (fromDate?: string, toDate?: string) =>
       request<RetailInvoiceReconciliation[]>("/order-reconciliation/retail-invoices", {}, { from_date: fromDate, to_date: toDate }),
     collectRetailInvoice: (invoiceId: number, payload: RetailInvoiceCollectPayload) =>

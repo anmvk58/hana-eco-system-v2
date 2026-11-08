@@ -12,6 +12,7 @@ from app.schemas.order_reconciliation import (
     ExternalHandoverReconcileCreate,
     ExternalHandoverReconciliationRowRead,
     RetailInvoiceCollectCreate,
+    RetailInvoiceMarkCreate,
     RetailInvoiceReconciliationRead,
 )
 from app.services import invoice_service, order_reconciliation_service
@@ -43,10 +44,14 @@ def list_retail_invoices(
 @router.post("/unaudited-invoices/{invoice_id}/mark-retail", response_model=InvoiceRead)
 def mark_invoice_as_retail(
     invoice_id: int,
+    payload: RetailInvoiceMarkCreate | None = None,
     current_user: User = Depends(require_permission("order_reconciliation.manage")),
     db: Session = Depends(get_db),
 ):
-    return invoice_service.assign_audit_label(db, invoice_id, InvoiceAuditLabel.retail, current_user)
+    return invoice_service.assign_audit_label(
+        db, invoice_id, InvoiceAuditLabel.retail, current_user,
+        handover_note=payload.handover_note if payload else None,
+    )
 
 
 @router.post("/retail-invoices/{invoice_id}/collect", response_model=RetailInvoiceReconciliationRead)

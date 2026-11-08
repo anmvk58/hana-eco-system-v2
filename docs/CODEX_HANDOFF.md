@@ -83,9 +83,42 @@ Only the Cloudflare Tunnel connector is public-facing. Frontend and API ports ar
 
 ## 4. Implemented and completed
 
+### Quick product rename from sales search (2026-11-08)
+
+- Search results add a pencil action immediately after the product name, alongside the existing quick price editing for users with `products.update`. The inline editor previews the auto-generated code, supports Enter/save and Escape/cancel, and retains inputs on errors. It reuses `productCodeFromName` from product creation: remove Vietnamese diacritics, replace whitespace with underscores, uppercase.
+- Saving sends only name/code to the existing permission-protected product update endpoint; the catalog/quick slots update from its response and search switches to the new code. Blank names, names over 240 characters, generated codes over 40 characters, and code collisions are rejected. Product pricing, stock and stored historical invoice-item snapshots are preserved. No backend/schema change.
+
+### Shared modal Escape dismissal (2026-11-08)
+
+- All shared `Modal` dialogs close on Escape through their existing close handler, preserving busy/save guards. With stacked modals, only the most recently opened closes; repeated keydown and IME composition are ignored, and controls that consume Escape retain priority.
+- Modal opening now focuses its panel unless an internal autofocus control already has focus, and closing restores focus to the opener when appropriate. This fixes Escape being swallowed by the AHAMOVE invoice-code button while focus remained behind its receipt dialog.
+- Removed the redundant shipping receipt Escape listener so it cannot dismiss an underlying receipt alongside a newer modal. The custom sales checkout already handles Escape through its own guarded keyboard handler.
+
+### Shipping management invoice previews (2026-11-08)
+
+- Both shipping management handover screens open invoice codes in the shared receipt modal, with Escape dismissal and focus restoration. Covers available/selected orders and internal shipper assigned-order desktop/mobile lists. Uses full invoice snapshots from each screen's authorized endpoints; opening a receipt preserves order selection and filters.
+- The invoice-code scan input receives autofocus when entering AHAMOVE, general shipping handover, or internal shipper handover. Modal focus behavior remains unchanged.
+
+### AHAMOVE handover invoice preview (2026-11-08)
+
+- Invoice codes in both the available and selected handover columns open the shared receipt-preview modal, using invoice data returned by the AHAMOVE list endpoint. Clicking or using Enter/Space on a code does not toggle order selection. No navigation or additional invoice-view permission is required.
+
+### Standalone retail orders menu (2026-11-08)
+
+- Added “Đơn khách lẻ” as a child of AHAMOVE, at `/retail-orders`, protected by the existing `order_reconciliation.manage` permission used by the server endpoints.
+- Reuses the reconciliation unaudited list in a standalone mode: date presets/range, search, desktop/mobile layouts, transfer confirmation, and retail assignment with optional handover note. Only transfer and retail assignment row actions remain; reconciliation tabs, summaries, and shipping shortcuts are hidden. This view requests only unaudited invoices. Separate route keys reset page state when switching between it and reconciliation.
+- Invoice codes in the standalone retail list and the reconciliation “Đơn chưa audit” / “Khách lẻ & chuyển khoản” tabs open a read-only receipt modal on desktop/mobile, using the complete invoice snapshot already returned by the authorized list endpoints. Reuses the received-shipment receipt preview layout; no navigation or extra invoice-view permission is needed.
+- No new backend endpoint or permission; existing transactional mutations and API authorization apply. AHAMOVE shows only authorized children and remains accessible to users with retail/reconciliation permission alone; its group opens and highlights on the retail route.
+
+### Note before retail assignment in order reconciliation (2026-11-08)
+
+- “Gán Khách lẻ” in the unaudited desktop/mobile list opens a dialog with an optional 500-character handover note. Only saving assigns the label; cancelling leaves the invoice unchanged. Errors retain the note for retry.
+- The existing mark-retail endpoint accepts an optional `handover_note` body, preserving bodyless requests. The service trims and saves the note with the audit label and invoice-history snapshot in one transaction. The existing retail/transfer tab displays it. Permissions remain enforced; no schema migration. Deploy frontend and API together.
+- Focused isolated SQLite regressions cover note/history persistence, duplicate assignment rejection, optional/blank notes, length limits, and rollback on history failure.
+
 ### Persistent sales receipt copy preference (2026-11-07)
 
-- The sales screen remembers “In 2 liên” immediately in browser localStorage per user (`hana-print-two-copies:<userId>`). Unchecked prints one receipt; checked prints two. Switching drafts, completing an order, and reloading retain the preference. Existing active-draft settings provide the fallback when no preference is stored; unavailable storage retains the in-memory choice. Invoice-edit printing keeps its existing two-copy behavior.
+- The sales screen remembers “In 2 liên” immediately in browser localStorage per user (`hana-print-two-copies:<userId>`). Unchecked prints one receipt; checked prints two. Switching drafts, completing an order, and reloading retain the preference. Existing active-draft settings provide the fallback when no preference is stored; unavailable storage retains the in-memory choice. As of 2026-11-08, invoice editing uses the same saved copy preference and shows the same checkbox in checkout; saving an edited invoice no longer forces two copies.
 
 ### Web-only shared repository and local APK isolation (2026-11-03)
 

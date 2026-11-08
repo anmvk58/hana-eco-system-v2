@@ -1,12 +1,14 @@
 import { ArrowRight, CheckCircle2, Handshake, LoaderCircle, RefreshCw, Search, Truck, X } from "lucide-react";
 import { FormEvent, useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+
 
 import "./AhamovePage.css";
 
 import { ApiError, api } from "../api/client";
 import { DateRangePicker } from "../components/DateRangePicker";
 import { EmptyState } from "../components/EmptyState";
+import { InvoiceReceipt } from "../components/InvoiceReceipt";
+import { Modal } from "../components/Modal";
 import { ToastNotification } from "../components/ToastNotification";
 import { TransferPaymentButton } from "../components/TransferPaymentButton";
 import type { Invoice, AhamoveHandoverPayload } from "../types";
@@ -17,6 +19,7 @@ export function AhamovePage() {
   const [fromDate, setFromDate] = useState(today);
   const [toDate, setToDate] = useState(today);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [receiptInvoiceId, setReceiptInvoiceId] = useState<number | null>(null);
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -147,6 +150,7 @@ export function AhamovePage() {
     }
   }
 
+  const receiptInvoice = invoices.find((invoice) => invoice.id === receiptInvoiceId);
   const allSelected = invoices.length > 0 && selectedIds.length === invoices.length;
   const availableInvoices = invoices.filter((invoice) => !selectedIds.includes(invoice.id));
   const selectedInvoices = invoices.filter((invoice) => selectedIds.includes(invoice.id));
@@ -174,14 +178,14 @@ export function AhamovePage() {
         </header>
         <form className="ship-management-code-entry" onSubmit={addInvoiceByCode}>
           <Search size={18}/>
-          <input value={invoiceCode} onChange={(event) => { setInvoiceCode(event.target.value); setQuickAddError(""); }} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); selectInvoiceByCode(); } }} placeholder="Nhập hoặc quét mã hóa đơn rồi nhấn Enter" aria-label="Mã hóa đơn cần bàn giao" autoComplete="off"/>
+          <input autoFocus value={invoiceCode} onChange={(event) => { setInvoiceCode(event.target.value); setQuickAddError(""); }} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); selectInvoiceByCode(); } }} placeholder="Nhập hoặc quét mã hóa đơn rồi nhấn Enter" aria-label="Mã hóa đơn cần bàn giao" autoComplete="off"/>
           <button className="secondary-button" type="submit" disabled={loading || submitting || transferBusy}>Thêm</button>
         </form>
         {quickAddError ? <div className="ship-management-code-error">{quickAddError}</div> : null}
         <div className="ship-management-order-list">
           {availableInvoices.map((invoice) => <article key={invoice.id} className={`ship-management-order${handoverIds.includes(invoice.id) ? " handover-success" : ""}`} role="checkbox" aria-checked="false" tabIndex={0} onClick={() => toggle(invoice.id)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); toggle(invoice.id); } }}>
             <div className="ship-management-order-main"><strong>{invoice.customer?.name ?? "Khách lẻ"}</strong><span>{invoice.customer?.phone || "Không có số điện thoại"}</span><small>{invoice.customer?.address || "Chưa có địa chỉ"}</small></div>
-            <Link className="ship-management-order-code" to={`/invoices/${invoice.id}`} state={{ returnTo: "/ahamove" }} onClick={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()} aria-label={`Xem chi tiết ${invoice.code}`}>{invoice.code}</Link>
+            <button className="shipping-invoice-preview-button ship-management-order-code" type="button" onClick={(event) => { event.stopPropagation(); setReceiptInvoiceId(invoice.id); }} onKeyDown={(event) => event.stopPropagation()} aria-label={`Xem chi tiết ${invoice.code}`}>{invoice.code}</button>
             <div className="ship-management-order-payment">{invoice.is_paid_by_transfer ? <span className="invoice-payment-badge"><CheckCircle2 size={14}/>Đã chuyển khoản</span> : <span className="invoice-cod-badge">COD</span>}<strong>{numberText(invoice.total_amount)}</strong>{!invoice.is_paid_by_transfer ? <span onClick={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()}><TransferPaymentButton invoice={invoice} disabled={loading || submitting || transferBusy} onBusyChange={setTransferBusy} onChanged={() => load(fromDate, toDate, true)}/></span> : null}</div>
             <button className="ship-management-move-button add" type="button" onClick={(event) => { event.stopPropagation(); toggle(invoice.id); }} aria-label={`Chọn ${invoice.code}`}><ArrowRight size={18}/></button>
           </article>)}
@@ -202,7 +206,7 @@ export function AhamovePage() {
         <div className="ship-management-order-list selected-orders" role="region" aria-label="Các đơn đã chọn" tabIndex={0}>
           {selectedInvoices.map((invoice) => <article key={invoice.id} className="ship-management-order selected-order">
             <div className="ship-management-order-main"><strong>{invoice.customer?.name ?? "Khách lẻ"}</strong><span>{invoice.customer?.phone || "Không có số điện thoại"}</span><small>{invoice.customer?.address || "Chưa có địa chỉ"}</small></div>
-            <Link className="ship-management-order-code" to={`/invoices/${invoice.id}`} state={{ returnTo: "/ahamove" }} aria-label={`Xem chi tiết ${invoice.code}`}>{invoice.code}</Link>
+            <button className="shipping-invoice-preview-button ship-management-order-code" type="button" onClick={(event) => { event.stopPropagation(); setReceiptInvoiceId(invoice.id); }} onKeyDown={(event) => event.stopPropagation()} aria-label={`Xem chi tiết ${invoice.code}`}>{invoice.code}</button>
             <div className="ship-management-order-payment">{invoice.is_paid_by_transfer ? <span className="invoice-payment-badge"><CheckCircle2 size={14}/>Đã chuyển khoản</span> : <span className="invoice-cod-badge">COD</span>}<strong>{numberText(invoice.total_amount)}</strong>{!invoice.is_paid_by_transfer ? <span onClick={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()}><TransferPaymentButton invoice={invoice} disabled={loading || submitting || transferBusy} onBusyChange={setTransferBusy} onChanged={() => load(fromDate, toDate, true)}/></span> : null}</div>
             <button className="ship-management-move-button remove" type="button" onClick={() => toggle(invoice.id)} aria-label={`Bỏ chọn ${invoice.code}`}><X size={18}/></button>
           </article>)}
@@ -222,6 +226,10 @@ export function AhamovePage() {
         </form>
       </div>
     </section>
+
+    {receiptInvoice ? <Modal className="shipping-invoice-preview-modal" title={`Hóa đơn ${receiptInvoice.code}`} onClose={() => setReceiptInvoiceId(null)}>
+      <div className="shipping-invoice-preview-content"><InvoiceReceipt invoice={receiptInvoice}/></div>
+    </Modal> : null}
 
     {toast ? <ToastNotification title={toast.title} message={toast.message} variant={toast.variant} duration={3600} onClose={() => setToast(null)}/> : null}
   </div>;

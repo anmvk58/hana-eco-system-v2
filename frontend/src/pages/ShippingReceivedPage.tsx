@@ -44,15 +44,6 @@ export function ShippingReceivedPage() {
     void load(fromDate, toDate);
   }, [fromDate, toDate]);
 
-  useEffect(() => {
-    if (receiptInvoiceId === null) return;
-    function closeOnEscape(event: KeyboardEvent) {
-      if (event.key === "Escape") setReceiptInvoiceId(null);
-    }
-    document.addEventListener("keydown", closeOnEscape);
-    return () => document.removeEventListener("keydown", closeOnEscape);
-  }, [receiptInvoiceId]);
-
   function changeDateRange(from: string, to: string) {
     setFromDate(from);
     setToDate(to);

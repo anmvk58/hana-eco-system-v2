@@ -1,22 +1,24 @@
 import { ArrowRight, Ban, CheckCircle2, Clock3, Handshake, LoaderCircle, PackageCheck, RefreshCw, RotateCcw, Search, Truck, X } from "lucide-react";
 import { FormEvent, useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+
 
 import { ApiError, api } from "../api/client";
 import { DateRangePicker } from "../components/DateRangePicker";
 import { EmptyState } from "../components/EmptyState";
 import { Modal } from "../components/Modal";
+import { InvoiceReceipt } from "../components/InvoiceReceipt";
 import { ToastNotification } from "../components/ToastNotification";
 import type { InternalShipperAssignment, Invoice, Shipper } from "../types";
 import { money, normalizeInvoiceCodeSearch, numberText, todayInputValue, utcDateTime } from "../utils/format";
 
-const returnPath = "/ship-management/internal-handover";
+
 
 export function InternalShipperHandoverPage() {
   const today = todayInputValue();
   const [fromDate, setFromDate] = useState(today);
   const [toDate, setToDate] = useState(today);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [receiptInvoiceId, setReceiptInvoiceId] = useState<number | null>(null);
   const [assignments, setAssignments] = useState<InternalShipperAssignment[]>([]);
   const [shippers, setShippers] = useState<Shipper[]>([]);
   const [view, setView] = useState<"handover" | "assigned">("handover");
@@ -180,6 +182,7 @@ export function InternalShipperHandoverPage() {
     }
   }
 
+  const receiptInvoice = invoices.find((invoice) => invoice.id === receiptInvoiceId) ?? assignments.find((assignment) => assignment.invoice.id === receiptInvoiceId)?.invoice;
   const allSelected = invoices.length > 0 && selectedIds.length === invoices.length;
   const availableInvoices = invoices.filter((invoice) => !selectedIds.includes(invoice.id));
   const selectedInvoices = invoices.filter((invoice) => selectedIds.includes(invoice.id));
@@ -221,14 +224,14 @@ export function InternalShipperHandoverPage() {
         </header>
         <form className="ship-management-code-entry" onSubmit={addInvoiceByCode}>
           <Search size={18}/>
-          <input value={invoiceCode} onChange={(event) => { setInvoiceCode(event.target.value); setQuickAddError(""); }} placeholder="Nhập hoặc quét mã hóa đơn rồi nhấn Enter" aria-label="Mã hóa đơn cần bàn giao" autoComplete="off"/>
+          <input autoFocus value={invoiceCode} onChange={(event) => { setInvoiceCode(event.target.value); setQuickAddError(""); }} placeholder="Nhập hoặc quét mã hóa đơn rồi nhấn Enter" aria-label="Mã hóa đơn cần bàn giao" autoComplete="off"/>
           <button className="secondary-button" type="submit" disabled={loading}>Thêm</button>
         </form>
         {quickAddError ? <div className="ship-management-code-error">{quickAddError}</div> : null}
         <div className="ship-management-order-list">
           {availableInvoices.map((invoice) => <article key={invoice.id} className="ship-management-order" role="checkbox" aria-checked="false" tabIndex={0} onClick={() => toggle(invoice.id)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); toggle(invoice.id); } }}>
             <div className="ship-management-order-main"><strong>{invoice.customer?.name ?? "Khách lẻ"}</strong><span>{invoice.customer?.phone || "Không có số điện thoại"}</span><small>{invoice.customer?.address || "Chưa có địa chỉ"}</small></div>
-            <Link className="ship-management-order-code" to={`/invoices/${invoice.id}`} state={{ returnTo: returnPath }} onClick={(event) => event.stopPropagation()} aria-label={`Xem chi tiết ${invoice.code}`}>{invoice.code}</Link>
+            <button className="shipping-invoice-preview-button ship-management-order-code" type="button" onClick={(event) => { event.stopPropagation(); setReceiptInvoiceId(invoice.id); }} onKeyDown={(event) => event.stopPropagation()} aria-label={`Xem chi tiết ${invoice.code}`}>{invoice.code}</button>
             <div className="ship-management-order-payment">{invoice.is_paid_by_transfer ? <span className="invoice-payment-badge"><CheckCircle2 size={14}/>Đã chuyển khoản</span> : <span className="invoice-cod-badge">COD</span>}<strong>{numberText(invoice.total_amount)}</strong></div>
             <button className="ship-management-move-button add" type="button" onClick={(event) => { event.stopPropagation(); toggle(invoice.id); }} aria-label={`Chọn ${invoice.code}`}><ArrowRight size={18}/></button>
           </article>)}
@@ -250,7 +253,7 @@ export function InternalShipperHandoverPage() {
         <div className="ship-management-order-list selected-orders">
           {selectedInvoices.map((invoice) => <article key={invoice.id} className="ship-management-order selected-order">
             <div className="ship-management-order-main"><strong>{invoice.customer?.name ?? "Khách lẻ"}</strong><span>{invoice.customer?.phone || "Không có số điện thoại"}</span><small>{invoice.customer?.address || "Chưa có địa chỉ"}</small></div>
-            <Link className="ship-management-order-code" to={`/invoices/${invoice.id}`} state={{ returnTo: returnPath }} aria-label={`Xem chi tiết ${invoice.code}`}>{invoice.code}</Link>
+            <button className="shipping-invoice-preview-button ship-management-order-code" type="button" onClick={(event) => { event.stopPropagation(); setReceiptInvoiceId(invoice.id); }} onKeyDown={(event) => event.stopPropagation()} aria-label={`Xem chi tiết ${invoice.code}`}>{invoice.code}</button>
             <div className="ship-management-order-payment">{invoice.is_paid_by_transfer ? <span className="invoice-payment-badge"><CheckCircle2 size={14}/>Đã chuyển khoản</span> : <span className="invoice-cod-badge">COD</span>}<strong>{numberText(invoice.total_amount)}</strong></div>
             <button className="ship-management-move-button remove" type="button" onClick={() => toggle(invoice.id)} aria-label={`Bỏ chọn ${invoice.code}`}><X size={18}/></button>
           </article>)}
@@ -265,11 +268,11 @@ export function InternalShipperHandoverPage() {
       <div className="internal-handover-assigned-table-wrap"><table className="data-table internal-handover-assigned-table"><thead><tr><th>Hóa đơn</th><th>Khách hàng</th><th>Địa chỉ giao hàng</th><th>Shipper đang giữ</th><th>Bàn giao lúc</th><th>Trạng thái giao</th><th>Thanh toán</th><th></th></tr></thead><tbody>{visibleAssignments.map((assignment) => {
         const invoice = assignment.invoice;
         const deliveryText = invoice.status === "cancelled" ? "Đã hủy" : invoice.delivered_at ? "Đã giao thành công" : "Đang giao";
-        return <tr className={invoice.delivered_at ? "delivered" : ""} key={invoice.id}><td><Link className="code-cell" to={`/invoices/${invoice.id}`} state={{ returnTo: returnPath }}>{invoice.code}</Link><small>{money(invoice.total_amount)}</small></td><td><strong>{invoice.customer?.name || "Khách lẻ"}</strong><small>{invoice.customer?.phone || "Không có SĐT"}</small></td><td className="internal-handover-address">{invoice.customer?.address || "Chưa có địa chỉ"}</td><td><strong>{invoice.assigned_shipper?.user.display_name || "Không rõ shipper"}</strong><small>{invoice.assigned_shipper?.phone || invoice.assigned_shipper?.user.username || "—"}</small></td><td>{invoice.audited_at ? utcDateTime(invoice.audited_at) : "—"}</td><td><span className={`internal-handover-delivery-badge ${invoice.status === "cancelled" ? "cancelled" : invoice.delivered_at ? "delivered" : "shipping"}`}>{invoice.status === "cancelled" ? <Ban size={14}/> : invoice.delivered_at ? <PackageCheck size={14}/> : <Clock3 size={14}/>} {deliveryText}</span></td><td>{invoice.is_paid_by_transfer ? <span className="invoice-payment-badge"><CheckCircle2 size={14}/>Đã chuyển khoản</span> : <span className="invoice-cod-badge">COD</span>}</td><td className="row-actions"><button className="secondary-button compact-button internal-handover-recall-button" type="button" disabled={!assignment.can_recall || submitting} title={assignment.recall_block_reason || "Thu hồi đơn khỏi shipper"} onClick={() => openRecall(assignment)}><RotateCcw size={15}/>{assignment.can_recall ? "Thu hồi" : "Không thể thu hồi"}</button></td></tr>;
+        return <tr className={invoice.delivered_at ? "delivered" : ""} key={invoice.id}><td><button className="shipping-invoice-preview-button code-cell" type="button" onClick={(event) => { event.stopPropagation(); setReceiptInvoiceId(invoice.id); }} onKeyDown={(event) => event.stopPropagation()} aria-label={`Xem chi tiết ${invoice.code}`}>{invoice.code}</button><small>{money(invoice.total_amount)}</small></td><td><strong>{invoice.customer?.name || "Khách lẻ"}</strong><small>{invoice.customer?.phone || "Không có SĐT"}</small></td><td className="internal-handover-address">{invoice.customer?.address || "Chưa có địa chỉ"}</td><td><strong>{invoice.assigned_shipper?.user.display_name || "Không rõ shipper"}</strong><small>{invoice.assigned_shipper?.phone || invoice.assigned_shipper?.user.username || "—"}</small></td><td>{invoice.audited_at ? utcDateTime(invoice.audited_at) : "—"}</td><td><span className={`internal-handover-delivery-badge ${invoice.status === "cancelled" ? "cancelled" : invoice.delivered_at ? "delivered" : "shipping"}`}>{invoice.status === "cancelled" ? <Ban size={14}/> : invoice.delivered_at ? <PackageCheck size={14}/> : <Clock3 size={14}/>} {deliveryText}</span></td><td>{invoice.is_paid_by_transfer ? <span className="invoice-payment-badge"><CheckCircle2 size={14}/>Đã chuyển khoản</span> : <span className="invoice-cod-badge">COD</span>}</td><td className="row-actions"><button className="secondary-button compact-button internal-handover-recall-button" type="button" disabled={!assignment.can_recall || submitting} title={assignment.recall_block_reason || "Thu hồi đơn khỏi shipper"} onClick={() => openRecall(assignment)}><RotateCcw size={15}/>{assignment.can_recall ? "Thu hồi" : "Không thể thu hồi"}</button></td></tr>;
       })}</tbody></table></div>
       <div className="internal-handover-assigned-mobile-list">{visibleAssignments.map((assignment) => {
         const invoice = assignment.invoice;
-        return <article className={invoice.delivered_at ? "delivered" : ""} key={invoice.id}><header><Link to={`/invoices/${invoice.id}`} state={{ returnTo: returnPath }}>{invoice.code}</Link>{invoice.status === "cancelled" ? <span className="internal-handover-delivery-badge cancelled"><Ban size={14}/>Đã hủy</span> : invoice.delivered_at ? <span className="internal-handover-delivery-badge delivered"><PackageCheck size={14}/>Đã giao</span> : <span className="internal-handover-delivery-badge shipping"><Clock3 size={14}/>Đang giao</span>}</header><div><h3>{invoice.customer?.name || "Khách lẻ"}</h3><p>{invoice.customer?.phone || "Không có SĐT"}</p><p className="internal-handover-mobile-address">{invoice.customer?.address || "Chưa có địa chỉ"}</p><p>Shipper: <strong>{invoice.assigned_shipper?.user.display_name || "Không rõ"}</strong></p><p>Bàn giao: {invoice.audited_at ? utcDateTime(invoice.audited_at) : "—"}</p><span>{invoice.is_paid_by_transfer ? <span className="invoice-payment-badge"><CheckCircle2 size={14}/>Đã chuyển khoản</span> : <span className="invoice-cod-badge">COD · {money(invoice.total_amount)}</span>}</span>{assignment.recall_block_reason ? <small className="internal-handover-recall-block"><Ban size={13}/>{assignment.recall_block_reason}</small> : null}</div><footer><button className="secondary-button" type="button" disabled={!assignment.can_recall || submitting} onClick={() => openRecall(assignment)}><RotateCcw size={16}/>{assignment.can_recall ? "Thu hồi đơn" : "Không thể thu hồi"}</button></footer></article>;
+        return <article className={invoice.delivered_at ? "delivered" : ""} key={invoice.id}><header><button className="shipping-invoice-preview-button code-cell" type="button" onClick={(event) => { event.stopPropagation(); setReceiptInvoiceId(invoice.id); }} onKeyDown={(event) => event.stopPropagation()} aria-label={`Xem chi tiết ${invoice.code}`}>{invoice.code}</button>{invoice.status === "cancelled" ? <span className="internal-handover-delivery-badge cancelled"><Ban size={14}/>Đã hủy</span> : invoice.delivered_at ? <span className="internal-handover-delivery-badge delivered"><PackageCheck size={14}/>Đã giao</span> : <span className="internal-handover-delivery-badge shipping"><Clock3 size={14}/>Đang giao</span>}</header><div><h3>{invoice.customer?.name || "Khách lẻ"}</h3><p>{invoice.customer?.phone || "Không có SĐT"}</p><p className="internal-handover-mobile-address">{invoice.customer?.address || "Chưa có địa chỉ"}</p><p>Shipper: <strong>{invoice.assigned_shipper?.user.display_name || "Không rõ"}</strong></p><p>Bàn giao: {invoice.audited_at ? utcDateTime(invoice.audited_at) : "—"}</p><span>{invoice.is_paid_by_transfer ? <span className="invoice-payment-badge"><CheckCircle2 size={14}/>Đã chuyển khoản</span> : <span className="invoice-cod-badge">COD · {money(invoice.total_amount)}</span>}</span>{assignment.recall_block_reason ? <small className="internal-handover-recall-block"><Ban size={13}/>{assignment.recall_block_reason}</small> : null}</div><footer><button className="secondary-button" type="button" disabled={!assignment.can_recall || submitting} onClick={() => openRecall(assignment)}><RotateCcw size={16}/>{assignment.can_recall ? "Thu hồi đơn" : "Không thể thu hồi"}</button></footer></article>;
       })}</div>
       {!loading && visibleAssignments.length === 0 ? <EmptyState title={assignmentSearch ? "Không tìm thấy đơn phù hợp" : "Chưa có đơn giao Shipper nội bộ"} description={assignmentSearch ? "Hãy thử mã hóa đơn, khách hàng hoặc tên shipper khác." : "Không có đơn nào được bàn giao trong khoảng ngày đã chọn."}/> : null}
       {loading && assignments.length === 0 ? <EmptyState title="Đang tải đơn đã bàn giao"/> : null}
@@ -289,6 +292,9 @@ export function InternalShipperHandoverPage() {
       <label>Lý do thu hồi<textarea maxLength={500} value={recallReason} onChange={(event) => setRecallReason(event.target.value)} placeholder="Ví dụ: Giao nhầm shipper, khách đổi phương thức nhận..."/></label>
       <div className="form-actions"><button className="secondary-button" type="button" disabled={submitting} onClick={() => setRecalling(null)}>Hủy</button><button className="secondary-button danger-button" type="submit" disabled={submitting}>{submitting ? <LoaderCircle className="loading-spinner" size={17}/> : <RotateCcw size={17}/>}Xác nhận thu hồi</button></div>
     </form></Modal> : null}
+    {receiptInvoice ? <Modal className="shipping-invoice-preview-modal" title={`Hóa đơn ${receiptInvoice.code}`} onClose={() => setReceiptInvoiceId(null)}>
+      <div className="shipping-invoice-preview-content"><InvoiceReceipt invoice={receiptInvoice}/></div>
+    </Modal> : null}
     {toast ? <ToastNotification title={toast.title} message={toast.message} variant={toast.variant} duration={3600} onClose={() => setToast(null)}/> : null}
   </div>;
 }

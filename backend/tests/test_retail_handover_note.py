@@ -15,6 +15,8 @@ from sqlalchemy.orm import Session
 from app.models import Base, Invoice, InvoiceHistory, User
 from app.models.enums import InvoiceAuditLabel
 from app.schemas.invoice import InvoiceBulkAuditAssign, InvoiceRead
+from app.schemas.order_reconciliation import RetailInvoiceMarkCreate
+from app.api.routers.order_reconciliation import mark_invoice_as_retail
 from app.services import invoice_service, order_reconciliation_service, ship_management_service
 
 
@@ -35,6 +37,42 @@ class RetailHandoverNoteTests(unittest.TestCase):
 
     def payload(self, **changes):
         return InvoiceBulkAuditAssign(invoice_ids=self.ids, audit_label="retail", **changes)
+
+    def test_single_retail_assignment_saves_note_and_history(self):
+        invoice = mark_invoice_as_retail(
+            self.ids[0], RetailInvoiceMarkCreate(handover_note="  Khách tự lấy\nThu tại quầy  "), self.user, self.db,
+        )
+        self.assertEqual(invoice.audit_label, InvoiceAuditLabel.retail)
+        self.assertEqual(invoice.handover_note, "Khách tự lấy\nThu tại quầy")
+        self.assertEqual(invoice.note, "Ghi chú bán hàng")
+        self.assertEqual(invoice.total_amount, 100000)
+        self.assertEqual(invoice.items, [])
+        self.assertEqual(order_reconciliation_service.list_retail_invoices(self.db)[0]["invoice"].handover_note, invoice.handover_note)
+        history = self.db.scalar(select(InvoiceHistory).where(InvoiceHistory.invoice_id == invoice.id))
+        self.assertIsNone(history.before_data["handover_note"])
+        self.assertEqual(history.after_data["handover_note"], invoice.handover_note)
+        with self.assertRaises(HTTPException) as caught:
+            mark_invoice_as_retail(self.ids[0], RetailInvoiceMarkCreate(handover_note="Ghi đè"), self.user, self.db)
+        self.assertEqual(caught.exception.status_code, 409)
+        self.db.refresh(invoice)
+        self.assertEqual(invoice.handover_note, "Khách tự lấy\nThu tại quầy")
+
+    def test_single_retail_assignment_accepts_legacy_and_blank_note(self):
+        for invoice_id, payload in zip(self.ids, [None, RetailInvoiceMarkCreate(handover_note=" \n ")]):
+            invoice = mark_invoice_as_retail(invoice_id, payload, self.user, self.db)
+            self.assertIsNone(invoice.handover_note)
+        with self.assertRaises(ValidationError):
+            RetailInvoiceMarkCreate(handover_note="a" * 501)
+        self.assertEqual(len(RetailInvoiceMarkCreate(handover_note="a" * 500).handover_note), 500)
+
+    def test_single_retail_history_failure_rolls_back_note_and_label(self):
+        with patch.object(invoice_service, "add_history", side_effect=RuntimeError("Simulated history failure")):
+            with self.assertRaises(RuntimeError):
+                mark_invoice_as_retail(self.ids[0], RetailInvoiceMarkCreate(handover_note="Không lưu"), self.user, self.db)
+        self.db.refresh(self.invoices[0])
+        self.assertIsNone(self.invoices[0].audit_label)
+        self.assertIsNone(self.invoices[0].handover_note)
+        self.assertEqual(self.db.scalars(select(InvoiceHistory)).all(), [])
 
     def test_note_persists_for_every_selected_invoice_and_reconciliation(self):
         invoices = ship_management_service.handover_invoices(self.db, self.payload(handover_note="  Thu tại quầy\nKhách tự lấy  "), self.user)

@@ -2129,6 +2129,12 @@ label {
   overflow-wrap: anywhere;
 }
 .product-suggestion-code { color: var(--muted); font-size: 13px; font-weight: 600; overflow-wrap: anywhere; }
+.product-suggestion-name-row { align-items: center; display: flex; gap: 5px; min-width: 0; }
+.product-suggestion-name-select { background: transparent; border: 0; cursor: pointer; font-family: inherit; padding: 0; text-align: left; }
+.product-suggestion-name-select:disabled { color: var(--teal); cursor: default; opacity: 1; }
+.product-suggestion-name-edit { align-items: center; background: transparent; border: 0; border-radius: 5px; color: var(--teal); cursor: pointer; display: inline-flex; flex: 0 0 28px; height: 28px; justify-content: center; padding: 0; }
+.product-suggestion-name-edit:hover { background: #dff2ee; color: var(--teal-dark); }
+.product-suggestion-name-select:focus-visible, .product-suggestion-name-edit:focus-visible { border-radius: 4px; outline: 2px solid var(--teal); outline-offset: 2px; }
 
 .product-suggestions > button > .product-suggestion-price,
 .product-suggestion-select > .product-suggestion-price {
@@ -2157,6 +2163,12 @@ label {
 .product-suggestion-price-editor input { border: 1px solid var(--teal); border-radius: 6px; font-size: 16px; font-weight: 700; min-height: 34px; min-width: 0; padding: 5px 8px; text-align: right; width: 100%; }
 .product-suggestion-price-editor input:focus { box-shadow: 0 0 0 3px rgba(0, 127, 114, .12); outline: 0; }
 .product-suggestion-price-editor small { color: #b42318; font-size: 11px; text-align: right; }
+.product-suggestion-name-editor { display: grid; flex: 1; gap: 8px; min-width: 0; padding: 12px 16px; }
+.product-suggestion-name-editor label { display: grid; gap: 5px; font-size: 12px; font-weight: 600; }
+.product-suggestion-name-editor input { font-size: 16px; min-width: 0; width: 100%; }
+.product-suggestion-name-editor > .field-hint { overflow-wrap: anywhere; }
+.product-suggestion-name-editor > small { color: #b42318; }
+.product-suggestion-name-editor > div { display: flex; gap: 8px; justify-content: flex-end; }
 
 .customer-suggestions {
   max-width: 100%;
@@ -5370,7 +5382,8 @@ label {
 .internal-cod-invoice-list .icon-button.transfer-payment-button { height: 28px; min-height: 28px; width: 28px; min-width: 28px; padding: 0; }
 .internal-cod-payment-actions { display: inline-flex; align-items: center; gap: 6px; }
 .internal-cod-invoice-table-wrap td.internal-cod-payment-cell { vertical-align: middle; }
-.order-reconciliation-card footer > .transfer-payment-button { width: auto; min-width: 0; min-height: 38px; flex: 0 1 auto; }
+.order-reconciliation-actions > .secondary-button.transfer-payment-button { flex: 0 0 auto; white-space: nowrap; }
+.order-reconciliation-card footer > .transfer-payment-button { width: auto; min-width: 0; min-height: 38px; flex: 0 0 auto; white-space: nowrap; }
 /* Standalone supplier debt ledger. */
 .supplier-toolbar { align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
 .supplier-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
